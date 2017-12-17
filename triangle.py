@@ -1,10 +1,13 @@
 from math import *
 
-teeth           = 16
-metric          = False
+# Gear description
+teeth           = 48
+metric          = False     # True for metric (mm), False for imperial (in)
 module          = .5
-thickness       = .125
+thickness       = .125      # Thickness of the gear surface (or edge of a crown)
+spurGear        = False     # True for spur gears, False for crown gears
 
+# Cutting tool description
 toolNumber      = 10
 spindleSpeed    = 3000
 feedRate        = 24.
@@ -12,10 +15,14 @@ cutterDiameter  = .75
 cutterAngle     = 60.
 centerlineOffset= .100      # distance from bottom of tool to edge cutting point
 
-depthOfCut      = .04
-yClearance      = .1
-xClearance      = .2
+# Extra cutting parameters
+depthOfCut      = .04       # Maximum depth of cut
+safeDistance    = .1        # Distance to retract from gear blank
+leadInOut       = .2        # Extra distance added to the entry and exit of the cut
 
+
+# Calculate internal working variables
+gearType        = 'Spur' if spurGear else 'Crown'
 module          = module if metric else module / 25.4
 units           = 'mms' if metric else 'inches'
 diameter        = teeth * module
@@ -24,26 +31,28 @@ circumference   = diameter * pi
 toothHeight     = sin(radians(cutterAngle)) * circumference/teeth
 addendum        = toothHeight / 2.
 dedendum        = toothHeight / 2.
+innerRadius     = radius-dedendum
 extraAngle      = 180./teeth
 cutterRadius    = cutterDiameter / 2.
+anglePerTooth   = 360./teeth
 
 
 # Angle passes are offsets to a centerline cutting setup to allow a standard fixed size cutter to create
 # included angles larger than the cutter's natural angle.  This is done by slightly rotating the gear up and down
 # while adjusting the height and y distance from the blank.
-innerRadius = radius - dedendum
 anglePasses = [
-        # aOffset,    yOffset,                                            zOffset
+        # aOffset,    rOffset,                                            zOffset
         (-extraAngle, innerRadius - cos(radians(extraAngle))*innerRadius, -sin(radians(extraAngle))*innerRadius),
         (extraAngle,  innerRadius - cos(radians(extraAngle))*innerRadius, sin(radians(extraAngle))*innerRadius)
 ]
 
-# Passes are the depths that the cutter should use for cutting the teeth
-passes = []
+# depthPasses are the depths that the cutter should use for cutting the teeth - sometimes multiple passes are needed due
+# to the rigidity of the cutter and materials
+depthPasses = []
 depth = 0.
 while depth < toothHeight:
     depth = min(depth+depthOfCut, toothHeight)
-    passes.append(depth)
+    depthPasses.append(depth)
 
 # Gcode helper to record a high-speed move operation
 def gMove(a=None,x=None,y=None,z=None):
@@ -57,9 +66,10 @@ def gCut(a=None,x=None,y=None,z=None):
 def gComment(c=None):
     gcode.append( "(%s)" % c if c else '' )
 
+# Preamble of parameter comments to assist machine setup
 gcode = []
 gcode.append( '%' )
-gComment( "Triangle gear cutting" )
+gComment( "%s Triangle gear cutting" % gearType )
 gComment( "Teeth: %d,  Module: %g %s,  Thickness: %g %s" % (teeth, module, units, thickness, units))
 gComment()
 gComment( "Diameter: %g %s" % (diameter, units))
@@ -81,18 +91,31 @@ gcode.append( 'G54' )
 gcode.append( 'F%g' % feedRate )
 
 # Actual logic to loop through each tooth, angle pass, and depth pass generating Gcode
-anglePerTooth = 360./teeth
-gMove(y=radius+cutterRadius+yClearance)
-gMove(0.,xClearance,z=0.)
-for tooth in range(teeth):
-    gComment( 'Tooth %d' % tooth )
-    for aOffset,yOffset,zOffset in anglePasses:
-        gMove(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
-        for p in passes:
-            gMove(y=radius+cutterRadius+addendum-yOffset-p)
-            gCut(x=-thickness-xClearance)
-            gMove(y=radius+cutterRadius+addendum+yClearance)
-            gMove(x=xClearance)
+if spurGear:
+    gMove(y=radius+cutterRadius+safeDistance)
+    gMove(0.,leadInOut,z=0.)
+    for tooth in range(teeth):
+        gComment( 'Tooth %d' % tooth )
+        for aOffset,rOffset,zOffset in anglePasses:
+            gMove(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
+            for depth in depthPasses:
+                gMove(y=radius+cutterRadius+addendum-rOffset-depth)
+                gCut(x=-thickness-leadInOut)
+                gMove(y=radius+cutterRadius+addendum+safeDistance)
+                gMove(x=leadInOut)
+
+else:   # Crown gear
+    gMove(x=cutterRadius+safeDistance)
+    gMove(0.,y=radius,z=0.)
+    for tooth in range(teeth):
+        gComment( 'Tooth %d' % tooth )
+        for aOffset,rOffset,zOffset in anglePasses:
+            gMove(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
+            for depth in depthPasses:
+                gMove(y=innerRadius-leadInOut-rOffset)
+                gMove(x=cutterRadius-depth)
+                gCut(y=radius+addendum+leadInOut-rOffset)
+                gMove(x=cutterRadius+safeDistance)
 
 # Program is done, shutdown time
 gcode.append( 'M05 M09' )

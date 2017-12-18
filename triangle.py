@@ -1,11 +1,18 @@
+"""
+    triangle.py -   Generate gcode for spur, crown, (and coming soon - bevel) gears using a triangular
+                    tooth profile.
+
+                    Orignally written by Michael Dubno and for general purpose use - no copyrights.
+"""
 from math import *
+from gcode import *
 
 # Gear description
 teeth           = 48
 metric          = False     # True for metric (mm), False for imperial (in)
 module          = .5
-thickness       = .125      # Thickness of the gear surface (or edge of a crown)
-spurGear        = False     # True for spur gears, False for crown gears
+thickness       = .0625     # Thickness of the gear surface (or edge of a crown)
+gearType        = 'Crown'   # Choices are: Spur, Crown, or Bevel
 
 # Cutting tool description
 toolNumber      = 10
@@ -22,7 +29,6 @@ leadInOut       = .2        # Extra distance added to the entry and exit of the 
 
 
 # Calculate internal working variables
-gearType        = 'Spur' if spurGear else 'Crown'
 module          = module if metric else module / 25.4
 units           = 'mms' if metric else 'inches'
 diameter        = teeth * module
@@ -54,73 +60,65 @@ while depth < toothHeight:
     depth = min(depth+depthOfCut, toothHeight)
     depthPasses.append(depth)
 
-# Gcode helper to record a high-speed move operation
-def gMove(a=None,x=None,y=None,z=None):
-    gcode.append( "G0" + (' A%g'%a if a!=None else '') + (' X%g'%x if x!=None else '') + (' Y%g'%y if y!=None else '') + (' Z%g'%z if z!=None else ''))
-
-# Gcode helper to record a cutting speed linear operation
-def gCut(a=None,x=None,y=None,z=None):
-    gcode.append( "G1" + (' A%g'%a if a!=None else '') + (' X%g'%x if x!=None else '') + (' Y%g'%y if y!=None else '') + (' Z%g'%z if z!=None else ''))
-
-# Gcode helper to record comments
-def gComment(c=None):
-    gcode.append( "(%s)" % c if c else '' )
-
 # Preamble of parameter comments to assist machine setup
-gcode = []
-gcode.append( '%' )
-gComment( "%s Triangle gear cutting" % gearType )
-gComment( "Teeth: %d,  Module: %g %s,  Thickness: %g %s" % (teeth, module, units, thickness, units))
-gComment()
-gComment( "Diameter: %g %s" % (diameter, units))
-gComment( "Radius: %g %s" % (radius, units))
-gComment( "Circumference: %g %s" % (circumference, units))
-gComment( "ToothHeight: %g %s" % (toothHeight, units))
-gComment( "Gear Blank Diameter: %g %s" % (diameter + 2.*addendum, units))
-gComment( "ExtraAngle: %g degrees" % extraAngle )
-gComment()
+g = Gcode()
+g.append( '%' )
+g.comment( "%s Triangle gear cutting" % gearType )
+g.comment( "Teeth: %d,  Module: %g %s,  Thickness: %g %s" % (teeth, module, units, thickness, units))
+g.comment()
+g.comment( "Diameter: %g %s" % (diameter, units))
+g.comment( "Radius: %g %s" % (radius, units))
+g.comment( "Circumference: %g %s" % (circumference, units))
+g.comment( "ToothHeight: %g %s" % (toothHeight, units))
+g.comment( "Gear Blank Diameter: %g %s" % (diameter + 2.*addendum, units))
+g.comment( "ExtraAngle: %g degrees" % extraAngle )
+g.comment()
 
 # Setup the machine, choose the tool, set the rates
-gComment( 'T%d D=%g - Dual bevel %g degree cutter' % (toolNumber, cutterDiameter, cutterAngle))
-gcode.append( 'G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49' )
-gcode.append( 'G21 (mm)' if metric else 'G20 (inch)' )
-gcode.append( 'G30' )
-gcode.append( 'T%d G43 H%d M6' % (toolNumber, toolNumber))
-gcode.append( 'S%d M3 M8' % spindleSpeed )
-gcode.append( 'G54' )
-gcode.append( 'F%g' % feedRate )
+g.comment( 'T%d D=%g - Dual bevel %g degree cutter' % (toolNumber, cutterDiameter, cutterAngle))
+g.append( 'G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49' )
+g.append( 'G21 (mm)' if metric else 'G20 (inch)' )
+g.append( 'G30' )
+g.append( 'T%d G43 H%d M6' % (toolNumber, toolNumber))
+g.append( 'S%d M3 M8' % spindleSpeed )
+g.append( 'G54' )
+g.append( 'F%g' % feedRate )
 
-# Actual logic to loop through each tooth, angle pass, and depth pass generating Gcode
-if spurGear:
-    gMove(y=radius+cutterRadius+safeDistance)
-    gMove(0.,leadInOut,z=0.)
+# Finally generate the gear teeth
+if gearType == 'Spur':
+    g.move(y=radius+cutterRadius+safeDistance)
+    g.move(0.,leadInOut,z=0.)
     for tooth in range(teeth):
-        gComment( 'Tooth %d' % tooth )
+        g.comment( 'Tooth %d' % tooth )
         for aOffset,rOffset,zOffset in anglePasses:
-            gMove(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
+            g.move(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
             for depth in depthPasses:
-                gMove(y=radius+cutterRadius+addendum-rOffset-depth)
-                gCut(x=-thickness-leadInOut)
-                gMove(y=radius+cutterRadius+addendum+safeDistance)
-                gMove(x=leadInOut)
+                g.move(y=radius+cutterRadius+addendum-rOffset-depth)
+                g.cut(x=-thickness-leadInOut)
+                g.move(y=radius+cutterRadius+addendum+safeDistance)
+                g.move(x=leadInOut)
 
-else:   # Crown gear
-    gMove(x=cutterRadius+safeDistance)
-    gMove(0.,y=radius,z=0.)
+elif gearType == 'Crown':
+    g.move(x=cutterRadius+safeDistance)
+    g.move(0.,y=radius,z=0.)
     for tooth in range(teeth):
-        gComment( 'Tooth %d' % tooth )
+        g.comment( 'Tooth %d' % tooth )
         for aOffset,rOffset,zOffset in anglePasses:
-            gMove(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
+            g.move(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
             for depth in depthPasses:
-                gMove(y=innerRadius-leadInOut-rOffset)
-                gMove(x=cutterRadius-depth)
-                gCut(y=radius+addendum+leadInOut-rOffset)
-                gMove(x=cutterRadius+safeDistance)
+                g.move(y=innerRadius-leadInOut-rOffset)
+                g.move(x=cutterRadius-depth)
+                g.cut(y=radius+addendum+leadInOut-rOffset)
+                g.move(x=cutterRadius+safeDistance)
+
+else:
+    g.Comment( '"%s" gearType is currently unsupported' )
 
 # Program is done, shutdown time
-gcode.append( 'M05 M09' )
-gcode.append( 'G30' )
-gcode.append( 'M30' )
+g.append( 'M05 M09' )
+g.append( 'G30' )
+g.append( 'M30' )
+g.append( '%' )
 
-print '\n'.join(gcode)
+print g.output()
 

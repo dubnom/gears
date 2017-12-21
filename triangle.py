@@ -2,17 +2,26 @@
     triangle.py -   Generate gcode for spur, crown, (and coming soon - bevel) gears using a triangular
                     tooth profile.
 
-                    Orignally written by Michael Dubno and for general purpose use - no copyrights.
+                    The code uses a little trick for creating included angles greater than the natural
+                    angle of a double bevel end mill (cutterAngle).  Gear blanks are rotated up and down
+                    at the same time the bevel cutter is raised and lowered.  The bevel cutter is
+                    then brought into the blank and the tip of the cutter ends at the same point it would
+                    have if the blank wasn't rotated at all.  By doing this, the cutter will cut the opening
+                    wider at the bottom while in the raised position, and wider at the top while in the
+                    lowered position.  Obviously the cutter will also cut its included angle (cutterAngle)
+                    as well.
+
+                    Originally written by Michael Dubno and for general purpose use - no copyrights.
 """
 from math import *
 from gcode import *
 
 # Gear description
-teeth           = 48
+teeth           = 223
 metric          = False     # True for metric (mm), False for imperial (in)
 module          = .5
 thickness       = .0625     # Thickness of the gear surface (or edge of a crown)
-gearType        = 'Crown'   # Choices are: Spur, Crown, or Bevel
+gearType        = 'Spur'    # Choices are: Spur, Crown, or Bevel
 
 # Cutting tool description
 toolNumber      = 10
@@ -40,6 +49,7 @@ dedendum        = toothHeight / 2.
 innerRadius     = radius-dedendum
 extraAngle      = 180./teeth
 cutterRadius    = cutterDiameter / 2.
+gearType        = 'Spur' if spurGear else 'Crown'
 anglePerTooth   = 360./teeth
 
 

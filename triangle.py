@@ -17,7 +17,7 @@ from math import *
 from gcode import *
 
 # Gear description
-teeth           = 223
+teeth           = 50
 metric          = False     # True for metric (mm), False for imperial (in)
 module          = .5
 thickness       = .0625     # Thickness of the gear surface (or edge of a crown)
@@ -47,9 +47,9 @@ toothHeight     = sin(radians(cutterAngle)) * circumference/teeth
 addendum        = toothHeight / 2.
 dedendum        = toothHeight / 2.
 innerRadius     = radius-dedendum
+outerRadius     = radius+addendum
 extraAngle      = 180./teeth
 cutterRadius    = cutterDiameter / 2.
-gearType        = 'Spur' if spurGear else 'Crown'
 anglePerTooth   = 360./teeth
 
 
@@ -80,7 +80,8 @@ g.comment( "Diameter: %g %s" % (diameter, units))
 g.comment( "Radius: %g %s" % (radius, units))
 g.comment( "Circumference: %g %s" % (circumference, units))
 g.comment( "ToothHeight: %g %s" % (toothHeight, units))
-g.comment( "Gear Blank Diameter: %g %s" % (diameter + 2.*addendum, units))
+g.comment( "Gear Blank Radius: %g %s" % (outerRadius, units))
+g.comment( "Gear Blank Diameter: %g %s" % (outerRadius * 2., units))
 g.comment( "ExtraAngle: %g degrees" % extraAngle )
 g.comment()
 
@@ -96,16 +97,16 @@ g.append( 'F%g' % feedRate )
 
 # Finally generate the gear teeth
 if gearType == 'Spur':
-    g.move(y=radius+cutterRadius+safeDistance)
+    g.move(y=outerRadius+cutterRadius+safeDistance)
     g.move(0.,leadInOut,z=0.)
     for tooth in range(teeth):
         g.comment( 'Tooth %d' % tooth )
         for aOffset,rOffset,zOffset in anglePasses:
             g.move(tooth*anglePerTooth+aOffset,z=zOffset-centerlineOffset)
             for depth in depthPasses:
-                g.move(y=radius+cutterRadius+addendum-rOffset-depth)
+                g.move(y=outerRadius+cutterRadius-rOffset-depth)
                 g.cut(x=-thickness-leadInOut)
-                g.move(y=radius+cutterRadius+addendum+safeDistance)
+                g.move(y=outerRadius+cutterRadius+safeDistance)
                 g.move(x=leadInOut)
 
 elif gearType == 'Crown':
@@ -118,7 +119,7 @@ elif gearType == 'Crown':
             for depth in depthPasses:
                 g.move(y=innerRadius-leadInOut-rOffset)
                 g.move(x=cutterRadius-depth)
-                g.cut(y=radius+addendum+leadInOut-rOffset)
+                g.cut(y=outerRadius+leadInOut-rOffset)
                 g.move(x=cutterRadius+safeDistance)
 
 else:

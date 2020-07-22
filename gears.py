@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from math import sin, cos, radians, degrees, sqrt, pi 
 
 """
@@ -9,12 +11,21 @@ In the future, the code will be modified to use single angle cutters and slittin
 All input parameters are specified in millimeters or degrees.
 """
 
+
 def rotate(a, x, y):
     """Return point x,y rotated by angle a (in radians)."""
     return x * cos(a) - y * sin(a), x * sin(a) + y * cos(a)
 
 
 # FIX: tool.radius must be added/subtracted from the Y value!!!
+# FIX: tool number should be added
+# FIX: spindle speed should be added
+# FIX: number of passes should be added
+# FIX: coolant should be added
+# FIX: Support for tool files and gear profile files should be added
+# FIX: Add command line parsing
+# FIX: Test with modified tipHeight, and different pressureAngles
+# FIX: Add error checking if tool is too small
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 

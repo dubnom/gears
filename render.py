@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser(
             so you can speed things up by animating a limited set of teeth.
             """)
 parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+parser.add_argument('--verbose', '-v', action='count', default=0, help='Show progress messages')
 parser.add_argument('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='Output animation file')
 parser.add_argument('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
 parser.add_argument('--animate', '-a', action='count', default=0, help='Generate animation')
@@ -31,6 +32,8 @@ animationFile = args.A
 pictureFile = args.P
 final = args.picture > 0
 animate = args.animate > 0
+verbose = args.verbose
+
 
 if not (final or animate):
     parser.print_help()
@@ -64,6 +67,8 @@ with open('teeth.nc') as f:
 
         if mTooth:
             tooth = int(mTooth.group(1))
+            if verbose:
+                print('Processing tooth #%g' % tooth)
 
         elif mGeneral:
             name = mGeneral.group(1)
@@ -81,6 +86,9 @@ with open('teeth.nc') as f:
 
         elif mgCode:
             if stepNumber == 0:
+                if verbose:
+                    print('Header has been read')
+
                 # Create a polygon to represent the gear blank
                 r = outsideDiameter / 2.
                 gearBlank = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
@@ -138,11 +146,15 @@ with open('teeth.nc') as f:
 
 # Create the animation (if we're creating animations)
 if animate:
+    if verbose:
+        print('Generating animation "%s"' % animationFile)
     animation = camera.animate()
-    animation.save(animationFile, writer = 'imagemagick')
+    animation.save(animationFile, writer = 'pillow')
 
 # Create a final picture of the gear (if we're creating final pictures of gears)
 if final:
+    if verbose:
+        print('Generating picture "%s"' % pictureFile)
     plt.plot(*pitchCircle.exterior.xy, color='g')
     plt.plot(*clearanceCircle.exterior.xy, color='c')
     plt.plot(*dedendumCircle.exterior.xy, color='m')

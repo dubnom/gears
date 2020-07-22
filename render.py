@@ -1,13 +1,41 @@
+#!/usr/bin/python3
+
 from shapely.geometry import Polygon, MultiPolygon
 from shapely.affinity import rotate, translate
 import matplotlib.pyplot as plt
-from math import *
+from math import sin, cos, radians
 import re
+import sys
 from celluloid import Camera
+import argparse
 
+# Parse the command line arguments
+parser = argparse.ArgumentParser(
+        prog="render",
+        description="Render G Code gear cutting files.",
+        epilog="""
+            Render can create animations and/or final images from a G Code involute
+            spur gear cutting file.  Creating animated GIFS can take a long time,
+            so you can speed things up by animating a limited set of teeth.
+            """)
+parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+parser.add_argument('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='Output animation file')
+parser.add_argument('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
+parser.add_argument('--animate', '-a', action='count', default=0, help='Generate animation')
+parser.add_argument('--picture', '-p', action='count', default=0, help='Generate picture')
+parser.add_argument('--teeth', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
+args = parser.parse_args()
 
-animate = True 
-final   = True
+teethToDraw = args.teeth[0]
+animationFile = args.A
+pictureFile = args.P
+final = args.picture > 0
+animate = args.animate > 0
+
+if not (final or animate):
+    parser.print_help()
+    exit(-1)
+
 
 # Regular expressions used to parse file from gears.py
 paramsTooth     = re.compile('^\( Tooth: ([-0-9]+)\)$')
@@ -88,11 +116,12 @@ with open('teeth.nc') as f:
                     if cutterY:
                         curCutter = translate(cutter, cutterY, cutterZ)
                         gearBlank = gearBlank.difference(curCutter)
+                        # Deal with an acute cutter trimming off a shard
                         if type(gearBlank) == MultiPolygon:
                             gearBlank = gearBlank[0]
 
                         # Write an animation frame
-                        if animate and tooth < 3:
+                        if animate and (teethToDraw == -1 or tooth < teethToDraw):
                             plt.plot(*pitchCircle.exterior.xy, color='g')
                             plt.plot(*clearanceCircle.exterior.xy, color='c')
                             plt.plot(*gearBlank.exterior.xy, color='b')
@@ -110,17 +139,15 @@ with open('teeth.nc') as f:
 # Create the animation (if we're creating animations)
 if animate:
     animation = camera.animate()
-    animation.save('animation.gif', writer = 'imagemagick')
+    animation.save(animationFile, writer = 'imagemagick')
 
 # Create a final picture of the gear (if we're creating final pictures of gears)
 if final:
-    plt.plot(*gearBlank.exterior.xy)
     plt.plot(*pitchCircle.exterior.xy, color='g')
-    plt.plot(*dedendumCircle.exterior.xy, color='m')
     plt.plot(*clearanceCircle.exterior.xy, color='c')
-    #plt.plot(*curCutter.exterior.xy)
-    #plt.plot((0., cos(radians(curAngle)) * outsideDiameter / 2.), (0., sin(radians(curAngle)) * outsideDiameter / 2.))
+    plt.plot(*dedendumCircle.exterior.xy, color='m')
+    plt.plot(*gearBlank.exterior.xy, color='b')
     plt.grid()
     plt.axis('equal')
-    plt.savefig('final.png')
+    plt.savefig(pictureFile)
 

@@ -108,18 +108,19 @@ class Gear():
                 if zSteps <= 0:
                     yP, zP = pitchRadius, z + zOffset
                     yTool, zTool = rotate(angleOffset, yP, zP)
-                    gcode.append('G0 Y%g' % (-angleDirection * (yTool - hDedendum)))
-                    gcode.append("G0 A%g" % (angleDirection * degrees(angle + angleOffset + toothAngleOffset)))
-                    gcode.append("G0 Z%g" % zTool)
+                    gcode.append('G0 Y%g A%g Z%g' % (
+                            (-angleDirection * (yTool - hDedendum)),
+                            (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
+                            zTool))
                     x = xEnd if x == xStart else xStart
                     gcode.append("G1 X%g" % x)
 
                 # Center of the slot
                 if zSteps == 0:
-                    gcode.append('G0 Y%g' % (-angleDirection * (pitchRadius - hDedendum)))
-                    gcode.append("G0 A%g" % (angleDirection * degrees(angle + toothAngleOffset)))
-                    # Upper offset
-                    gcode.append("G0 Z%g" % z)
+                    gcode.append('G0 Y%g A%g Z%g' % ( 
+                            (-angleDirection * (pitchRadius - hDedendum)),
+                            (angleDirection * degrees(angle + toothAngleOffset)),
+                            z))
                     x = xEnd if x == xStart else xStart
                     gcode.append("G1 X%g" % x)
                 
@@ -127,9 +128,10 @@ class Gear():
                 if zSteps >= 0:
                     yP, zP = pitchRadius, z - zOffset
                     yTool, zTool = rotate(-angleOffset, yP, zP)
-                    gcode.append('G0 Y%g' % (-angleDirection * (yTool - hDedendum)))
-                    gcode.append("G0 A%g" % (angleDirection * degrees(angle - angleOffset + toothAngleOffset)))
-                    gcode.append("G0 Z%g" % zTool)
+                    gcode.append('G0 Y%g A%g Z%g' % (
+                            (-angleDirection * (yTool - hDedendum)),
+                            (angleDirection * degrees(angle - angleOffset + toothAngleOffset)),
+                            zTool))
                     x = xEnd if x == xStart else xStart
                     gcode.append("G1 X%g" % x)
 

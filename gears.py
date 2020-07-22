@@ -24,16 +24,16 @@ def rotate(a, x, y):
 # FIX: coolant should be added
 # FIX: Support for tool files and gear profile files should be added
 # FIX: Add command line parsing
-# FIX: Test with modified tipHeight, and different pressureAngles
 # FIX: Add error checking if tool is too small
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 
-    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0.):
+    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1):
         self.angle = radians(angle)
         self.depth = depth
         self.radius = radius
         self.tipHeight = tipHeight
+        self.number = number
 
     def __str__(self):
         return "(Angle: %s, Depth: %s, Radius: %s, TipHeight: %s)" % (degrees(self.angle), self.depth, self.radius, self.tipHeight)
@@ -88,8 +88,9 @@ class Gear():
 
         # Include all of the generating parameters in the G Code header
         f = ['zMax', 'module', 'teeth', 'blankThickness', 'tool', 'reliefFactor', 'pressureAngle', 'steps',
-                'cutterClearance', 'rightRotary', 'hAddendum', 'hDedendum', 'hTotal', 'circularPitch', 'pitchDiameter', 'baseDiameter',
-                'outsideDiameter', 'outsideRadius', 'zOffset', 'angleOffset', 'xStart', 'xEnd']
+                'cutterClearance', 'rightRotary', 'hAddendum', 'hDedendum', 'hTotal', 'circularPitch',
+                'pitchDiameter', 'baseDiameter', 'outsideDiameter', 'outsideRadius', 'zOffset',
+                'angleOffset', 'xStart', 'xEnd']
         for v in f:
             if v in locals():
                 gcode.append('(%15s: %-70s)' % (v, locals()[v]))
@@ -150,7 +151,7 @@ class Gear():
 
 
 def main():
-    g = Gear(Tool(angle=40., depth=4.), rightRotary=True, steps=15)
+    g = Gear(Tool(angle=40., depth=4.), rightRotary=False, steps=15)
 
     print('%')
     print('G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49')

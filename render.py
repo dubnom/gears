@@ -106,11 +106,12 @@ with open('teeth.nc') as f:
                 clearanceCircle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
                 # Create a polygon to represent the cutting tool
+                direction = 1 if rightRotary else -1
                 y = toolTipHeight / 2. + sin(radians(toolAngle / 2.)) * toolDepth
                 cutter = Polygon([
                         (0, toolTipHeight / 2.),
-                        (toolDepth, y), 
-                        (toolDepth, -y),
+                        (direction * toolDepth, y), 
+                        (direction * toolDepth, -y),
                         (0, -toolTipHeight / 2.),
                         ])
 
@@ -135,7 +136,7 @@ with open('teeth.nc') as f:
                             plt.plot(*gearBlank.exterior.xy, color='b')
                             plt.plot(*curCutter.exterior.xy, color='r')
                             plt.plot((0., cos(radians(-curAngle)) * outsideRadius), (0., sin(radians(-curAngle)) * outsideRadius), color='b')
-                            plt.plot((outsideRadius-hTotal, outsideRadius-hTotal), (-zMax, zMax), color='y')
+                            plt.plot((direction*(outsideRadius-hTotal), direction*(outsideRadius-hTotal)), (-zMax, zMax), color='y')
                             plt.grid()
                             plt.axis('equal')
                             camera.snap()

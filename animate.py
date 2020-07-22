@@ -14,7 +14,7 @@ paramsTooth     = re.compile('^\( Tooth: ([-0-9]+)\)$')
 paramsGeneral   = re.compile('^\( *([a-zA-Z]+): ([-0-9\.]+) *\)$')
 paramsRotary    = re.compile('^\( *rightRotary: (True|False) *\)$')
 paramsTool      = re.compile('^\( *tool: \(Angle: ([-0-9\.]+), Depth: ([-0-9\.]+), Radius: ([-0-9\.]+), TipHeight: ([-0-9\.]+)\) *\)$') 
-gCode = re.compile('^G([01]+) ([AXYZ])([-0-9\.]+)$')
+parseGCode      = '([AXYZ])([-0-9\.]+)'
 
 # Start up a camera if we're creating an animation
 if animate:
@@ -32,7 +32,7 @@ with open('teeth.nc') as f:
         mGeneral    = paramsGeneral.match(l)
         mTool       = paramsTool.match(l)
         mRotary     = paramsRotary.match(l)
-        mgCode      = gCode.match(l)
+        mgCode      = re.findall(parseGCode, l)
 
         if mTooth:
             tooth = int(mTooth.group(1))
@@ -78,34 +78,34 @@ with open('teeth.nc') as f:
                         (0, -toolTipHeight / 2.),
                         ])
 
-            stepNumber += 1
-            axis = mgCode.group(2)
-            amt = float(mgCode.group(3))
-            if axis == 'A':
-                gearBlank = rotate(gearBlank, curAngle - amt, origin = (0, 0))
-                curAngle = amt
-            elif axis == 'X':
-                if cutterY:
-                    curCutter = translate(cutter, cutterY, cutterZ)
-                    gearBlank = gearBlank.difference(curCutter)
-                    if type(gearBlank) == MultiPolygon:
-                        gearBlank = gearBlank[0]
+            for axis, amt in mgCode:
+                stepNumber += 1
+                amt = float(amt)
+                if axis == 'A':
+                    gearBlank = rotate(gearBlank, curAngle - amt, origin = (0, 0))
+                    curAngle = amt
+                elif axis == 'X':
+                    if cutterY:
+                        curCutter = translate(cutter, cutterY, cutterZ)
+                        gearBlank = gearBlank.difference(curCutter)
+                        if type(gearBlank) == MultiPolygon:
+                            gearBlank = gearBlank[0]
 
-                    # Write an animation frame
-                    if animate and tooth < 3:
-                        plt.plot(*pitchCircle.exterior.xy, color='g')
-                        plt.plot(*clearanceCircle.exterior.xy, color='c')
-                        plt.plot(*gearBlank.exterior.xy, color='b')
-                        plt.plot(*curCutter.exterior.xy, color='r')
-                        plt.plot((0., cos(radians(-curAngle)) * outsideRadius), (0., sin(radians(-curAngle)) * outsideRadius), color='b')
-                        plt.plot((outsideRadius-hTotal, outsideRadius-hTotal), (-zMax, zMax), color='y')
-                        plt.grid()
-                        plt.axis('equal')
-                        camera.snap()
-            elif axis == 'Y':
-                cutterY = amt
-            elif axis == 'Z':
-                cutterZ = amt
+                        # Write an animation frame
+                        if animate and tooth < 3:
+                            plt.plot(*pitchCircle.exterior.xy, color='g')
+                            plt.plot(*clearanceCircle.exterior.xy, color='c')
+                            plt.plot(*gearBlank.exterior.xy, color='b')
+                            plt.plot(*curCutter.exterior.xy, color='r')
+                            plt.plot((0., cos(radians(-curAngle)) * outsideRadius), (0., sin(radians(-curAngle)) * outsideRadius), color='b')
+                            plt.plot((outsideRadius-hTotal, outsideRadius-hTotal), (-zMax, zMax), color='y')
+                            plt.grid()
+                            plt.axis('equal')
+                            camera.snap()
+                elif axis == 'Y':
+                    cutterY = amt
+                elif axis == 'Z':
+                    cutterZ = amt
 
 # Create the animation (if we're creating animations)
 if animate:

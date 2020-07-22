@@ -41,14 +41,14 @@ class Gear():
         
         angleOffset = radians(self.tool.angle / 2.) - self.pressureAngle 
 
-        zOffset = (circularPitch / 2. - 2. * sin(self.pressureAngle + angleOffset) * hDedendum - self.tool.tipHeight) / 2.
+        #zOffset = (circularPitch / 2. - 2. * sin(self.pressureAngle) * hDedendum - self.tool.tipHeight) / 2.
+        # size of cut at pitch circle - size of cutter at pitch circle
+        zOffset = (circularPitch / 2. - 2. * sin(radians(self.tool.angle / 2.)) * hDedendum - self.tool.tipHeight) / 2.
+
         xOffset = self.cutterClearance + blankThickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - hTotal) ** 2)
         xStart, xEnd = -xOffset, xOffset
         angleDirection = -1 if self.rightRotary else 1
 
-        # This code is for offsetting non-40 degree cutters
-        # angleOffset = radians(self.tool.angle - 40.) / 2    # FIX: Angle and zToolOffset don't work.
-        
         # Determine the maximum amount of height (or depth) in the Z axis before part of the cutter
         # won't intersect with the gear blank.
         zMax = min(sqrt(outsideRadius**2 - (outsideRadius-hAddendum)**2), outsideRadius * sin(radians(90.) - self.pressureAngle))
@@ -91,24 +91,18 @@ class Gear():
                 z = zSteps * zIncr
                 angle = z / pitchRadius
 
-                # Cutter shift
-                #bangle = angle - radians(self.tool.angle / 2.) + self.pressureAngle 
-                pX, pY = pitchRadius * cos(angle), pitchRadius * sin(angle)
-                yToolOffset, zToolOffset = rotate(sign(z) * angleOffset, pX, pY)
-                yToolOffset, zToolOffset = yToolOffset - pX, zToolOffset - pY
-                yToolOffset = zToolOffset = 0
-
-                gcode.append('G0 Y%g' % ((hTotal - yToolOffset) * angleDirection))
-
-                #gcode.append("G0 A%g" % (angleDirection * degrees(angle + angleOffset + toothAngleOffset)))
                 if zSteps <= 0:
+                    yP, zP = pitchRadius, z + zOffset
+                    yTool, zTool = rotate(angleOffset, yP, zP)
+                    gcode.append('G0 Y%g' % (-angleDirection * (yTool - hDedendum)))
                     gcode.append("G0 A%g" % (angleDirection * degrees(angle + angleOffset + toothAngleOffset)))
                     # Upper offset
-                    gcode.append("G0 Z%g" % (z + zOffset + zToolOffset))
+                    gcode.append("G0 Z%g" % zTool)
                     x = xEnd if x == xStart else xStart
                     gcode.append("G1 X%g" % x)
 
                 if zSteps == 0:
+                    gcode.append('G0 Y%g' % (-angleDirection * (pitchRadius - hDedendum)))
                     gcode.append("G0 A%g" % (angleDirection * degrees(angle + toothAngleOffset)))
                     # Upper offset
                     gcode.append("G0 Z%g" % z)
@@ -116,16 +110,19 @@ class Gear():
                     gcode.append("G1 X%g" % x)
                 
                 if zSteps >= 0:
+                    yP, zP = pitchRadius, z - zOffset
+                    yTool, zTool = rotate(-angleOffset, yP, zP)
+                    gcode.append('G0 Y%g' % (-angleDirection * (yTool - hDedendum)))
                     gcode.append("G0 A%g" % (angleDirection * degrees(angle - angleOffset + toothAngleOffset)))
                     # Lower offset
-                    gcode.append("G0 Z%g" % (z - zOffset + zToolOffset))
+                    gcode.append("G0 Z%g" % zTool)
                     x = xEnd if x == xStart else xStart
                     gcode.append("G1 X%g" % x)
 
         return '\n'.join(gcode)
 
 
-g = Gear(Tool(40), rightRotary=True, steps=15)
+g = Gear(Tool(angle=40., depth=4.), rightRotary=True, steps=15)
 print('%')
 print('G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49')
 print('G21 (Millimeters)')

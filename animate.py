@@ -1,4 +1,4 @@
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiPolygon
 from shapely.affinity import rotate, translate
 import matplotlib.pyplot as plt
 from math import *
@@ -82,12 +82,14 @@ with open('teeth.nc') as f:
             axis = mgCode.group(2)
             amt = float(mgCode.group(3))
             if axis == 'A':
-                gearBlank = rotate(gearBlank, curAngle - amt)
+                gearBlank = rotate(gearBlank, curAngle - amt, origin = (0, 0))
                 curAngle = amt
             elif axis == 'X':
                 if cutterY:
-                    curCutter = translate(cutter, cutterY + outsideRadius, cutterZ)
+                    curCutter = translate(cutter, cutterY, cutterZ)
                     gearBlank = gearBlank.difference(curCutter)
+                    if type(gearBlank) == MultiPolygon:
+                        gearBlank = gearBlank[0]
 
                     # Write an animation frame
                     if animate and tooth < 3:

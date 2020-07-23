@@ -144,7 +144,7 @@ with open('teeth.nc') as f:
                             plt.plot(*gearBlank.exterior.xy, color='b')
                             plt.plot(*curCutter.exterior.xy, color='r')
                             plt.plot((0., cos(radians(-curAngle)) * outsideRadius), (0., sin(radians(-curAngle)) * outsideRadius), color='b')
-                            plt.plot((direction*(outsideRadius-hTotal), direction*(outsideRadius-hTotal)), (-zMax, zMax), color='y')
+                            plt.plot((-direction*(outsideRadius-hTotal), -direction*(outsideRadius-hTotal)), (-zMax, zMax), color='y')
                             plt.grid()
                             plt.axis('equal')
                             camera.snap()
@@ -164,6 +164,7 @@ if animate:
 if final:
     if verbose:
         print('Generating picture "%s"' % pictureFile)
+    fig = plt.figure()
     plt.plot(*pitchCircle.exterior.xy, color='g')
     plt.plot(*clearanceCircle.exterior.xy, color='c')
     plt.plot(*dedendumCircle.exterior.xy, color='m')

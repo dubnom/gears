@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-import argparse
+#import argparse
+import configargparse
 import sys
 from math import sin, cos, radians, degrees, sqrt, pi 
 
@@ -19,7 +20,6 @@ def rotate(a, x, y):
     return x * cos(a) - y * sin(a), x * sin(a) + y * cos(a)
 
 
-# FIX: Support for tool files and gear profile files should be added
 # FIX: Add error checking if tool is too small
 # FIX: Add support for climb, conventional, both
 
@@ -191,8 +191,9 @@ M30
 
 
 def main():
-    parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    p = configargparse.ArgParser(
+            default_config_files=['gears.cfg'],
+            formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
             prog="gears",
             description="Generate G Code to create involute spur gears.",
             epilog="""
@@ -202,34 +203,35 @@ def main():
 
                 A rotary 4th-axis is used to rotate the gear blank with the cutting tool held in the spindle.
                 """)
-    parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
+    p.add('outfile', nargs='?', type=configargparse.FileType('w'), default=sys.stdout)
+    p.add('--config', '-X', is_config_file=True, help='Config file path')
 
     # Tool arguments
-    parser.add_argument('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
-    parser.add_argument('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
-    parser.add_argument('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
-    parser.add_argument('--diameter', '-I', type=float, default=15., help='Tool: cutting diameter at tip in mm')
-    parser.add_argument('--number', '-N', type=int, default=1, help='Tool: tool number')
-    parser.add_argument('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
-    parser.add_argument('--feed', '-F', type=float, default=200., help='Tool: feed rate')
-    parser.add_argument('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
-    parser.add_argument('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
-    parser.add_argument('--ease', '-E', type=int, default=0, help='Tool: number of steps to "ease into" the first cut')
+    p.add('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
+    p.add('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
+    p.add('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
+    p.add('--diameter', '-I', type=float, default=15., help='Tool: cutting diameter at tip in mm')
+    p.add('--number', '-N', type=int, default=1, help='Tool: tool number')
+    p.add('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
+    p.add('--feed', '-F', type=float, default=200., help='Tool: feed rate')
+    p.add('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
+    p.add('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
+    p.add('--ease', '-E', type=int, default=0, help='Tool: number of steps to "ease into" the first cut')
 
     # Gear type arguments
-    parser.add_argument('--module', '-m', type=float, default=1., help='Module of the gear')
-    parser.add_argument('--pressure', '-p', type=float, default=20., help='Pressure angle in degrees')
-    parser.add_argument('--relief', type=float, default=1.25, help='Relief factor (for the dedendum)')
-    parser.add_argument('--steps', '-s', type=int, default=5, help='Steps/tooth face')
-    parser.add_argument('--clear', '-c', type=float, default=2., help='Cutter clearance from gear blank in mm')
-    parser.add_argument('--right', '-r', action='store_true', help='Rotary axis is on the right side of the machine')
+    p.add('--module', '-m', type=float, default=1., help='Module of the gear')
+    p.add('--pressure', '-p', type=float, default=20., help='Pressure angle in degrees')
+    p.add('--relief', type=float, default=1.25, help='Relief factor (for the dedendum)')
+    p.add('--steps', '-s', type=int, default=5, help='Steps/tooth face')
+    p.add('--clear', '-c', type=float, default=2., help='Cutter clearance from gear blank in mm')
+    p.add('--right', '-r', action='store_true', help='Rotary axis is on the right side of the machine')
 
     # Specific gear arguments
-    parser.add_argument('--teeth', '-t', type=int, required=True, help='Number of teeth for the entire gear')
-    parser.add_argument('--thick', '-k', type=float, required=True, help='Thickness of gear blank in mm')
-    parser.add_argument('--make', type=int, default=0, help='Actual number of teeth to cut.')
+    p.add('--teeth', '-t', type=int, required=True, help='Number of teeth for the entire gear')
+    p.add('--thick', '-k', type=float, required=True, help='Thickness of gear blank in mm')
+    p.add('--make', type=int, default=0, help='Actual number of teeth to cut.')
 
-    args = parser.parse_args()
+    args = p.parse_args()
  
     tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height, radius=args.diameter / 2.,
             number=args.number, rpm=args.rpm, feed=args.feed,

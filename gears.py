@@ -29,14 +29,14 @@ def rotate(a, x, y):
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 
-    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1, rpm=2000, feedRate=200):
+    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1, rpm=2000, feed=200):
         self.angle = radians(angle)
         self.depth = depth
         self.radius = radius
         self.tipHeight = tipHeight
         self.number = number
         self.rpm = rpm
-        self.feedRate = feedRate
+        self.feed = feed
 
     def __str__(self):
         return "(Angle: %s, Depth: %s, Radius: %s, TipHeight: %s)" % (degrees(self.angle), self.depth, self.radius, self.tipHeight)
@@ -65,7 +65,7 @@ G30
 T{number} G43 H{number} M6
 S{rpm} M3 M9
 G54
-F{feed}""".format(number=self.tool.number, feed=self.tool.feedRate, rpm=self.tool.rpm)
+F{feed}""".format(number=self.tool.number, feed=self.tool.feed, rpm=self.tool.rpm)
 
     def footer(self):
         return \
@@ -176,6 +176,7 @@ M30
 
 def main():
     parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog="gears",
             description="Generate G Code to create involute spur gears.",
             epilog="""
@@ -186,12 +187,8 @@ def main():
                 A rotary 4th-axis is used to rotate the gear blank with the cutting tool held in the spindle.
                 """)
     parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
-    # Tool definition
-    #  angle, depth, tipHeight, number, rpm, feedRate, COOLANT
-    # Gear type definition
-    #  module, pressureAngle, reliefFactor, steps, cutterClearance, rightRotary
-    # Gear definition
-    #  teeth, blankThickness, teethToMake
+
+    # Tool arguments
     parser.add_argument('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
     parser.add_argument('--depth', '-D', type=float, default=3., help='Tool: depth of cutting head in mm')
     parser.add_argument('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
@@ -200,6 +197,7 @@ def main():
     parser.add_argument('--feed', '-F', type=float, default=200., help='Tool: feed rate')
     # Coolant
 
+    # Gear type arguments
     parser.add_argument('--module', '-m', type=float, default=1., help='Module of the gear')
     parser.add_argument('--pressure', '-p', type=float, default=20., help='Pressure angle in degrees')
     parser.add_argument('--relief', type=float, default=1.25, help='Relief factor (for the dedendum)')
@@ -207,17 +205,22 @@ def main():
     parser.add_argument('--clear', '-c', type=float, default=2., help='Cutter clearance from gear blank in mm')
     # Rotary
 
+    # Specific gear arguments
     parser.add_argument('--teeth', '-t', type=int, default=10, help='Number of teeth for the entire gear')
     parser.add_argument('--thick', type=float, default=1, help='Thickness of gear blank in mm')
-    parser.add_argument('--make', type=int, default=-1, help='Actual number of teeth to cut.')
+    parser.add_argument('--make', type=int, default=0, help='Actual number of teeth to cut.')
 
     args = parser.parse_args()
     print(args)
 
-    g = Gear(Tool(angle=40., depth=4.), rightRotary=False, steps=15)
+ 
+    tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height, number=args.number, rpm=args.rpm, feed=args.feed)
+    g = Gear(tool, module=args.module, pressureAngle=args.pressure,
+            reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
+            rightRotary=True)
 
     print(g.header())
-    print(g.generate(7, 22., teethToMake=0))
+    print(g.generate(args.teeth, args.thick, args.make))
     print(g.footer())
 
 

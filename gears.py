@@ -20,11 +20,9 @@ def rotate(a, x, y):
 
 
 # FIX: tool.radius must be added/subtracted from the Y value!!!
-# FIX: spindle speed should be added
 # FIX: number of passes should be added
 # FIX: coolant should be added
 # FIX: Support for tool files and gear profile files should be added
-# FIX: Add command line parsing
 # FIX: Add error checking if tool is too small
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
@@ -87,7 +85,6 @@ M30
         outsideRadius = outsideDiameter / 2.
         
         angleOffset = self.tool.angle / 2. - self.pressureAngle 
-
         zOffset = (circularPitch / 2. - 2. * sin(self.tool.angle / 2.) * hDedendum - self.tool.tipHeight) / 2.
 
         xOffset = self.cutterClearance + blankThickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - hTotal) ** 2)
@@ -206,8 +203,8 @@ def main():
     # Rotary
 
     # Specific gear arguments
-    parser.add_argument('--teeth', '-t', type=int, default=10, help='Number of teeth for the entire gear')
-    parser.add_argument('--thick', type=float, default=1, help='Thickness of gear blank in mm')
+    parser.add_argument('--teeth', '-t', type=int, required=True, help='Number of teeth for the entire gear')
+    parser.add_argument('--thick', '-k', type=float, required=True, help='Thickness of gear blank in mm')
     parser.add_argument('--make', type=int, default=0, help='Actual number of teeth to cut.')
 
     args = parser.parse_args()

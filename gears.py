@@ -20,13 +20,15 @@ def rotate(a, x, y):
 
 
 # FIX: number of passes should be added
-# FIX: coolant should be added
+# FIX: add "ease-in" mode. Similar to number of passes, but smarter
 # FIX: Support for tool files and gear profile files should be added
 # FIX: Add error checking if tool is too small
+# FIX: Add rightRotary to parser
+
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 
-    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1, rpm=2000, feed=200):
+    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1, rpm=2000, feed=200, mist=False, flood=False):
         self.angle = radians(angle)
         self.depth = depth
         self.radius = radius
@@ -34,6 +36,8 @@ class Tool():
         self.number = number
         self.rpm = rpm
         self.feed = feed
+        self.mist = mist
+        self.flood = flood
 
     def __str__(self):
         return "(Angle: %s, Depth: %s, Radius: %s, TipHeight: %s)" % (degrees(self.angle), self.depth, self.radius, self.tipHeight)
@@ -60,9 +64,13 @@ G21 (Millimeters)'
 G30
 
 T{number} G43 H{number} M6
-S{rpm} M3 M9
+S{rpm} M3{mist}{flood}
 G54
-F{feed}""".format(number=self.tool.number, feed=self.tool.feed, rpm=self.tool.rpm)
+F{feed}""".format(number=self.tool.number,
+        feed=self.tool.feed,
+        rpm=self.tool.rpm,
+        mist=' M07' if self.tool.mist else '',
+        flood=' M08' if self.tool.flood else '')
 
     def footer(self):
         return \
@@ -192,7 +200,8 @@ def main():
     parser.add_argument('--number', '-N', type=int, default=1, help='Tool: tool number')
     parser.add_argument('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
     parser.add_argument('--feed', '-F', type=float, default=200., help='Tool: feed rate')
-    # Coolant
+    parser.add_argument('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
+    parser.add_argument('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
 
     # Gear type arguments
     parser.add_argument('--module', '-m', type=float, default=1., help='Module of the gear')
@@ -200,7 +209,7 @@ def main():
     parser.add_argument('--relief', type=float, default=1.25, help='Relief factor (for the dedendum)')
     parser.add_argument('--steps', '-s', type=int, default=5, help='Steps/tooth face')
     parser.add_argument('--clear', '-c', type=float, default=2., help='Cutter clearance from gear blank in mm')
-    # Rotary
+    parser.add_argument('--right', '-r', action='store_true', help='Rotary axis is on the right side of the machine')
 
     # Specific gear arguments
     parser.add_argument('--teeth', '-t', type=int, required=True, help='Number of teeth for the entire gear')
@@ -208,14 +217,13 @@ def main():
     parser.add_argument('--make', type=int, default=0, help='Actual number of teeth to cut.')
 
     args = parser.parse_args()
-    print(args)
-
  
     tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height, radius=args.diameter / 2.,
-            number=args.number, rpm=args.rpm, feed=args.feed)
+            number=args.number, rpm=args.rpm, feed=args.feed,
+            mist=args.mist, flood=args.flood)
     g = Gear(tool, module=args.module, pressureAngle=args.pressure,
             reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
-            rightRotary=True)
+            rightRotary=args.right)
 
     print(g.header())
     print(g.generate(args.teeth, args.thick, args.make))

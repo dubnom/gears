@@ -24,7 +24,7 @@ parser.add_argument('--A', '-A', nargs=1, default='animation.gif', metavar='file
 parser.add_argument('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
 parser.add_argument('--animate', '-a', action='count', default=0, help='Generate animation')
 parser.add_argument('--picture', '-p', action='count', default=0, help='Generate picture')
-parser.add_argument('--teeth', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
+parser.add_argument('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
 args = parser.parse_args()
 
 teethToDraw = args.teeth[0]

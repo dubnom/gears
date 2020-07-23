@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import argparse
+import sys
 from math import sin, cos, radians, degrees, sqrt, pi 
 
 """
@@ -18,7 +20,6 @@ def rotate(a, x, y):
 
 
 # FIX: tool.radius must be added/subtracted from the Y value!!!
-# FIX: tool number should be added
 # FIX: spindle speed should be added
 # FIX: number of passes should be added
 # FIX: coolant should be added
@@ -28,12 +29,14 @@ def rotate(a, x, y):
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 
-    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1):
+    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1, rpm=2000, feedRate=200):
         self.angle = radians(angle)
         self.depth = depth
         self.radius = radius
         self.tipHeight = tipHeight
         self.number = number
+        self.rpm = rpm
+        self.feedRate = feedRate
 
     def __str__(self):
         return "(Angle: %s, Depth: %s, Radius: %s, TipHeight: %s)" % (degrees(self.angle), self.depth, self.radius, self.tipHeight)
@@ -50,6 +53,27 @@ class Gear():
         self.steps = steps
         self.cutterClearance = cutterClearance
         self.rightRotary = rightRotary
+
+    def header(self):
+        return \
+"""\
+%
+G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49
+G21 (Millimeters)'
+G30
+
+T{number} G43 H{number} M6
+S{rpm} M3 M9
+G54
+F{feed}""".format(number=self.tool.number, feed=self.tool.feedRate, rpm=self.tool.rpm)
+
+    def footer(self):
+        return \
+"""\
+M5 M9
+G30
+M30
+%"""
 
     def generate(self, teeth, blankThickness, teethToMake=0):
         hAddendum = self.module
@@ -151,24 +175,50 @@ class Gear():
 
 
 def main():
+    parser = argparse.ArgumentParser(
+            prog="gears",
+            description="Generate G Code to create involute spur gears.",
+            epilog="""
+                By using simple cutters like double angle shaft cutters or #8 gear cutter, you can cut
+                most modules, pressure angles, and tooth count involute spur gears.  The limiting factors
+                are the size of the cutter and the working envelope of the mill.
+
+                A rotary 4th-axis is used to rotate the gear blank with the cutting tool held in the spindle.
+                """)
+    parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
+    # Tool definition
+    #  angle, depth, tipHeight, number, rpm, feedRate, COOLANT
+    # Gear type definition
+    #  module, pressureAngle, reliefFactor, steps, cutterClearance, rightRotary
+    # Gear definition
+    #  teeth, blankThickness, teethToMake
+    parser.add_argument('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
+    parser.add_argument('--depth', '-D', type=float, default=3., help='Tool: depth of cutting head in mm')
+    parser.add_argument('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
+    parser.add_argument('--number', '-N', type=int, default=1, help='Tool: tool number')
+    parser.add_argument('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
+    parser.add_argument('--feed', '-F', type=float, default=200., help='Tool: feed rate')
+    # Coolant
+
+    parser.add_argument('--module', '-m', type=float, default=1., help='Module of the gear')
+    parser.add_argument('--pressure', '-p', type=float, default=20., help='Pressure angle in degrees')
+    parser.add_argument('--relief', type=float, default=1.25, help='Relief factor (for the dedendum)')
+    parser.add_argument('--steps', '-s', type=int, default=5, help='Steps/tooth face')
+    parser.add_argument('--clear', '-c', type=float, default=2., help='Cutter clearance from gear blank in mm')
+    # Rotary
+
+    parser.add_argument('--teeth', '-t', type=int, default=10, help='Number of teeth for the entire gear')
+    parser.add_argument('--thick', type=float, default=1, help='Thickness of gear blank in mm')
+    parser.add_argument('--make', type=int, default=-1, help='Actual number of teeth to cut.')
+
+    args = parser.parse_args()
+    print(args)
+
     g = Gear(Tool(angle=40., depth=4.), rightRotary=False, steps=15)
 
-    print('%')
-    print('G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49')
-    print('G21 (Millimeters)')
-    print('G30')
-
-    print('T40 G43 H40 M6')
-    print('S4000 M3 M9')
-    print('G54')
-    print('F200')
-
+    print(g.header())
     print(g.generate(7, 22., teethToMake=0))
-
-    print('M5 M9')
-    print('G30')
-    print('M30')
-    print('%')
+    print(g.footer())
 
 
 if __name__ == '__main__':

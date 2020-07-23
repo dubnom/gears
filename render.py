@@ -107,12 +107,20 @@ with open('teeth.nc') as f:
 
                 # Create a polygon to represent the cutting tool
                 direction = 1 if rightRotary else -1
-                y = toolTipHeight / 2. + sin(radians(toolAngle / 2.)) * toolDepth
+                halfTip = toolTipHeight / 2.
+                y = halfTip + sin(radians(toolAngle / 2.)) * toolDepth
+                shaft = toolRadius - toolDepth
                 cutter = Polygon([
-                        (0, toolTipHeight / 2.),
-                        (direction * toolDepth, y), 
-                        (direction * toolDepth, -y),
-                        (0, -toolTipHeight / 2.),
+                        (shaft, 4. * y),
+                        (shaft, y),
+                        (toolRadius, halfTip), 
+                        (toolRadius, -halfTip),
+                        (shaft, -y),
+                        (-shaft, -y),
+                        (-toolRadius, -halfTip),
+                        (-toolRadius, halfTip),
+                        (-shaft, y),
+                        (-shaft, 4. * y),
                         ])
 
             for axis, amt in mgCode:

@@ -19,7 +19,6 @@ def rotate(a, x, y):
     return x * cos(a) - y * sin(a), x * sin(a) + y * cos(a)
 
 
-# FIX: tool.radius must be added/subtracted from the Y value!!!
 # FIX: number of passes should be added
 # FIX: coolant should be added
 # FIX: Support for tool files and gear profile files should be added
@@ -142,7 +141,7 @@ M30
                     yP, zP = pitchRadius, z + zOffset
                     yTool, zTool = rotate(angleOffset, yP, zP)
                     gcode.append('G0 Y%g A%g Z%g' % (
-                            (-angleDirection * (yTool - hDedendum)),
+                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
                             (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
                             zTool))
                     x = xEnd if x == xStart else xStart
@@ -151,7 +150,7 @@ M30
                 # Center of the slot
                 if zSteps == 0:
                     gcode.append('G0 Y%g A%g Z%g' % ( 
-                            (-angleDirection * (pitchRadius - hDedendum)),
+                            (-angleDirection * (self.tool.radius + pitchRadius - hDedendum)),
                             (angleDirection * degrees(angle + toothAngleOffset)),
                             z))
                     x = xEnd if x == xStart else xStart
@@ -162,7 +161,7 @@ M30
                     yP, zP = pitchRadius, z - zOffset
                     yTool, zTool = rotate(-angleOffset, yP, zP)
                     gcode.append('G0 Y%g A%g Z%g' % (
-                            (-angleDirection * (yTool - hDedendum)),
+                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
                             (angleDirection * degrees(angle - angleOffset + toothAngleOffset)),
                             zTool))
                     x = xEnd if x == xStart else xStart
@@ -187,8 +186,9 @@ def main():
 
     # Tool arguments
     parser.add_argument('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
-    parser.add_argument('--depth', '-D', type=float, default=3., help='Tool: depth of cutting head in mm')
+    parser.add_argument('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
     parser.add_argument('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
+    parser.add_argument('--diameter', '-I', type=float, default=15., help='Tool: cutting diameter at tip in mm')
     parser.add_argument('--number', '-N', type=int, default=1, help='Tool: tool number')
     parser.add_argument('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
     parser.add_argument('--feed', '-F', type=float, default=200., help='Tool: feed rate')
@@ -211,7 +211,8 @@ def main():
     print(args)
 
  
-    tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height, number=args.number, rpm=args.rpm, feed=args.feed)
+    tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height, radius=args.diameter / 2.,
+            number=args.number, rpm=args.rpm, feed=args.feed)
     g = Gear(tool, module=args.module, pressureAngle=args.pressure,
             reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
             rightRotary=True)

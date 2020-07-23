@@ -19,16 +19,14 @@ def rotate(a, x, y):
     return x * cos(a) - y * sin(a), x * sin(a) + y * cos(a)
 
 
-# FIX: number of passes should be added
-# FIX: add "ease-in" mode. Similar to number of passes, but smarter
 # FIX: Support for tool files and gear profile files should be added
 # FIX: Add error checking if tool is too small
-# FIX: Add rightRotary to parser
+# FIX: Add support for climb, conventional, both
 
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 
-    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1, rpm=2000, feed=200, mist=False, flood=False):
+    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1, rpm=2000, feed=200, mist=False, flood=False, ease=0):
         self.angle = radians(angle)
         self.depth = depth
         self.radius = radius
@@ -38,6 +36,7 @@ class Tool():
         self.feed = feed
         self.mist = mist
         self.flood = flood
+        self.ease = ease
 
     def __str__(self):
         return "(Angle: %s, Depth: %s, Radius: %s, TipHeight: %s)" % (degrees(self.angle), self.depth, self.radius, self.tipHeight)
@@ -96,16 +95,13 @@ M30
 
         xOffset = self.cutterClearance + blankThickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - hTotal) ** 2)
         xStart, xEnd = -xOffset, xOffset
-        angleDirection = -1 if self.rightRotary else 1
+        angleDirection = 1 if self.rightRotary else -1
 
         # Determine the maximum amount of height (or depth) in the Z axis before part of the cutter
         # won't intersect with the gear blank.
         zMax = min(sqrt(outsideRadius**2 - (outsideRadius-hAddendum)**2), outsideRadius * sin(radians(90.) - self.pressureAngle))
         zMax += zOffset
         zIncr = zMax / self.steps
-
-        # FIX: Missing cleaning of the root
-        # FIX: Steps may need to be spaced differently
 
         # A partial number of teeth can be created if "teethToMake" is set,
         # otherwise all of the gears teeth are cut.
@@ -125,11 +121,12 @@ M30
             else:
                 gcode.append('(%15s: %-70s)' % (v, getattr(self,v)))
 
-        # Move to initial positions
-        gcode.append('')
+        # Move to safe initial position
         x = xStart
+        gcode.append('')
+        gcode.append('G0 Z%g' % -outsideRadius)
         gcode.append('G0 X%g' % x)
-        # FIX: Bring cutter to known safe position in Y and Z axes
+        gcode.append('G0 Y%g' % (angleDirection * (outsideRadius + self.tool.radius + self.cutterClearance)))
 
         # Generate a tooth profile for ever tooth requested
         for tooth in range(teethToMake):
@@ -148,12 +145,27 @@ M30
                 if zSteps <= 0:
                     yP, zP = pitchRadius, z + zOffset
                     yTool, zTool = rotate(angleOffset, yP, zP)
-                    gcode.append('G0 Y%g A%g Z%g' % (
-                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
-                            (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
-                            zTool))
-                    x = xEnd if x == xStart else xStart
-                    gcode.append("G1 X%g" % x)
+                    
+                    # Handle the special case of "easing into the first cut"
+                    if self.tool.ease and zSteps == -self.steps:
+                        yStart = self.tool.radius + yTool
+                        yEnd = self.tool.radius + yTool - hDedendum
+                        yDiv = (yEnd - yStart) / self.tool.ease
+                        for easeStep in range(self.tool.ease):
+                            y = yStart + yDiv * easeStep
+                            gcode.append('G0 Y%g A%g Z%g' % (
+                                    (-angleDirection * y),
+                                    (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
+                                    zTool))
+                            x = xEnd if x == xStart else xStart
+                            gcode.append("G1 X%g" % x)
+                    else:
+                        gcode.append('G0 Y%g A%g Z%g' % (
+                                (-angleDirection * (self.tool.radius + yTool - hDedendum)),
+                                (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
+                                zTool))
+                        x = xEnd if x == xStart else xStart
+                        gcode.append("G1 X%g" % x)
 
                 # Center of the slot
                 if zSteps == 0:
@@ -202,6 +214,7 @@ def main():
     parser.add_argument('--feed', '-F', type=float, default=200., help='Tool: feed rate')
     parser.add_argument('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
     parser.add_argument('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
+    parser.add_argument('--ease', '-E', type=int, default=0, help='Tool: number of steps to "ease into" the first cut')
 
     # Gear type arguments
     parser.add_argument('--module', '-m', type=float, default=1., help='Module of the gear')
@@ -220,7 +233,7 @@ def main():
  
     tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height, radius=args.diameter / 2.,
             number=args.number, rpm=args.rpm, feed=args.feed,
-            mist=args.mist, flood=args.flood)
+            mist=args.mist, flood=args.flood, ease=args.ease)
     g = Gear(tool, module=args.module, pressureAngle=args.pressure,
             reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
             rightRotary=args.right)

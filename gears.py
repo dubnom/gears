@@ -125,27 +125,12 @@ M30
                 gcode.append('(%15s: %-70s)' % (v, getattr(self,v)))
 
         # Move to safe initial position
-        x = xEnd if mill == 'climb' else xStart
+        cut = Cut(mill, xStart, xEnd, -angleDirection * self.cutterClearance)
         gcode.append('')
         gcode.append('G0 Z%g' % outsideRadius)
-        gcode.append('G0 X%g' % x)
         gcode.append('G0 Y%g' % (-angleDirection * (outsideRadius + self.tool.radius + self.cutterClearance)))
+        gcode.append( cut.start() )
 
-        cut = lambda x: cutty(x, gcode, mill, xStart, xEnd)
-
-        def cutty(x, gcode, mill, xStart, xEnd):
-            if mill == 'climb':
-                gcode.append("G1 X%g" % xStart)
-                gcode.append("G0 X%g" % xEnd)
-                return x
-            elif mill == 'conventional':
-                gcode.append("G1 X%g" % xEnd)
-                gcode.append("G0 X%g" % xStart)
-                return x
-            else:
-                x = xEnd if x == xStart else xStart
-                gcode.append("G1 X%g" % x)
-                return x
 
         # Generate a tooth profile for ever tooth requested
         for tooth in range(teethToMake):
@@ -172,37 +157,71 @@ M30
                         yDiv = (yEnd - yStart) / self.tool.ease
                         for easeStep in range(self.tool.ease):
                             y = yStart + yDiv * easeStep
-                            gcode.append('G0 Y%g A%g Z%g' % (
-                                    (-angleDirection * y),
+                            gcode.append( cut.cut(
                                     (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
+                                    (-angleDirection * y),
                                     zTool))
-                            x = cut(x)
 
-                    gcode.append('G0 Y%g A%g Z%g' % (
-                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
+                    gcode.append( cut.cut(
                             (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
+                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
                             zTool))
-                    x = cut(x)
 
                 # Center of the slot
                 if zSteps == 0:
-                    gcode.append('G0 Y%g A%g Z%g' % ( 
-                            (-angleDirection * (self.tool.radius + pitchRadius - hDedendum)),
+                    gcode.append( cut.cut(
                             (angleDirection * degrees(angle + toothAngleOffset)),
+                            (-angleDirection * (self.tool.radius + pitchRadius - hDedendum)),
                             z))
-                    x = cut(x)
                 
                 # Top of the slot
                 if zSteps >= 0:
                     yP, zP = pitchRadius, z - zOffset
                     yTool, zTool = rotate(-angleOffset, yP, zP)
-                    gcode.append('G0 Y%g A%g Z%g' % (
-                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
+                    gcode.append( cut.cut(
                             (angleDirection * degrees(angle - angleOffset + toothAngleOffset)),
+                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
                             zTool))
-                    x = cut(x)
 
         return '\n'.join(gcode)
+
+
+class Cut():
+    """Cut is used to generate the gcode for the actual cutting and retraction
+    of the tool and the gear blank.  This can get a bit complicated due to the
+    different styles of cutting (climb, conventional, both) and the various
+    setups of the rotary table on the left or right side.
+    """
+
+    def __init__(self, mill, xStart, xEnd, yBackoff):
+        self.mill = mill
+        self.xStart = xStart
+        self.xEnd = xEnd
+        self.yBackoff = yBackoff
+        self.stroke = 0
+
+    def start(self):
+        if self.mill == 'climb':
+            return "G0 X%g" % self.xEnd
+        return "G0 X%g" % self.xStart
+
+    def cut(self, a, y, z):
+        if self.mill == 'climb':
+            ret = [ "G1 X%g" % self.xStart,
+                    "G0 Y%g" % (y + self.yBackoff),
+                    "G0 X%g" % self.xEnd,
+                    "G0 Y%g" % y]
+        elif self.mill == 'conventional':
+            ret = [ "G1 X%g" % self.xEnd,
+                    "G0 Y%g" % (y + self.yBackoff),
+                    "G0 X%g" % self.xStart,
+                    "G0 Y%g" % y]
+        else:
+            ret = [ "G1 X%g" % [self.xStart, self.xEnd][self.stroke] ]
+            self.stroke = (self.stroke + 1) % 2
+            
+        return '\n'.join( ["G0 A%g Y%g Z%g" % (a, y, z)] + ret )
+
 
 
 def main():

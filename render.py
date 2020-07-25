@@ -1,13 +1,14 @@
 #!/usr/bin/python3
 
-from shapely.geometry import Polygon, MultiPolygon
-from shapely.affinity import rotate, translate
-import matplotlib.pyplot as plt
 from math import sin, cos, radians
 import re
 import sys
-from celluloid import Camera
 import argparse
+import statistics
+import matplotlib.pyplot as plt
+from celluloid import Camera
+from shapely.geometry import Polygon, MultiPolygon
+from shapely.affinity import rotate, translate
 
 # Parse the command line arguments
 parser = argparse.ArgumentParser(
@@ -22,8 +23,9 @@ parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sy
 parser.add_argument('--verbose', '-v', action='count', default=0, help='Show progress messages')
 parser.add_argument('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='Output animation file')
 parser.add_argument('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
-parser.add_argument('--animate', '-a', action='count', default=0, help='Generate animation')
-parser.add_argument('--picture', '-p', action='count', default=0, help='Generate picture')
+parser.add_argument('--animate', '-a', action='store_true', help='Generate animation')
+parser.add_argument('--picture', '-p', action='store_true', help='Generate picture')
+parser.add_argument('--stats', '-s', action='store_true', help='Generate statistics')
 parser.add_argument('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
 args = parser.parse_args()
 
@@ -33,9 +35,9 @@ pictureFile = args.P
 final = args.picture > 0
 animate = args.animate > 0
 verbose = args.verbose
+stats = args.stats
 
-
-if not (final or animate):
+if not (final or animate or stats):
     parser.print_help()
     exit(-1)
 
@@ -56,6 +58,7 @@ if animate:
 cutterY = cutterZ = curAngle = 0.
 tooth = 0
 stepNumber = 0
+cuttings = []
 with open('teeth.nc') as f:
     for line in f:
         l = line.strip()
@@ -65,27 +68,33 @@ with open('teeth.nc') as f:
         mRotary     = paramsRotary.match(l)
         mgCode      = re.findall(parseGCode, l)
 
+        # Tooth comment
         if mTooth:
             tooth = int(mTooth.group(1))
             if verbose:
                 print('Processing tooth #%g' % tooth)
 
+        # Numeric arguments
         elif mGeneral:
             name = mGeneral.group(1)
             value = float(mGeneral.group(2))
             locals()[name] = value
 
+        # Rotary argument
         elif mRotary:
             rightRotary = mRotary.group(1) == 'True'
 
+        # Tool argument
         elif mTool:
             toolAngle = float(mTool.group(1))
             toolDepth = float(mTool.group(2))
             toolRadius = float(mTool.group(3))
             toolTipHeight = float(mTool.group(4))
 
+        # GCode
         elif mgCode:
             if stepNumber == 0:
+                # Create all of the shapes the first time real GCode is encountered.
                 if verbose:
                     print('Header has been read')
 
@@ -123,6 +132,7 @@ with open('teeth.nc') as f:
                         (-shaft, 4. * y),
                         ])
 
+            # Move and cut based on each axis
             for axis, amt in mgCode:
                 stepNumber += 1
                 amt = float(amt)
@@ -132,10 +142,16 @@ with open('teeth.nc') as f:
                 elif axis == 'X':
                     if cutterY:
                         curCutter = translate(cutter, cutterY, cutterZ)
+                        areaStart = gearBlank.area
                         gearBlank = gearBlank.difference(curCutter)
                         # Deal with an acute cutter trimming off a shard
                         if type(gearBlank) == MultiPolygon:
                             gearBlank = gearBlank[0]
+                        
+                        # Track material removal
+                        amountCut = areaStart - gearBlank.area
+                        if amountCut > 0.:
+                            cuttings.append(amountCut)
 
                         # Write an animation frame
                         if animate and (teethToDraw == -1 or tooth < teethToDraw):
@@ -153,14 +169,14 @@ with open('teeth.nc') as f:
                 elif axis == 'Z':
                     cutterZ = amt
 
-# Create the animation (if we're creating animations)
+# Create the animation
 if animate:
     if verbose:
         print('Generating animation "%s"' % animationFile)
     animation = camera.animate()
     animation.save(animationFile, writer = 'pillow')
 
-# Create a final picture of the gear (if we're creating final pictures of gears)
+# Create a final picture of the gear
 if final:
     if verbose:
         print('Generating picture "%s"' % pictureFile)
@@ -172,4 +188,34 @@ if final:
     plt.grid()
     plt.axis('equal')
     plt.savefig(pictureFile)
+
+# Print statistics
+if stats:
+    print("Number of cuts: %g" % len(cuttings))
+    print("Total material removed: %g mm^3" % (sum(cuttings) * blankThickness))
+    print("Cross section (per pass):")
+    print("    Maximum: %g mm^2" % max(cuttings))
+    print("    Minimum: %g mm^2" % min(cuttings))
+    print("    Average: %g mm^2" % statistics.mean(cuttings))
+    print("Material removal (per pass):")
+    print("    Maximum: %g mm^3" % (blankThickness * max(cuttings)))
+    print("    Minimum: %g mm^3" % (blankThickness * min(cuttings)))
+    print("    Average: %g mm^3" % (blankThickness * statistics.mean(cuttings)))
+    print("Cutting rate (per pass):")
+
+    toolFeed = 200
+    toolRPM = 4000
+    toolFlutes = 4
+    area = blankThickness * max(cuttings)
+    cutTime = blankThickness / toolFeed
+    cutCount = toolRPM * cutTime * toolFlutes
+    materialPerFlute =  area * blankThickness / cutCount
+    materialRR = area * blankThickness / cutTime
+
+    print("    Time per each cut: %g mins" % cutTime)
+    print("    Cut count per pass: %g" % cutCount)
+    print("    Material per flute: %g mm^3" % materialPerFlute)
+    print("    Material removal rate: %g mm^3/min" % materialRR)
+
+
 

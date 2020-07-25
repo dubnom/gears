@@ -202,28 +202,38 @@ if svg:
 
 # Print statistics
 if stats:
-    print("Number of cuts: %g" % len(cuttings))
-    print("Total material removed: %g mm^3" % (sum(cuttings) * blankThickness))
+    inches = True
+    if inches:
+        conv1, units1 = 1/ 25.4, "inch"
+        conv2, units2 = conv1 / 25.4, "inch^2"
+        conv3, units3 = conv2 / 25.4, "inch^3" 
+    else:
+        conv1, units1 = .1, "cm"
+        conv2, units2 = .01, "cm^2"
+        conv3, units3 = .001, "cc"
+
+    print("Number of passes: %g" % len(cuttings))
+    print("Total material removed: %g %s" % (conv3 * sum(cuttings) * blankThickness, units3))
     print("Cross section (per pass):")
-    print("    Maximum: %g mm^2" % max(cuttings))
-    print("    Minimum: %g mm^2" % min(cuttings))
-    print("    Average: %g mm^2" % statistics.mean(cuttings))
+    print("    Maximum: %g %s" % (conv2 * max(cuttings), units2))
+    print("    Minimum: %g %s" % (conv2 * min(cuttings), units2))
+    print("    Average: %g %s" % (conv2 * statistics.mean(cuttings), units2))
     print("Material removal (per pass):")
-    print("    Maximum: %g mm^3" % (blankThickness * max(cuttings)))
-    print("    Minimum: %g mm^3" % (blankThickness * min(cuttings)))
-    print("    Average: %g mm^3" % (blankThickness * statistics.mean(cuttings)))
+    print("    Maximum: %g %s" % (conv3 * blankThickness * max(cuttings), units3))
+    print("    Minimum: %g %s" % (conv3 * blankThickness * min(cuttings), units3))
+    print("    Average: %g %s" % (conv3 * blankThickness * statistics.mean(cuttings), units3))
     print("Cutting rate (per pass):")
 
     toolFeed = 200
     toolRPM = 4000
     toolFlutes = 4
-    area = blankThickness * max(cuttings)
+    area = max(cuttings)
     cutTime = blankThickness / toolFeed
     cutCount = toolRPM * cutTime * toolFlutes
     materialPerFlute =  area * blankThickness / cutCount
     materialRR = area * blankThickness / cutTime
 
-    print("    Time per each cut: %g mins" % cutTime)
-    print("    Cut count per pass: %g" % cutCount)
-    print("    Material per flute: %g mm^3" % materialPerFlute)
-    print("    Material removal rate: %g mm^3/min" % materialRR)
+    print("    Time per each pass: %g mins" % cutTime)
+    print("    Cuts per pass: %g" % cutCount)
+    print("    Material per flute: %g %s" % (conv3 * materialPerFlute, units3))
+    print("    Material removal rate: %g %s/min" % (conv3 * materialRR, units3))

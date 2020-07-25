@@ -23,8 +23,10 @@ parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sy
 parser.add_argument('--verbose', '-v', action='count', default=0, help='Show progress messages')
 parser.add_argument('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='Output animation file')
 parser.add_argument('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
+parser.add_argument('--G', '-G', nargs=1, default='gear.svg', metavar='filename', help='Output SVG file')
 parser.add_argument('--animate', '-a', action='store_true', help='Generate animation')
 parser.add_argument('--picture', '-p', action='store_true', help='Generate picture')
+parser.add_argument('--svg', '-g', action="store_true", help='Generate svg file')
 parser.add_argument('--stats', '-s', action='store_true', help='Generate statistics')
 parser.add_argument('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
 args = parser.parse_args()
@@ -32,12 +34,14 @@ args = parser.parse_args()
 teethToDraw = args.teeth[0]
 animationFile = args.A
 pictureFile = args.P
-final = args.picture > 0
-animate = args.animate > 0
+svgFile = args.G
+final = args.picture
+animate = args.animate
+svg = args.svg
 verbose = args.verbose
 stats = args.stats
 
-if not (final or animate or stats):
+if not (final or animate or svg or stats):
     parser.print_help()
     exit(-1)
 
@@ -189,6 +193,13 @@ if final:
     plt.axis('equal')
     plt.savefig(pictureFile)
 
+# Create an svg file of only the gear
+if svg:
+    if verbose:
+        print('Generating svg file "%s"' % svgFile)
+    with open(svgFile, 'w') as f:
+        f.write(gearBlank._repr_svg_())
+
 # Print statistics
 if stats:
     print("Number of cuts: %g" % len(cuttings))
@@ -216,6 +227,3 @@ if stats:
     print("    Cut count per pass: %g" % cutCount)
     print("    Material per flute: %g mm^3" % materialPerFlute)
     print("    Material removal rate: %g mm^3/min" % materialRR)
-
-
-

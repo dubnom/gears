@@ -1,18 +1,22 @@
 #!/usr/bin/python3
 
-#import argparse
-import configargparse
-import sys
-from math import sin, cos, radians, degrees, sqrt, pi 
-
 """
 G Code generator for cutting metric involute gears.
 
-It is currently designed to use double angle shaft cutters or double bevel cutters.
-In the future, the code will be modified to use single angle cutters and slitting saws.
+It is currently designed to use double angle shaft cutters or double bevel
+cutters. In the future, the code will be modified to use single angle cutters
+and slitting saws.
 
 All input parameters are specified in millimeters or degrees.
 """
+
+# FIX: Add error checking if tool is too small
+# FIX: Add multiple passes
+# FIX: Add support for DP
+
+import configargparse
+import sys
+from math import sin, cos, radians, degrees, sqrt, pi
 
 
 def rotate(a, x, y):
@@ -20,14 +24,12 @@ def rotate(a, x, y):
     return x * cos(a) - y * sin(a), x * sin(a) + y * cos(a)
 
 
-# FIX: Add error checking if tool is too small
-# FIX: Add support for climb, conventional, both
-
 class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 
-    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0., number=1,
-                rpm=2000, feed=200, mist=False, flood=False, ease=0, mill='both'):
+    def __init__(self, angle=40., depth=3., radius=10., tipHeight=0.,
+                 number=1, rpm=2000, feed=200, mist=False, flood=False,
+                 ease=0, mill='both'):
         self.angle = radians(angle)
         self.depth = depth
         self.radius = radius
@@ -41,13 +43,15 @@ class Tool():
         self.mill = mill
 
     def __str__(self):
-        return "(Angle: %s, Depth: %s, Radius: %s, TipHeight: %s)" % (degrees(self.angle), self.depth, self.radius, self.tipHeight)
+        return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {})".format(
+            degrees(self.angle), self.depth, self.radius, self.tipHeight)
 
 
 class Gear():
     """The Gear class is used to generate G Code of involute gears."""
 
-    def __init__(self, tool, module=1., pressureAngle=20., reliefFactor=1.25, steps=5, cutterClearance = 2., rightRotary=False):
+    def __init__(self, tool, module=1., pressureAngle=20., reliefFactor=1.25,
+                 steps=5, cutterClearance=2., rightRotary=False):
         self.module = module
         self.tool = tool
         self.reliefFactor = reliefFactor
@@ -68,10 +72,10 @@ T{number} G43 H{number} M6
 S{rpm} M3{mist}{flood}
 G54
 F{feed}""".format(number=self.tool.number,
-        feed=self.tool.feed,
-        rpm=self.tool.rpm,
-        mist=' M07' if self.tool.mist else '',
-        flood=' M08' if self.tool.flood else '')
+                  feed=self.tool.feed,
+                  rpm=self.tool.rpm,
+                  mist=' M07' if self.tool.mist else '',
+                  flood=' M08' if self.tool.flood else '')
 
     def footer(self):
         return \
@@ -91,8 +95,8 @@ M30
         baseDiameter = pitchDiameter * cos(self.pressureAngle)
         outsideDiameter = pitchDiameter + 2 * hAddendum
         outsideRadius = outsideDiameter / 2.
-        
-        angleOffset = self.tool.angle / 2. - self.pressureAngle 
+
+        angleOffset = self.tool.angle / 2. - self.pressureAngle
         zOffset = (circularPitch / 2. - 2. * sin(self.tool.angle / 2.) * hDedendum - self.tool.tipHeight) / 2.
 
         xOffset = self.cutterClearance + blankThickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - hTotal) ** 2)
@@ -111,26 +115,26 @@ M30
         if teethToMake == 0 or teethToMake > teeth:
             teethToMake = teeth
 
-        gcode = [] 
+        gcode = []
 
         # Include all of the generating parameters in the G Code header
-        f = ['zMax', 'module', 'teeth', 'blankThickness', 'tool', 'reliefFactor', 'pressureAngle', 'steps',
-                'cutterClearance', 'rightRotary', 'hAddendum', 'hDedendum', 'hTotal', 'circularPitch',
-                'pitchDiameter', 'baseDiameter', 'outsideDiameter', 'outsideRadius', 'zOffset',
-                'angleOffset', 'xStart', 'xEnd']
+        f = ['zMax', 'module', 'teeth', 'blankThickness', 'tool', 'reliefFactor',
+             'pressureAngle', 'steps', 'cutterClearance', 'rightRotary', 'hAddendum',
+             'hDedendum', 'hTotal', 'circularPitch', 'pitchDiameter', 'baseDiameter',
+             'outsideDiameter', 'outsideRadius', 'zOffset', 'angleOffset', 'xStart',
+             'xEnd']
         for v in f:
             if v in locals():
                 gcode.append('(%15s: %-70s)' % (v, locals()[v]))
             else:
-                gcode.append('(%15s: %-70s)' % (v, getattr(self,v)))
+                gcode.append('(%15s: %-70s)' % (v, getattr(self, v)))
 
         # Move to safe initial position
         cut = Cut(mill, xStart, xEnd, -angleDirection * self.cutterClearance)
         gcode.append('')
         gcode.append('G0 Z%g' % outsideRadius)
         gcode.append('G0 Y%g' % (-angleDirection * (outsideRadius + self.tool.radius + self.cutterClearance)))
-        gcode.append( cut.start() )
-
+        gcode.append(cut.start())
 
         # Generate a tooth profile for ever tooth requested
         for tooth in range(teethToMake):
@@ -149,7 +153,7 @@ M30
                 if zSteps <= 0:
                     yP, zP = pitchRadius, z + zOffset
                     yTool, zTool = rotate(angleOffset, yP, zP)
-                    
+
                     # Handle the special case of "easing into the first cut"
                     if self.tool.ease and zSteps == -self.steps:
                         yStart = self.tool.radius + yTool
@@ -157,31 +161,31 @@ M30
                         yDiv = (yEnd - yStart) / self.tool.ease
                         for easeStep in range(self.tool.ease):
                             y = yStart + yDiv * easeStep
-                            gcode.append( cut.cut(
-                                    (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
-                                    (-angleDirection * y),
-                                    zTool))
+                            gcode.append(cut.cut(
+                                (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
+                                (-angleDirection * y),
+                                zTool))
 
-                    gcode.append( cut.cut(
-                            (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
-                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
-                            zTool))
+                    gcode.append(cut.cut(
+                        (angleDirection * degrees(angle + angleOffset + toothAngleOffset)),
+                        (-angleDirection * (self.tool.radius + yTool - hDedendum)),
+                        zTool))
 
                 # Center of the slot
                 if zSteps == 0:
-                    gcode.append( cut.cut(
-                            (angleDirection * degrees(angle + toothAngleOffset)),
-                            (-angleDirection * (self.tool.radius + pitchRadius - hDedendum)),
-                            z))
-                
+                    gcode.append(cut.cut(
+                        (angleDirection * degrees(angle + toothAngleOffset)),
+                        (-angleDirection * (self.tool.radius + pitchRadius - hDedendum)),
+                        z))
+
                 # Top of the slot
                 if zSteps >= 0:
                     yP, zP = pitchRadius, z - zOffset
                     yTool, zTool = rotate(-angleOffset, yP, zP)
-                    gcode.append( cut.cut(
-                            (angleDirection * degrees(angle - angleOffset + toothAngleOffset)),
-                            (-angleDirection * (self.tool.radius + yTool - hDedendum)),
-                            zTool))
+                    gcode.append(cut.cut(
+                        (angleDirection * degrees(angle - angleOffset + toothAngleOffset)),
+                        (-angleDirection * (self.tool.radius + yTool - hDedendum)),
+                        zTool))
 
         return '\n'.join(gcode)
 
@@ -207,35 +211,34 @@ class Cut():
 
     def cut(self, a, y, z):
         if self.mill == 'climb':
-            ret = [ "G1 X%g" % self.xStart,
-                    "G0 Y%g" % (y + self.yBackoff),
-                    "G0 X%g" % self.xEnd,
-                    "G0 Y%g" % y]
+            ret = ["G1 X%g" % self.xStart,
+                   "G0 Y%g" % (y + self.yBackoff),
+                   "G0 X%g" % self.xEnd,
+                   "G0 Y%g" % y]
         elif self.mill == 'conventional':
-            ret = [ "G1 X%g" % self.xEnd,
-                    "G0 Y%g" % (y + self.yBackoff),
-                    "G0 X%g" % self.xStart,
-                    "G0 Y%g" % y]
+            ret = ["G1 X%g" % self.xEnd,
+                   "G0 Y%g" % (y + self.yBackoff),
+                   "G0 X%g" % self.xStart,
+                   "G0 Y%g" % y]
         else:
-            ret = [ "G1 X%g" % [self.xStart, self.xEnd][self.stroke] ]
+            ret = ["G1 X%g" % [self.xStart, self.xEnd][self.stroke]]
             self.stroke = (self.stroke + 1) % 2
-            
-        return '\n'.join( ["G0 A%g Y%g Z%g" % (a, y, z)] + ret )
 
+        return '\n'.join(["G0 A%g Y%g Z%g" % (a, y, z)] + ret)
 
 
 def main():
     p = configargparse.ArgParser(
-            default_config_files=['gears.cfg'],
-            formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
-            prog="gears",
-            description="Generate G Code to create involute spur gears.",
-            epilog="""
-                By using simple cutters like double angle shaft cutters or #8 gear cutter, you can cut
-                most modules, pressure angles, and tooth count involute spur gears.  The limiting factors
-                are the size of the cutter and the working envelope of the mill.
+        default_config_files=['gears.cfg'],
+        formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
+        prog="gears",
+        description="Generate G Code to create involute spur gears.",
+        epilog="""
+            By using simple cutters like double angle shaft cutters or #8 gear cutter, you can cut
+            most modules, pressure angles, and tooth count involute spur gears.  The limiting factors
+            are the size of the cutter and the working envelope of the mill.
 
-                A rotary 4th-axis is used to rotate the gear blank with the cutting tool held in the spindle.
+            A rotary 4th-axis is used to rotate the gear blank with the cutting tool held in the spindle.
                 """)
     p.add('outfile', nargs='?', type=configargparse.FileType('w'), default=sys.stdout)
     p.add('--config', '-X', is_config_file=True, help='Config file path')
@@ -267,13 +270,15 @@ def main():
     p.add('--make', type=int, default=0, help='Actual number of teeth to cut.')
 
     args = p.parse_args()
- 
-    tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height, radius=args.diameter / 2.,
-            number=args.number, rpm=args.rpm, feed=args.feed,
-            mist=args.mist, flood=args.flood, ease=args.ease, mill=args.mill)
+
+    tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height,
+                radius=args.diameter / 2., number=args.number, rpm=args.rpm,
+                feed=args.feed, mist=args.mist, flood=args.flood, ease=args.ease,
+                mill=args.mill)
+
     g = Gear(tool, module=args.module, pressureAngle=args.pressure,
-            reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
-            rightRotary=args.right)
+             reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
+             rightRotary=args.right)
 
     print(g.header())
     print(g.generate(args.teeth, args.thick, args.make))

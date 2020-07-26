@@ -8,7 +8,7 @@ Also calculate and display statistics about the cutting process.
 Copyright 2020 - Michael Dubno - New York
 """
 
-from math import sin, cos, radians, pi
+from math import sin, cos, radians, degrees, pi
 import re
 import sys
 import configargparse
@@ -212,9 +212,11 @@ if svg:
 
 # Print statistics
 if stats:
+    inches = False
     toolFeed = 200
     toolRPM = 4000
     toolFlutes = 4
+
     area = max(cuttings)
     cutTime = blankThickness / toolFeed
     cutCount = toolRPM * cutTime * toolFlutes
@@ -223,28 +225,32 @@ if stats:
 
     surfaceMPS = .001 * toolRadius * 2. * pi * (toolRPM / 60.)
 
-    inches = True
     if inches:
         conv1, units1 = 1/ 25.4, "inch"
         conv2, units2 = conv1 / 25.4, "inch^2"
         conv3, units3 = conv2 / 25.4, "inch^3" 
     else:
-        conv1, units1 = .1, "cm"
+        conv1, units1 = 1, "mm"
         conv2, units2 = .01, "cm^2"
         conv3, units3 = .001, "cc"
 
     print("Parameters:")
     print("    Tool:")
     print("        RPM: %g" % toolRPM)
-    print("        Radius: %g" % toolRadius)
-    print("        Depth: %g" % toolDepth)
+    print("        Radius: %g %s" % (conv1 * toolRadius, units1))
+    print("        Depth: %g %s" % (conv1 * toolDepth, units1))
     print("        Flutes: %g" % toolFlutes)
-    print("        Feed: %g" % toolFeed)
+    print("        Feed: %g %s/minute" % (conv1 * toolFeed, units1))
     print("        Feed per tooth: %g %s" % (conv1 * toolFeed / (toolRPM * toolFlutes), units1))
     if inches:
         print("        SFM: %g feet/minute" % (surfaceMPS / .00508))
     else:
-        print("        Surface m/sec: %g" % surfaceMPS)
+        print("        Surface meters/minute: %g" % (surfaceMPS * 60.))
+    print("    Gear:")
+    print("        Module: %g" % module)
+    print("        Teeth: %g" % teeth)
+    print("        Thickness: %g %s" % (blankThickness * conv1, units1))
+    print("        Pressure Angle: %g degrees" % degrees(pressureAngle))
     print("    Cutting:")
     print("        Passes: %g" % len(cuttings))
     print("        Total material removed: %g %s" % (conv3 * sum(cuttings) * blankThickness, units3))

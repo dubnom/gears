@@ -123,7 +123,7 @@ M30
         # won't intersect with the gear blank.
         zMax = min(sqrt(outsideRadius**2 - (outsideRadius-hAddendum)**2), outsideRadius * sin(radians(90.) - self.pressureAngle))
         zMax += zOffset
-        zIncr = zMax / self.steps
+        zIncr = 0 if self.steps == 0 else zMax / self.steps
 
         # A partial number of teeth can be created if "teethToMake" is set,
         # otherwise all of the gears teeth are cut.

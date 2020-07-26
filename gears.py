@@ -8,15 +8,17 @@ cutters. In the future, the code will be modified to use single angle cutters
 and slitting saws.
 
 All input parameters are specified in millimeters or degrees.
+
+Copyright 2020 - Michael Dubno - New York
 """
 
 # FIX: Add error checking if tool is too small
 # FIX: Add multiple passes
 # FIX: Add support for DP
 
-import configargparse
 import sys
 from math import sin, cos, radians, degrees, sqrt, pi
+import configargparse
 
 
 def rotate(a, x, y):

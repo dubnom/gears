@@ -1,9 +1,17 @@
 #!/usr/bin/python3
 
-from math import sin, cos, radians
+"""
+Render 2-dimensional pictures and animations from gear cutting G code files.
+
+Also calculate and display statistics about the cutting process.
+
+Copyright 2020 - Michael Dubno - New York
+"""
+
+from math import sin, cos, radians, pi
 import re
 import sys
-import argparse
+import configargparse
 import statistics
 import matplotlib.pyplot as plt
 from celluloid import Camera
@@ -11,25 +19,27 @@ from shapely.geometry import Polygon, MultiPolygon
 from shapely.affinity import rotate, translate
 
 # Parse the command line arguments
-parser = argparse.ArgumentParser(
-        prog="render",
-        description="Render G Code gear cutting files.",
-        epilog="""
-            Render can create animations and/or final images from a G Code involute
-            spur gear cutting file.  Creating animated GIFS can take a long time,
-            so you can speed things up by animating a limited set of teeth.
-            """)
-parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
-parser.add_argument('--verbose', '-v', action='count', default=0, help='Show progress messages')
-parser.add_argument('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='Output animation file')
-parser.add_argument('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
-parser.add_argument('--G', '-G', nargs=1, default='gear.svg', metavar='filename', help='Output SVG file')
-parser.add_argument('--animate', '-a', action='store_true', help='Generate animation')
-parser.add_argument('--picture', '-p', action='store_true', help='Generate picture')
-parser.add_argument('--svg', '-g', action="store_true", help='Generate svg file')
-parser.add_argument('--stats', '-s', action='store_true', help='Generate statistics')
-parser.add_argument('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
-args = parser.parse_args()
+p = configargparse.ArgParser(
+    default_config_files=['render.cfg'],
+    formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
+    prog="render",
+    description="Render G Code gear cutting files.",
+    epilog="""
+        Render can create animations and/or final images from a G Code involute
+        spur gear cutting file.  Creating animated GIFS can take a long time,
+        so you can speed things up by animating a limited set of teeth.
+        """)
+p.add('infile', nargs='?', type=configargparse.FileType('r'), default=sys.stdin)
+p.add('--verbose', '-v', action='count', default=0, help='Show progress messages')
+p.add('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='Output animation file')
+p.add('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
+p.add('--G', '-G', nargs=1, default='gear.svg', metavar='filename', help='Output SVG file')
+p.add('--animate', '-a', action='store_true', help='Generate animation')
+p.add('--picture', '-p', action='store_true', help='Generate picture')
+p.add('--svg', '-g', action="store_true", help='Generate svg file')
+p.add('--stats', '-s', action='store_true', help='Generate statistics')
+p.add('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
+args = p.parse_args()
 
 teethToDraw = args.teeth[0]
 animationFile = args.A
@@ -202,6 +212,17 @@ if svg:
 
 # Print statistics
 if stats:
+    toolFeed = 200
+    toolRPM = 4000
+    toolFlutes = 4
+    area = max(cuttings)
+    cutTime = blankThickness / toolFeed
+    cutCount = toolRPM * cutTime * toolFlutes
+    materialPerFlute =  area * blankThickness / cutCount
+    materialRR = area * blankThickness / cutTime
+
+    surfaceMPS = .001 * toolRadius * 2. * pi * (toolRPM / 60.)
+
     inches = True
     if inches:
         conv1, units1 = 1/ 25.4, "inch"
@@ -212,8 +233,21 @@ if stats:
         conv2, units2 = .01, "cm^2"
         conv3, units3 = .001, "cc"
 
-    print("Number of passes: %g" % len(cuttings))
-    print("Total material removed: %g %s" % (conv3 * sum(cuttings) * blankThickness, units3))
+    print("Parameters:")
+    print("    Tool:")
+    print("        RPM: %g" % toolRPM)
+    print("        Radius: %g" % toolRadius)
+    print("        Depth: %g" % toolDepth)
+    print("        Flutes: %g" % toolFlutes)
+    print("        Feed: %g" % toolFeed)
+    print("        Feed per tooth: %g %s" % (conv1 * toolFeed / (toolRPM * toolFlutes), units1))
+    if inches:
+        print("        SFM: %g feet/minute" % (surfaceMPS / .00508))
+    else:
+        print("        Surface m/sec: %g" % surfaceMPS)
+    print("    Cutting:")
+    print("        Passes: %g" % len(cuttings))
+    print("        Total material removed: %g %s" % (conv3 * sum(cuttings) * blankThickness, units3))
     print("Cross section (per pass):")
     print("    Maximum: %g %s" % (conv2 * max(cuttings), units2))
     print("    Minimum: %g %s" % (conv2 * min(cuttings), units2))
@@ -223,16 +257,6 @@ if stats:
     print("    Minimum: %g %s" % (conv3 * blankThickness * min(cuttings), units3))
     print("    Average: %g %s" % (conv3 * blankThickness * statistics.mean(cuttings), units3))
     print("Cutting rate (per pass):")
-
-    toolFeed = 200
-    toolRPM = 4000
-    toolFlutes = 4
-    area = max(cuttings)
-    cutTime = blankThickness / toolFeed
-    cutCount = toolRPM * cutTime * toolFlutes
-    materialPerFlute =  area * blankThickness / cutCount
-    materialRR = area * blankThickness / cutTime
-
     print("    Time per each pass: %g mins" % cutTime)
     print("    Cuts per pass: %g" % cutCount)
     print("    Material per flute: %g %s" % (conv3 * materialPerFlute, units3))

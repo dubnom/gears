@@ -35,6 +35,7 @@ class Tool():
         assert depth > 0., 'Tool: Depth must be greater than 0'
         assert radius > depth, 'Tool: Radius must be greater than depth'
         assert tipHeight >= 0, 'Tool: tipHeight must be greater than or equal to 0'
+        assert mill in ['both', 'climb', 'conventional'], 'Tool: mill must be "both", "climb", or "conventional'
 
         self.angle = radians(angle)
         self.depth = depth
@@ -129,24 +130,11 @@ M30
         if teethToMake == 0 or teethToMake > teeth:
             teethToMake = teeth
 
-        gcode = []
-
-        # Include all of the generating parameters in the G Code header
-        f = ['zMax', 'module', 'teeth', 'blankThickness', 'tool', 'reliefFactor',
-             'pressureAngle', 'steps', 'cutterClearance', 'rightRotary', 'hAddendum',
-             'hDedendum', 'hTotal', 'circularPitch', 'pitchDiameter', 'baseDiameter',
-             'outsideDiameter', 'outsideRadius', 'zOffset', 'angleOffset', 'xStart',
-             'xEnd']
-        for v in f:
-            if v in locals():
-                gcode.append('(%15s: %-70s)' % (v, locals()[v]))
-            else:
-                gcode.append('(%15s: %-70s)' % (v, getattr(self, v)))
+        # Make sure the cutter is big enough
+        if hTotal > self.tool.depth:
+           raise ValueError("Cutter depth is too shallow for tooth height")
 
         # Check to make sure the cutter shaft doesn't hit the gear blank.
-        if hTotal > self.tool.depth:
-           raise ValueError("Cutter depth is too shallow to tooth height")
-
         shaftRadius = self.tool.radius - self.tool.depth
         yP, zP = pitchRadius, zMax + zOffset
         yTool, zTool = rotate(-angleOffset, yP, zP)
@@ -154,6 +142,19 @@ M30
         shaftClearance = y - outsideRadius - shaftRadius
         if shaftClearance < 0:
             raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaftClearance)
+
+        # Include all of the generating parameters in the G Code header
+        f = ['zMax', 'module', 'teeth', 'blankThickness', 'tool', 'reliefFactor',
+             'pressureAngle', 'steps', 'cutterClearance', 'rightRotary', 'hAddendum',
+             'hDedendum', 'hTotal', 'circularPitch', 'pitchDiameter', 'baseDiameter',
+             'outsideDiameter', 'outsideRadius', 'zOffset', 'angleOffset', 'xStart',
+             'xEnd']
+        gcode = []
+        for v in f:
+            if v in locals():
+                gcode.append('(%15s: %-70s)' % (v, locals()[v]))
+            else:
+                gcode.append('(%15s: %-70s)' % (v, getattr(self, v)))
 
         # Move to safe initial position
         cut = Cut(mill, xStart, xEnd, -angleDirection * self.cutterClearance)
@@ -297,18 +298,21 @@ def main():
 
     args = p.parse_args()
 
-    tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height,
-                radius=args.diameter / 2., number=args.number, rpm=args.rpm,
-                feed=args.feed, mist=args.mist, flood=args.flood, ease=args.ease,
-                mill=args.mill)
+    try:
+        tool = Tool(angle=args.angle, depth=args.depth, tipHeight=args.height,
+                    radius=args.diameter / 2., number=args.number, rpm=args.rpm,
+                    feed=args.feed, mist=args.mist, flood=args.flood, ease=args.ease,
+                    mill=args.mill)
 
-    g = Gear(tool, module=args.module, pressureAngle=args.pressure,
-             reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
-             rightRotary=args.right)
+        g = Gear(tool, module=args.module, pressureAngle=args.pressure,
+                 reliefFactor=args.relief, steps=args.steps, cutterClearance=args.clear,
+                 rightRotary=args.right)
 
-    print(g.header())
-    print(g.generate(args.teeth, args.thick, args.make))
-    print(g.footer())
+        print(g.header())
+        print(g.generate(args.teeth, args.thick, args.make))
+        print(g.footer())
+    except Exception as e:
+        print(e, file=sys.stderr)
 
 
 if __name__ == '__main__':

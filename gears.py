@@ -12,7 +12,6 @@ All input parameters are specified in millimeters or degrees.
 Copyright 2020 - Michael Dubno - New York
 """
 
-# FIX: Add error checking if tool is too small
 # FIX: Add multiple passes
 # FIX: Add support for DP
 
@@ -32,6 +31,11 @@ class Tool():
     def __init__(self, angle=40., depth=3., radius=10., tipHeight=0.,
                  number=1, rpm=2000, feed=200, mist=False, flood=False,
                  ease=0, mill='both'):
+        assert angle >= 0., 'Tool: Angle must be greater than or equal to 0'
+        assert depth > 0., 'Tool: Depth must be greater than 0'
+        assert radius > depth, 'Tool: Radius must be greater than depth'
+        assert tipHeight >= 0, 'Tool: tipHeight must be greater than or equal to 0'
+
         self.angle = radians(angle)
         self.depth = depth
         self.radius = radius
@@ -54,6 +58,10 @@ class Gear():
 
     def __init__(self, tool, module=1., pressureAngle=20., reliefFactor=1.25,
                  steps=5, cutterClearance=2., rightRotary=False):
+        assert module > 0, 'Gear: Module must be greater than 0.'
+        assert pressureAngle > 0, 'Gear: Pressure angle must be greater than 0.'
+        assert steps >= 0, 'Gear: Steps must be greater than or equal to 0.'
+
         self.module = module
         self.tool = tool
         self.reliefFactor = reliefFactor
@@ -88,6 +96,10 @@ M30
 %"""
 
     def generate(self, teeth, blankThickness, teethToMake=0):
+        assert teeth > 0, 'Gear: Number of teeth must be greater than 0.'
+        assert blankThickness > 0, 'Gear: Blank thickness must be greater than 0.'
+
+        # Calculate the variables used to generate the gear teeth
         hAddendum = self.module
         hDedendum = self.module * self.reliefFactor
         hTotal = hAddendum + hDedendum
@@ -130,6 +142,18 @@ M30
                 gcode.append('(%15s: %-70s)' % (v, locals()[v]))
             else:
                 gcode.append('(%15s: %-70s)' % (v, getattr(self, v)))
+
+        # Check to make sure the cutter shaft doesn't hit the gear blank.
+        if hTotal > self.tool.depth:
+           raise ValueError("Cutter depth is too shallow to tooth height")
+
+        shaftRadius = self.tool.radius - self.tool.depth
+        yP, zP = pitchRadius, zMax + zOffset
+        yTool, zTool = rotate(-angleOffset, yP, zP)
+        y = self.tool.radius + yTool - hDedendum
+        shaftClearance = y - outsideRadius - shaftRadius
+        if shaftClearance < 0:
+            raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaftClearance)
 
         # Move to safe initial position
         cut = Cut(mill, xStart, xEnd, -angleDirection * self.cutterClearance)

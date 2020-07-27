@@ -136,7 +136,7 @@ with open('teeth.nc') as f:
                 y = half_tip + sin(radians(tool_angle / 2.)) * tool_depth
                 shaft = tool_radius - tool_depth
                 cutter = Polygon([
-                    (shaft, 4. * y),
+                    (shaft, outside_radius),
                     (shaft, y),
                     (tool_radius, half_tip),
                     (tool_radius, -half_tip),
@@ -145,7 +145,7 @@ with open('teeth.nc') as f:
                     (-tool_radius, -half_tip),
                     (-tool_radius, half_tip),
                     (-shaft, y),
-                    (-shaft, 4. * y),
+                    (-shaft, outside_radius),
                     ])
 
             # Move and cut based on each axis
@@ -162,7 +162,11 @@ with open('teeth.nc') as f:
                         gear_blank = gear_blank.difference(cur_cutter)
                         # Deal with an acute cutter trimming off a shard
                         if type(gear_blank) == MultiPolygon:
-                            gear_blank = gear_blank[0]
+                            big_poly, area = None, 0.
+                            for polygon in gear_blank:
+                                if polygon.area > area:
+                                    big_poly, area = polygon, polygon.area
+                            gear_blank = big_poly
 
                         # Track material removal
                         amountCut = area_start - gear_blank.area

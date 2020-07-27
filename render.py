@@ -9,10 +9,10 @@ Copyright 2020 - Michael Dubno - New York
 """
 
 from math import sin, cos, radians, degrees, pi
+import statistics
 import re
 import sys
 import configargparse
-import statistics
 import matplotlib.pyplot as plt
 from celluloid import Camera
 from shapely.geometry import Polygon, MultiPolygon
@@ -36,20 +36,22 @@ p.add('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Out
 p.add('--G', '-G', nargs=1, default='gear.svg', metavar='filename', help='Output SVG file')
 p.add('--animate', '-a', action='store_true', help='Generate animation')
 p.add('--picture', '-p', action='store_true', help='Generate picture')
-p.add('--svg', '-g', action="store_true", help='Generate svg file')
+p.add('--svg', '-g', action='store_true', help='Generate svg file')
 p.add('--stats', '-s', action='store_true', help='Generate statistics')
+p.add('--inches', '-i', action='store_true', help='Show statistics in imperial units')
 p.add('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
 args = p.parse_args()
 
-teethToDraw = args.teeth[0]
+teeth_to_draw = args.teeth[0]
 animationFile = args.A
 pictureFile = args.P
-svgFile = args.G
+svg_file = args.G
 final = args.picture
 animate = args.animate
 svg = args.svg
 verbose = args.verbose
 stats = args.stats
+inches = args.inches
 
 if not (final or animate or svg or stats):
     parser.print_help()
@@ -57,11 +59,11 @@ if not (final or animate or svg or stats):
 
 
 # Regular expressions used to parse file from gears.py
-paramsTooth     = re.compile('^\( Tooth: ([-0-9]+)\)$')
-paramsGeneral   = re.compile('^\( *([a-z_A-Z]+): ([-0-9\.]+) *\)$')
-paramsRotary    = re.compile('^\( *right_rotary: (True|False) *\)$')
-paramsTool      = re.compile('^\( *tool: \(Angle: ([-0-9\.]+), Depth: ([-0-9\.]+), Radius: ([-0-9\.]+), TipHeight: ([-0-9\.]+)\) *\)$') 
-parseGCode      = '([AXYZ])([-0-9\.]+)'
+parse_tooth = re.compile(r'^\( Tooth: ([-0-9]+)\)$')
+parse_general = re.compile(r'^\( *([a-z_A-Z]+): ([-0-9\.]+) *\)$')
+parse_rotary = re.compile(r'^\( *right_rotary: (True|False) *\)$')
+parse_tool = re.compile(r'^\( *tool: \(Angle: ([-0-9\.]+), Depth: ([-0-9\.]+), Radius: ([-0-9\.]+), TipHeight: ([-0-9\.]+)\) *\)$')
+parse_gcode = r'([AXYZ])([-0-9\.]+)'
 
 # Start up a camera if we're creating an animation
 if animate:
@@ -76,11 +78,11 @@ cuttings = []
 with open('teeth.nc') as f:
     for line in f:
         l = line.strip()
-        mTooth      = paramsTooth.match(l)
-        mGeneral    = paramsGeneral.match(l)
-        mTool       = paramsTool.match(l)
-        mRotary     = paramsRotary.match(l)
-        mgCode      = re.findall(parseGCode, l)
+        mTooth = parse_tooth.match(l)
+        mGeneral = parse_general.match(l)
+        mTool = parse_tool.match(l)
+        mRotary = parse_rotary.match(l)
+        mgCode = re.findall(parse_gcode, l)
 
         # Tooth comment
         if mTooth:
@@ -122,7 +124,7 @@ with open('teeth.nc') as f:
 
                 # Create a polygon to for the dedendum circle
                 r = outside_diameter / 2. - h_addendum - h_addendum
-                dedendumCircle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
+                dedendum_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
                 # Create a polygon to for the clearance circle
                 r = outside_diameter / 2. - h_total
@@ -130,49 +132,49 @@ with open('teeth.nc') as f:
 
                 # Create a polygon to represent the cutting tool
                 direction = 1 if right_rotary else -1
-                halfTip = tool_tip_height / 2.
-                y = halfTip + sin(radians(tool_angle / 2.)) * tool_depth
+                half_tip = tool_tip_height / 2.
+                y = half_tip + sin(radians(tool_angle / 2.)) * tool_depth
                 shaft = tool_radius - tool_depth
                 cutter = Polygon([
-                        (shaft, 4. * y),
-                        (shaft, y),
-                        (tool_radius, halfTip), 
-                        (tool_radius, -halfTip),
-                        (shaft, -y),
-                        (-shaft, -y),
-                        (-tool_radius, -halfTip),
-                        (-tool_radius, halfTip),
-                        (-shaft, y),
-                        (-shaft, 4. * y),
-                        ])
+                    (shaft, 4. * y),
+                    (shaft, y),
+                    (tool_radius, half_tip),
+                    (tool_radius, -half_tip),
+                    (shaft, -y),
+                    (-shaft, -y),
+                    (-tool_radius, -half_tip),
+                    (-tool_radius, half_tip),
+                    (-shaft, y),
+                    (-shaft, 4. * y),
+                    ])
 
             # Move and cut based on each axis
             for axis, amt in mgCode:
                 step_number += 1
                 amt = float(amt)
                 if axis == 'A':
-                    gear_blank = rotate(gear_blank, cur_angle - amt, origin = (0, 0))
+                    gear_blank = rotate(gear_blank, cur_angle - amt, origin=(0, 0))
                     cur_angle = amt
                 elif axis == 'X':
                     if cutter_y:
-                        curCutter = translate(cutter, cutter_y, cutter_z)
-                        areaStart = gear_blank.area
-                        gear_blank = gear_blank.difference(curCutter)
+                        cur_cutter = translate(cutter, cutter_y, cutter_z)
+                        area_start = gear_blank.area
+                        gear_blank = gear_blank.difference(cur_cutter)
                         # Deal with an acute cutter trimming off a shard
                         if type(gear_blank) == MultiPolygon:
                             gear_blank = gear_blank[0]
-                        
+
                         # Track material removal
-                        amountCut = areaStart - gear_blank.area
+                        amountCut = area_start - gear_blank.area
                         if amountCut > 0.:
                             cuttings.append(amountCut)
 
                         # Write an animation frame
-                        if animate and (teethToDraw == -1 or tooth < teethToDraw):
+                        if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
                             plt.plot(*pitch_circle.exterior.xy, color='g')
                             plt.plot(*clearance_circle.exterior.xy, color='c')
                             plt.plot(*gear_blank.exterior.xy, color='b')
-                            plt.plot(*curCutter.exterior.xy, color='r')
+                            plt.plot(*cur_cutter.exterior.xy, color='r')
                             plt.plot((0., cos(radians(-cur_angle)) * outside_radius), (0., sin(radians(-cur_angle)) * outside_radius), color='b')
                             plt.plot((-direction*(outside_radius-h_total), -direction*(outside_radius-h_total)), (-z_max, z_max), color='y')
                             plt.grid()
@@ -188,7 +190,7 @@ if animate:
     if verbose:
         print('Generating animation "%s"' % animationFile)
     animation = camera.animate()
-    animation.save(animationFile, writer = 'pillow')
+    animation.save(animationFile, writer='pillow')
 
 # Create a final picture of the gear
 if final:
@@ -197,7 +199,7 @@ if final:
     fig = plt.figure()
     plt.plot(*pitch_circle.exterior.xy, color='g')
     plt.plot(*clearance_circle.exterior.xy, color='c')
-    plt.plot(*dedendumCircle.exterior.xy, color='m')
+    plt.plot(*dedendum_circle.exterior.xy, color='m')
     plt.plot(*gear_blank.exterior.xy, color='b')
     plt.grid()
     plt.axis('equal')
@@ -206,29 +208,28 @@ if final:
 # Create an svg file of only the gear
 if svg:
     if verbose:
-        print('Generating svg file "%s"' % svgFile)
-    with open(svgFile, 'w') as f:
+        print('Generating svg file "%s"' % svg_file)
+    with open(svg_file, 'w') as f:
         f.write(gear_blank._repr_svg_())
 
 # Print statistics
 if stats:
-    inches = False
-    tooL_feed = 200
+    tool_feed = 200
     tool_rpm = 4000
     tool_flutes = 4
 
     area = max(cuttings)
-    cutTime = blank_thickness / tooL_feed
-    cut_count = tool_rpm * cutTime * tool_flutes
-    materialPerFlute =  area * blank_thickness / cut_count
-    materialRR = area * blank_thickness / cutTime
+    cut_time = blank_thickness / tool_feed
+    cut_count = tool_rpm * cut_time * tool_flutes
+    materialPerFlute = area * blank_thickness / cut_count
+    materialRR = area * blank_thickness / cut_time
 
     surfaceMPS = .001 * tool_radius * 2. * pi * (tool_rpm / 60.)
 
     if inches:
         conv1, units1 = 1/ 25.4, "inch"
         conv2, units2 = conv1 / 25.4, "inch^2"
-        conv3, units3 = conv2 / 25.4, "inch^3" 
+        conv3, units3 = conv2 / 25.4, "inch^3"
     else:
         conv1, units1 = 1, "mm"
         conv2, units2 = .01, "cm^2"
@@ -240,8 +241,8 @@ if stats:
     print("        Radius: %g %s" % (conv1 * tool_radius, units1))
     print("        Depth: %g %s" % (conv1 * tool_depth, units1))
     print("        Flutes: %g" % tool_flutes)
-    print("        Feed: %g %s/minute" % (conv1 * tooL_feed, units1))
-    print("        Feed per tooth: %g %s" % (conv1 * tooL_feed / (tool_rpm * tool_flutes), units1))
+    print("        Feed: %g %s/minute" % (conv1 * tool_feed, units1))
+    print("        Feed per tooth: %g %s" % (conv1 * tool_feed / (tool_rpm * tool_flutes), units1))
     if inches:
         print("        SFM: %g feet/minute" % (surfaceMPS / .00508))
     else:
@@ -263,7 +264,7 @@ if stats:
     print("    Minimum: %g %s" % (conv3 * blank_thickness * min(cuttings), units3))
     print("    Average: %g %s" % (conv3 * blank_thickness * statistics.mean(cuttings), units3))
     print("Cutting rate (per pass):")
-    print("    Time per each pass: %g mins" % cutTime)
+    print("    Time per each pass: %g mins" % cut_time)
     print("    Cuts per pass: %g" % cut_count)
     print("    Material per flute: %g %s" % (conv3 * materialPerFlute, units3))
     print("    Material removal rate: %g %s/min" % (conv3 * materialRR, units3))

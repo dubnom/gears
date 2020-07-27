@@ -99,6 +99,8 @@ F{feed}""".format(number=self.tool.number,
                   flood=' M08' if self.tool.flood else '')
 
     def footer(self):
+        """Return the gcode for the bottom of the file."""
+
         return \
 """\
 M5 M9
@@ -127,10 +129,10 @@ M30
         angle_offset = self.tool.angle / 2. - self.pressure_angle
         z_offset = (circular_pitch / 2. - 2. * sin(self.tool.angle / 2.) * h_dedendum - self.tool.tip_height) / 2.
 
-        xOffset = self.cutter_clearance + blank_thickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
+        x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
         mill = self.tool.mill
         angle_direction = 1 if self.right_rotary else -1
-        x_start, x_end = -angle_direction * xOffset, angle_direction * xOffset
+        x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
 
         # Determine the maximum amount of height (or depth) in the Z axis before part of the cutter
         # won't intersect with the gear blank.
@@ -157,17 +159,17 @@ M30
             raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
         # Include all of the generating parameters in the G Code header
-        f = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
-             'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
-             'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
-             'outside_diameter', 'outside_radius', 'z_offset', 'angle_offset', 'x_start',
-             'x_end']
+        var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
+                 'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
+                 'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
+                 'outside_diameter', 'outside_radius', 'z_offset', 'angle_offset', 'x_start',
+                 'x_end']
         gcode = []
-        for v in f:
-            if v in locals():
-                gcode.append('( %16s: %-70s )' % (v, locals()[v]))
+        for var in var_t:
+            if var in locals():
+                gcode.append('( %16s: %-70s )' % (var, locals()[var]))
             else:
-                gcode.append('( %16s: %-70s )' % (v, getattr(self, v)))
+                gcode.append('( %16s: %-70s )' % (var, getattr(self, var)))
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
@@ -196,11 +198,11 @@ M30
 
                     # Handle the special case of "easing into the first cut"
                     if self.tool.ease and z_steps == -self.steps:
-                        yStart = self.tool.radius + y_tool
-                        yEnd = self.tool.radius + y_tool - h_dedendum
-                        yDiv = (yEnd - yStart) / self.tool.ease
-                        for easeStep in range(self.tool.ease):
-                            y = yStart + yDiv * easeStep
+                        y_start = self.tool.radius + y_tool
+                        y_end = self.tool.radius + y_tool - h_dedendum
+                        y_div = (y_end - y_start) / self.tool.ease
+                        for ease_step in range(self.tool.ease):
+                            y = y_start + y_div * ease_step
                             gcode.append(cut.cut(
                                 (angle_direction * degrees(angle + angle_offset + tooth_angle_offset)),
                                 (-angle_direction * y),
@@ -321,13 +323,13 @@ def main():
                     feed=args.feed, mist=args.mist, flood=args.flood, ease=args.ease,
                     mill=args.mill)
 
-        g = Gear(tool, module=args.module, pressure_angle=args.pressure,
-                 relief_factor=args.relief, steps=args.steps, cutter_clearance=args.clear,
-                 right_rotary=args.right)
+        gear = Gear(tool, module=args.module, pressure_angle=args.pressure,
+                    relief_factor=args.relief, steps=args.steps, cutter_clearance=args.clear,
+                    right_rotary=args.right)
 
-        print(g.header())
-        print(g.generate(args.teeth, args.thick, args.make))
-        print(g.footer())
+        print(gear.header())
+        print(gear.generate(args.teeth, args.thick, args.make))
+        print(gear.footer())
     except ValueError as error:
         print(error, file=sys.stderr)
 

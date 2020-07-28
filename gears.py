@@ -29,7 +29,7 @@ class Tool():
     """The Tool class holds the specifications of the cutting tool."""
 
     def __init__(self, angle=40., depth=3., radius=10., tip_height=0.,
-                 number=1, rpm=2000, feed=200, mist=False, flood=False,
+                 number=1, rpm=2000, feed=200, flutes=4, mist=False, flood=False,
                  ease=0, mill='both'):
         if angle < 0.:
             raise ValueError('Tool: Angle must be greater than or equal to 0')
@@ -49,14 +49,15 @@ class Tool():
         self.number = number
         self.rpm = rpm
         self.feed = feed
+        self.flutes = flutes
         self.mist = mist
         self.flood = flood
         self.ease = ease
         self.mill = mill
 
     def __str__(self):
-        return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {})".format(
-            degrees(self.angle), self.depth, self.radius, self.tip_height)
+        return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {}, Flutes: {})".format(
+            degrees(self.angle), self.depth, self.radius, self.tip_height, self.flutes)
 
 
 class Gear():
@@ -297,6 +298,7 @@ def main():
     p.add('--number', '-N', type=int, default=1, help='Tool: tool number')
     p.add('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
     p.add('--feed', '-F', type=float, default=200., help='Tool: feed rate')
+    p.add('--flutes', '-U', type=int, default=4, help='Tool: flutes')
     p.add('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
     p.add('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
     p.add('--ease', '-E', type=int, default=0, help='Tool: number of steps to "ease into" the first cut')
@@ -320,8 +322,8 @@ def main():
     try:
         tool = Tool(angle=args.angle, depth=args.depth, tip_height=args.height,
                     radius=args.diameter / 2., number=args.number, rpm=args.rpm,
-                    feed=args.feed, mist=args.mist, flood=args.flood, ease=args.ease,
-                    mill=args.mill)
+                    feed=args.feed, flutes=args.flutes, mist=args.mist,
+                    flood=args.flood, ease=args.ease, mill=args.mill)
 
         gear = Gear(tool, module=args.module, pressure_angle=args.pressure,
                     relief_factor=args.relief, steps=args.steps, cutter_clearance=args.clear,

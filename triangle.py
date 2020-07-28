@@ -42,7 +42,7 @@ leadInOut       = .2        # Extra distance added to the entry and exit of the 
 
 
 p = configargparse.ArgParser(
-    default_config_files=['triangle.cfg']
+    default_config_files=['triangle.cfg'],
     formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
     description="Generate G Code to create triangular profile spur and crown gears.")
 

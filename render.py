@@ -62,7 +62,9 @@ if not (final or animate or svg or stats):
 parse_tooth = re.compile(r'^\( Tooth: ([-0-9]+)\)$')
 parse_general = re.compile(r'^\( *([a-z_A-Z]+): ([-0-9\.]+) *\)$')
 parse_rotary = re.compile(r'^\( *right_rotary: (True|False) *\)$')
-parse_tool = re.compile(r'^\( *tool: \(Angle: ([-0-9\.]+), Depth: ([-0-9\.]+), Radius: ([-0-9\.]+), TipHeight: ([-0-9\.]+)\) *\)$')
+parse_tool = re.compile(r'^\( *tool: \(Angle: ([0-9\.]+), Depth: ([0-9\.]+), Radius: ([0-9\.]+), TipHeight: ([0-9\.]+), Flutes: ([0-9]+)\) *\)$')
+parse_feed = re.compile(r'^F([-0-9\.]+)')
+parse_speed = re.compile(r'^S([-0-9\.]+)')
 parse_gcode = r'([AXYZ])([-0-9\.]+)'
 
 # Start up a camera if we're creating an animation
@@ -75,6 +77,7 @@ cutter_y = cutter_z = cur_angle = 0.
 tooth = 0
 step_number = 0
 cuttings = []
+v = {}
 with open('teeth.nc') as f:
     for line in f:
         l = line.strip()
@@ -82,7 +85,10 @@ with open('teeth.nc') as f:
         mGeneral = parse_general.match(l)
         mTool = parse_tool.match(l)
         mRotary = parse_rotary.match(l)
+        mFeed = parse_feed.match(l)
+        mSpeed = parse_speed.match(l)
         mgCode = re.findall(parse_gcode, l)
+
 
         # Tooth comment
         if mTooth:
@@ -94,7 +100,7 @@ with open('teeth.nc') as f:
         elif mGeneral:
             name = mGeneral.group(1)
             value = float(mGeneral.group(2))
-            locals()[name] = value
+            v[name] = value
 
         # Rotary argument
         elif mRotary:
@@ -106,6 +112,15 @@ with open('teeth.nc') as f:
             tool_depth = float(mTool.group(2))
             tool_radius = float(mTool.group(3))
             tool_tip_height = float(mTool.group(4))
+            tool_flutes = int(mTool.group(5))
+
+        # Feed rate
+        elif mFeed:
+            tool_feed = float(mFeed.group(1))
+
+        # Spindle speed
+        elif mSpeed:
+            tool_rpm = float(mSpeed.group(1))
 
         # GCode
         elif mgCode:
@@ -115,19 +130,19 @@ with open('teeth.nc') as f:
                     print('Header has been read')
 
                 # Create a polygon to represent the gear blank
-                r = outside_diameter / 2.
+                r = v['outside_diameter'] / 2.
                 gear_blank = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
                 # Create a polygon to for the pitch circle
-                r = outside_diameter / 2. - h_addendum
+                r = v['outside_diameter'] / 2. - v['h_addendum']
                 pitch_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
                 # Create a polygon to for the dedendum circle
-                r = outside_diameter / 2. - h_addendum - h_addendum
+                r = v['outside_diameter'] / 2. - v['h_addendum'] - v['h_addendum']
                 dedendum_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
                 # Create a polygon to for the clearance circle
-                r = outside_diameter / 2. - h_total
+                r = v['outside_diameter'] / 2. - v['h_total']
                 clearance_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
                 # Create a polygon to represent the cutting tool
@@ -136,7 +151,7 @@ with open('teeth.nc') as f:
                 y = half_tip + sin(radians(tool_angle / 2.)) * tool_depth
                 shaft = tool_radius - tool_depth
                 cutter = Polygon([
-                    (shaft, outside_radius),
+                    (shaft, v['outside_radius']),
                     (shaft, y),
                     (tool_radius, half_tip),
                     (tool_radius, -half_tip),
@@ -145,7 +160,7 @@ with open('teeth.nc') as f:
                     (-tool_radius, -half_tip),
                     (-tool_radius, half_tip),
                     (-shaft, y),
-                    (-shaft, outside_radius),
+                    (-shaft, v['outside_radius']),
                     ])
 
             # Move and cut based on each axis
@@ -218,15 +233,11 @@ if svg:
 
 # Print statistics
 if stats:
-    tool_feed = 200
-    tool_rpm = 4000
-    tool_flutes = 4
-
     area = max(cuttings)
-    cut_time = blank_thickness / tool_feed
+    cut_time = v['blank_thickness'] / tool_feed
     cut_count = tool_rpm * cut_time * tool_flutes
-    materialPerFlute = area * blank_thickness / cut_count
-    materialRR = area * blank_thickness / cut_time
+    materialPerFlute = area * v['blank_thickness'] / cut_count
+    materialRR = area * v['blank_thickness'] / cut_time
 
     surfaceMPS = .001 * tool_radius * 2. * pi * (tool_rpm / 60.)
 
@@ -252,21 +263,21 @@ if stats:
     else:
         print("        Surface meters/minute: %g" % (surfaceMPS * 60.))
     print("    Gear:")
-    print("        Module: %g" % module)
-    print("        Teeth: %g" % teeth)
-    print("        Thickness: %g %s" % (blank_thickness * conv1, units1))
-    print("        Pressure Angle: %g degrees" % degrees(pressure_angle))
+    print("        Module: %g" % v['module'])
+    print("        Teeth: %g" % v['teeth'])
+    print("        Thickness: %g %s" % (v['blank_thickness'] * conv1, units1))
+    print("        Pressure Angle: %g degrees" % degrees(v['pressure_angle']))
     print("    Cutting:")
     print("        Passes: %g" % len(cuttings))
-    print("        Total material removed: %g %s" % (conv3 * sum(cuttings) * blank_thickness, units3))
+    print("        Total material removed: %g %s" % (conv3 * sum(cuttings) * v['blank_thickness'], units3))
     print("Cross section (per pass):")
     print("    Maximum: %g %s" % (conv2 * max(cuttings), units2))
     print("    Minimum: %g %s" % (conv2 * min(cuttings), units2))
     print("    Average: %g %s" % (conv2 * statistics.mean(cuttings), units2))
     print("Material removal (per pass):")
-    print("    Maximum: %g %s" % (conv3 * blank_thickness * max(cuttings), units3))
-    print("    Minimum: %g %s" % (conv3 * blank_thickness * min(cuttings), units3))
-    print("    Average: %g %s" % (conv3 * blank_thickness * statistics.mean(cuttings), units3))
+    print("    Maximum: %g %s" % (conv3 * v['blank_thickness'] * max(cuttings), units3))
+    print("    Minimum: %g %s" % (conv3 * v['blank_thickness'] * min(cuttings), units3))
+    print("    Average: %g %s" % (conv3 * v['blank_thickness'] * statistics.mean(cuttings), units3))
     print("Cutting rate (per pass):")
     print("    Time per each pass: %g mins" % cut_time)
     print("    Cuts per pass: %g" % cut_count)

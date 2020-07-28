@@ -1,20 +1,24 @@
-"""
-    triangle.py -   Generate gcode for spur, crown, (and coming soon - bevel) gears using a triangular
-                    tooth profile.
+#!/usr/bin/python3
 
-                    The code uses a little trick for creating included angles greater than the natural
-                    angle of a double bevel end mill (cutterAngle).  Gear blanks are rotated up and down
-                    at the same time the bevel cutter is raised and lowered.  The bevel cutter is
-                    then brought into the blank and the tip of the cutter ends at the same point it would
-                    have if the blank wasn't rotated at all.  By doing this, the cutter will cut the opening
-                    wider at the bottom while in the raised position, and wider at the top while in the
-                    lowered position.  Obviously the cutter will also cut its included angle (cutterAngle)
-                    as well.
-
-                    Originally written by Michael Dubno and for general purpose use - no copyrights.
 """
+triangle.py -   Generate gcode for spur, crown, (and coming soon - bevel) gears using a triangular
+                tooth profile.
+
+                The code uses a little trick for creating included angles greater than the natural
+                angle of a double bevel end mill (cutterAngle).  Gear blanks are rotated up and down
+                at the same time the bevel cutter is raised and lowered.  The bevel cutter is
+                then brought into the blank and the tip of the cutter ends at the same point it would
+                have if the blank wasn't rotated at all.  By doing this, the cutter will cut the opening
+                wider at the bottom while in the raised position, and wider at the top while in the
+                lowered position.  Obviously the cutter will also cut its included angle (cutterAngle)
+                as well.
+
+                Originally written by Michael Dubno and for general purpose use - no copyrights.
+"""
+
 from math import *
 from gcode import *
+import configargparse
 
 # Gear description
 teeth           = 50
@@ -36,6 +40,35 @@ depthOfCut      = .04       # Maximum depth of cut
 safeDistance    = .1        # Distance to retract from gear blank
 leadInOut       = .2        # Extra distance added to the entry and exit of the cut
 
+
+p = configargparse.ArgParser(
+    default_config_files=['triangle.cfg']
+    formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
+    description="Generate G Code to create triangular profile spur and crown gears.")
+
+p.add('--config', '-X', is_config_file=True, help='Config file path')
+
+# Tool arguments
+p.add('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
+p.add('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
+p.add('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
+p.add('--diameter', '-I', type=float, default=15., help='Tool: cutting diameter at tip in mm')
+p.add('--number', '-N', type=int, default=1, help='Tool: tool number')
+p.add('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
+p.add('--feed', '-F', type=float, default=200., help='Tool: feed rate')
+p.add('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
+p.add('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
+p.add('--ease', '-E', type=int, default=0, help='Tool: number of steps to "ease into" the first cut')
+p.add('--mill', default='both', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
+
+# Specific gear arguments
+p.add('--teeth', '-t', type=int, required=True, help='Number of teeth for the entire gear')
+p.add('--thick', '-k', type=float, required=True, help='Thickness of gear blank in mm')
+p.add('--make', type=int, default=0, help='Actual number of teeth to cut.')
+
+# FIX: Command line arguments are currently not being supported
+if False:
+    args = p.parse_args()
 
 # Calculate internal working variables
 module          = module if metric else module / 25.4
@@ -131,5 +164,4 @@ g.append( 'G30' )
 g.append( 'M30' )
 g.append( '%' )
 
-print g.output()
-
+print(g.output())

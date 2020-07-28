@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from math import *
 from gcode import *
 
@@ -70,4 +72,4 @@ g.append( 'G30' )
 g.append( 'M30' )
 g.append( '%' )
 
-print g.output()
+print(g.output())

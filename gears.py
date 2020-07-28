@@ -287,7 +287,7 @@ def main():
 
             A rotary 4th-axis is used to rotate the gear blank with the cutting tool held in the spindle.
                 """)
-    p.add('outfile', nargs='?', type=configargparse.FileType('w'), default=sys.stdout)
+    p.add('out', nargs='?', type=configargparse.FileType('w'), default=sys.stdout)
     p.add('--config', '-X', is_config_file=True, help='Config file path')
 
     # Tool arguments
@@ -318,6 +318,7 @@ def main():
     p.add('--make', type=int, default=0, help='Actual number of teeth to cut.')
 
     args = p.parse_args()
+    out = args.out
 
     try:
         tool = Tool(angle=args.angle, depth=args.depth, tip_height=args.height,
@@ -329,9 +330,9 @@ def main():
                     relief_factor=args.relief, steps=args.steps, cutter_clearance=args.clear,
                     right_rotary=args.right)
 
-        print(gear.header())
-        print(gear.generate(args.teeth, args.thick, args.make))
-        print(gear.footer())
+        print(gear.header(), file=out)
+        print(gear.generate(args.teeth, args.thick, args.make), file=out)
+        print(gear.footer(), file=out)
     except ValueError as error:
         print(error, file=sys.stderr)
 

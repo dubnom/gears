@@ -52,6 +52,7 @@ svg = args.svg
 verbose = args.verbose
 stats = args.stats
 inches = args.inches
+infile = args.infile
 
 if not (final or animate or svg or stats):
     parser.print_help()
@@ -78,131 +79,131 @@ tooth = 0
 step_number = 0
 cuttings = []
 v = {}
-with open('teeth.nc') as f:
-    for line in f:
-        l = line.strip()
-        mTooth = parse_tooth.match(l)
-        mGeneral = parse_general.match(l)
-        mTool = parse_tool.match(l)
-        mRotary = parse_rotary.match(l)
-        mFeed = parse_feed.match(l)
-        mSpeed = parse_speed.match(l)
-        mgCode = re.findall(parse_gcode, l)
+
+for line in infile:
+    l = line.strip()
+    mTooth = parse_tooth.match(l)
+    mGeneral = parse_general.match(l)
+    mTool = parse_tool.match(l)
+    mRotary = parse_rotary.match(l)
+    mFeed = parse_feed.match(l)
+    mSpeed = parse_speed.match(l)
+    mgCode = re.findall(parse_gcode, l)
 
 
-        # Tooth comment
-        if mTooth:
-            tooth = int(mTooth.group(1))
+    # Tooth comment
+    if mTooth:
+        tooth = int(mTooth.group(1))
+        if verbose:
+            print('Processing tooth #%g' % tooth)
+
+    # Numeric arguments
+    elif mGeneral:
+        name = mGeneral.group(1)
+        value = float(mGeneral.group(2))
+        v[name] = value
+
+    # Rotary argument
+    elif mRotary:
+        right_rotary = mRotary.group(1) == 'True'
+
+    # Tool argument
+    elif mTool:
+        tool_angle = float(mTool.group(1))
+        tool_depth = float(mTool.group(2))
+        tool_radius = float(mTool.group(3))
+        tool_tip_height = float(mTool.group(4))
+        tool_flutes = int(mTool.group(5))
+
+    # Feed rate
+    elif mFeed:
+        tool_feed = float(mFeed.group(1))
+
+    # Spindle speed
+    elif mSpeed:
+        tool_rpm = float(mSpeed.group(1))
+
+    # GCode
+    elif mgCode:
+        if step_number == 0:
+            # Create all of the shapes the first time real GCode is encountered.
             if verbose:
-                print('Processing tooth #%g' % tooth)
+                print('Header has been read')
 
-        # Numeric arguments
-        elif mGeneral:
-            name = mGeneral.group(1)
-            value = float(mGeneral.group(2))
-            v[name] = value
+            # Create a polygon to represent the gear blank
+            r = v['outside_diameter'] / 2.
+            gear_blank = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
-        # Rotary argument
-        elif mRotary:
-            right_rotary = mRotary.group(1) == 'True'
+            # Create a polygon to for the pitch circle
+            r = v['outside_diameter'] / 2. - v['h_addendum']
+            pitch_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
-        # Tool argument
-        elif mTool:
-            tool_angle = float(mTool.group(1))
-            tool_depth = float(mTool.group(2))
-            tool_radius = float(mTool.group(3))
-            tool_tip_height = float(mTool.group(4))
-            tool_flutes = int(mTool.group(5))
+            # Create a polygon to for the dedendum circle
+            r = v['outside_diameter'] / 2. - v['h_addendum'] - v['h_addendum']
+            dedendum_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
-        # Feed rate
-        elif mFeed:
-            tool_feed = float(mFeed.group(1))
+            # Create a polygon to for the clearance circle
+            r = v['outside_diameter'] / 2. - v['h_total']
+            clearance_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
-        # Spindle speed
-        elif mSpeed:
-            tool_rpm = float(mSpeed.group(1))
+            # Create a polygon to represent the cutting tool
+            direction = 1 if right_rotary else -1
+            half_tip = tool_tip_height / 2.
+            y = half_tip + sin(radians(tool_angle / 2.)) * tool_depth
+            shaft = tool_radius - tool_depth
+            cutter = Polygon([
+                (shaft, v['outside_radius']),
+                (shaft, y),
+                (tool_radius, half_tip),
+                (tool_radius, -half_tip),
+                (shaft, -y),
+                (-shaft, -y),
+                (-tool_radius, -half_tip),
+                (-tool_radius, half_tip),
+                (-shaft, y),
+                (-shaft, v['outside_radius']),
+                ])
 
-        # GCode
-        elif mgCode:
-            if step_number == 0:
-                # Create all of the shapes the first time real GCode is encountered.
-                if verbose:
-                    print('Header has been read')
+        # Move and cut based on each axis
+        for axis, amt in mgCode:
+            step_number += 1
+            amt = float(amt)
+            if axis == 'A':
+                gear_blank = rotate(gear_blank, cur_angle - amt, origin=(0, 0))
+                cur_angle = amt
+            elif axis == 'X':
+                if cutter_y:
+                    cur_cutter = translate(cutter, cutter_y, cutter_z)
+                    area_start = gear_blank.area
+                    gear_blank = gear_blank.difference(cur_cutter)
+                    # Deal with an acute cutter trimming off a shard
+                    if type(gear_blank) == MultiPolygon:
+                        big_poly, area = None, 0.
+                        for polygon in gear_blank:
+                            if polygon.area > area:
+                                big_poly, area = polygon, polygon.area
+                        gear_blank = big_poly
 
-                # Create a polygon to represent the gear blank
-                r = v['outside_diameter'] / 2.
-                gear_blank = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
+                    # Track material removal
+                    amountCut = area_start - gear_blank.area
+                    if amountCut > 0.:
+                        cuttings.append(amountCut)
 
-                # Create a polygon to for the pitch circle
-                r = v['outside_diameter'] / 2. - v['h_addendum']
-                pitch_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
-
-                # Create a polygon to for the dedendum circle
-                r = v['outside_diameter'] / 2. - v['h_addendum'] - v['h_addendum']
-                dedendum_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
-
-                # Create a polygon to for the clearance circle
-                r = v['outside_diameter'] / 2. - v['h_total']
-                clearance_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
-
-                # Create a polygon to represent the cutting tool
-                direction = 1 if right_rotary else -1
-                half_tip = tool_tip_height / 2.
-                y = half_tip + sin(radians(tool_angle / 2.)) * tool_depth
-                shaft = tool_radius - tool_depth
-                cutter = Polygon([
-                    (shaft, v['outside_radius']),
-                    (shaft, y),
-                    (tool_radius, half_tip),
-                    (tool_radius, -half_tip),
-                    (shaft, -y),
-                    (-shaft, -y),
-                    (-tool_radius, -half_tip),
-                    (-tool_radius, half_tip),
-                    (-shaft, y),
-                    (-shaft, v['outside_radius']),
-                    ])
-
-            # Move and cut based on each axis
-            for axis, amt in mgCode:
-                step_number += 1
-                amt = float(amt)
-                if axis == 'A':
-                    gear_blank = rotate(gear_blank, cur_angle - amt, origin=(0, 0))
-                    cur_angle = amt
-                elif axis == 'X':
-                    if cutter_y:
-                        cur_cutter = translate(cutter, cutter_y, cutter_z)
-                        area_start = gear_blank.area
-                        gear_blank = gear_blank.difference(cur_cutter)
-                        # Deal with an acute cutter trimming off a shard
-                        if type(gear_blank) == MultiPolygon:
-                            big_poly, area = None, 0.
-                            for polygon in gear_blank:
-                                if polygon.area > area:
-                                    big_poly, area = polygon, polygon.area
-                            gear_blank = big_poly
-
-                        # Track material removal
-                        amountCut = area_start - gear_blank.area
-                        if amountCut > 0.:
-                            cuttings.append(amountCut)
-
-                        # Write an animation frame
-                        if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
-                            plt.plot(*pitch_circle.exterior.xy, color='g')
-                            plt.plot(*clearance_circle.exterior.xy, color='c')
-                            plt.plot(*gear_blank.exterior.xy, color='b')
-                            plt.plot(*cur_cutter.exterior.xy, color='r')
-                            plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
-                            plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
-                            plt.grid()
-                            plt.axis('equal')
-                            camera.snap()
-                elif axis == 'Y':
-                    cutter_y = amt
-                elif axis == 'Z':
-                    cutter_z = amt
+                    # Write an animation frame
+                    if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
+                        plt.plot(*pitch_circle.exterior.xy, color='g')
+                        plt.plot(*clearance_circle.exterior.xy, color='c')
+                        plt.plot(*gear_blank.exterior.xy, color='b')
+                        plt.plot(*cur_cutter.exterior.xy, color='r')
+                        plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
+                        plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
+                        plt.grid()
+                        plt.axis('equal')
+                        camera.snap()
+            elif axis == 'Y':
+                cutter_y = amt
+            elif axis == 'Z':
+                cutter_z = amt
 
 # Create the animation
 if animate:
@@ -237,7 +238,7 @@ if stats:
     cut_time = v['blank_thickness'] / tool_feed
     cut_count = tool_rpm * cut_time * tool_flutes
     materialPerFlute = area * v['blank_thickness'] / cut_count
-    materialRR = area * v['blank_thickness'] / cut_time
+    materialRR = area * tool_feed
 
     surfaceMPS = .001 * tool_radius * 2. * pi * (tool_rpm / 60.)
 
@@ -278,7 +279,7 @@ if stats:
     print("    Maximum: %g %s" % (conv3 * v['blank_thickness'] * max(cuttings), units3))
     print("    Minimum: %g %s" % (conv3 * v['blank_thickness'] * min(cuttings), units3))
     print("    Average: %g %s" % (conv3 * v['blank_thickness'] * statistics.mean(cuttings), units3))
-    print("Cutting rate (per pass):")
+    print("Cutting rate:")
     print("    Time per each pass: %g mins" % cut_time)
     print("    Cuts per pass: %g" % cut_count)
     print("    Material per flute: %g %s" % (conv3 * materialPerFlute, units3))

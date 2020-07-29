@@ -25,7 +25,7 @@ p = configargparse.ArgParser(
     prog="render",
     description="Render G Code gear cutting files.",
     epilog="""
-        Render can create animations and/or final images from a G Code involute
+        Render can create animations and/or pictures from a G Code involute
         spur gear cutting file.  Creating animated GIFS can take a long time,
         so you can speed things up by animating a limited set of teeth.
         """)
@@ -38,6 +38,7 @@ p.add('--animate', '-a', action='store_true', help='Generate animation')
 p.add('--picture', '-p', action='store_true', help='Generate picture')
 p.add('--svg', '-g', action='store_true', help='Generate svg file')
 p.add('--stats', '-s', action='store_true', help='Generate statistics')
+p.add('--zoom', '-z', action='store_true', help='Zoom into one/two teeth in picture')
 p.add('--inches', '-i', action='store_true', help='Show statistics in imperial units')
 p.add('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
 args = p.parse_args()
@@ -46,15 +47,16 @@ teeth_to_draw = args.teeth[0]
 animationFile = args.A
 pictureFile = args.P
 svg_file = args.G
-final = args.picture
+picture = args.picture
 animate = args.animate
 svg = args.svg
 verbose = args.verbose
 stats = args.stats
 inches = args.inches
 infile = args.infile
+zoom = args.zoom
 
-if not (final or animate or svg or stats):
+if not (picture or animate or svg or stats):
     parser.print_help()
     exit(-1)
 
@@ -212,16 +214,27 @@ if animate:
     animation = camera.animate()
     animation.save(animationFile, writer='pillow')
 
-# Create a final picture of the gear
-if final:
+# Create a picture picture of the gear
+if picture:
     if verbose:
         print('Generating picture "%s"' % pictureFile)
     fig = plt.figure()
-    plt.plot(*pitch_circle.exterior.xy, color='g')
-    plt.plot(*clearance_circle.exterior.xy, color='c')
-    plt.plot(*dedendum_circle.exterior.xy, color='m')
-    plt.plot(*gear_blank.exterior.xy, color='b')
-    plt.grid()
+    if zoom:
+        clip = Polygon([
+            (-v['module'] * 2, v['outside_radius']+v['h_addendum']),
+            (v['module'] * 2, v['outside_radius']+v['h_addendum']),
+            (v['module'] * 2, v['outside_radius'] - v['h_total'] -v['h_addendum']),
+            (-v['module'] * 2, v['outside_radius'] - v['h_total'] - v['h_addendum'])])
+        plt.plot(*pitch_circle.intersection(clip).exterior.xy, color='g')
+        plt.plot(*clearance_circle.intersection(clip).exterior.xy, color='c')
+        plt.plot(*dedendum_circle.intersection(clip).exterior.xy, color='m')
+        plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
+    else:
+        plt.plot(*pitch_circle.exterior.xy, color='g')
+        plt.plot(*clearance_circle.exterior.xy, color='c')
+        plt.plot(*dedendum_circle.exterior.xy, color='m')
+        plt.plot(*gear_blank.exterior.xy, color='b')
+        plt.grid()
     plt.axis('equal')
     plt.savefig(pictureFile)
 

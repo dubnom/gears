@@ -49,6 +49,7 @@ inner_radius = inner_diameter / 2.
 blank_thickness = args.thick
 turn_angle = radians(args.angle)
 angle_direction = 1 if args.right else -1
+mill = args.mill
 
 steps = args.steps
 out = args.out
@@ -80,20 +81,29 @@ x_offset = cutter_clearance + blank_thickness / 2.
 x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
 cut_radius = outer_radius - cut_step
 
-# FIX: Add cut direction support
+x = x_end if mill=='climb' else x_start
+g.move(x=x)
 
-g.move(x=x_start)
+# Cut the blank to size
 while cut_radius >= inner_radius:
     z = -sqrt(cut_radius**2 - (cut_radius-cut_step)**2) 
     g.move(z=z)
     angle = 0.
+    y = cut_radius + tool_radius
+    g.move(y=y)
     while angle < 2 * pi:
-        g.move(a=degrees(angle))
-        y = cut_radius + tool_radius
-        g.move(y=y)
-        g.cut(x=x_end)
-        g.move(y=y+cutter_clearance)
-        g.move(x=x_start)
+        g.move(a=angle_direction * degrees(angle))
+        g.cut(x=x)
+        if mill=='conventional':
+            g.move(y=y+cutter_clearance)
+            g.move(x=x_start)
+            g.move(y=y)
+        elif mill=='climb':
+            g.move(y=y+cutter_clearance)
+            g.move(x=x_end)
+            g.move(y=y)
+        else:
+            x = x_start if x == x_end else x_end        
         angle += turn_angle
     cut_radius -= cut_step
 

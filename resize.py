@@ -78,14 +78,17 @@ depths = []
 cut_step = (outer_radius - inner_radius) / steps
 x_offset = cutter_clearance + blank_thickness / 2.
 x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
-cut_radius = outer_radius
+cut_radius = outer_radius - cut_step
+
+# FIX: Add cut direction support
 
 g.move(x=x_start)
 while cut_radius >= inner_radius:
-    # FIX: FIGURE OUT Z TOOL DEPTH
+    z = -sqrt(cut_radius**2 - (cut_radius-cut_step)**2) 
+    g.move(z=z)
     angle = 0.
     while angle < 2 * pi:
-        g.move(a=angle)
+        g.move(a=degrees(angle))
         y = cut_radius + tool_radius
         g.move(y=y)
         g.cut(x=x_end)

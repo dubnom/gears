@@ -1,15 +1,14 @@
 #!/usr/bin/python3
 
 import sys
-from math import *
-from gcode import *
+from math import radians, degrees, pi, sqrt
 import configargparse
+from gcode import *
 
 
 p = configargparse.ArgParser(
     default_config_files=['resize.cfg'],
     formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
-    prog="gears",
     description="Generate G Code to trim a gear blank to size.")
 
 p.add('out', nargs='?', type=configargparse.FileType('w'), default=sys.stdout)
@@ -56,23 +55,23 @@ out = args.out
 
 # Preamble of parameter comments to assist machine setup
 g = Gcode()
-g.append( '%' )
-g.comment( 'Spur gear blank trimming' )
+g.append('%')
+g.comment('Spur gear blank trimming')
 g.comment()
-g.comment( "Rough Diameter: %g mm" % outer_diameter)
-g.comment( "Finish Diameter: %g mm" % inner_diameter)
-g.comment( "Thickness: %g mm" % blank_thickness)
+g.comment("Rough Diameter: %g mm" % outer_diameter)
+g.comment("Finish Diameter: %g mm" % inner_diameter)
+g.comment("Thickness: %g mm" % blank_thickness)
 g.comment()
 
 # Setup the machine, choose the tool, set the rates
-#g.comment( 'T%d D=%g WOC=%g - End mill' % (toolNumber, cutterDiameter, depthOfCut))
-g.append( 'G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49' )
-g.append( 'G21')
-g.append( 'G30' )
-g.append( 'T{number} G43 H{number} M6'.format(number=tool_number))
-g.append( 'S%d M3 M8' % tool_rpm )
-g.append( 'G54' )
-g.append( 'F%g' % tool_feed )
+#g.comment('T%d D=%g WOC=%g - End mill' % (toolNumber, cutterDiameter, depthOfCut))
+g.append('G90 G54 G64 G50 G17 G40 G80 G94 G91.1 G49')
+g.append('G21')
+g.append('G30')
+g.append('T{number} G43 H{number} M6'.format(number=tool_number))
+g.append('S%d M3 M8' % tool_rpm)
+g.append('G54')
+g.append('F%g' % tool_feed)
 
 # depths are the various passes for trimming the blank
 depths = []
@@ -81,12 +80,12 @@ x_offset = cutter_clearance + blank_thickness / 2.
 x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
 cut_radius = outer_radius - cut_step
 
-x = x_end if mill=='climb' else x_start
+x = x_end if mill == 'climb' else x_start
 g.move(x=x)
 
 # Cut the blank to size
 while cut_radius >= inner_radius:
-    z = -sqrt(cut_radius**2 - (cut_radius-cut_step)**2) 
+    z = -sqrt(cut_radius**2 - (cut_radius-cut_step)**2)
     g.move(z=z)
     angle = 0.
     y = cut_radius + tool_radius
@@ -94,23 +93,23 @@ while cut_radius >= inner_radius:
     while angle < 2 * pi:
         g.move(a=angle_direction * degrees(angle))
         g.cut(x=x)
-        if mill=='conventional':
+        if mill == 'conventional':
             g.move(y=y+cutter_clearance)
             g.move(x=x_start)
             g.move(y=y)
-        elif mill=='climb':
+        elif mill == 'climb':
             g.move(y=y+cutter_clearance)
             g.move(x=x_end)
             g.move(y=y)
         else:
-            x = x_start if x == x_end else x_end        
+            x = x_start if x == x_end else x_end
         angle += turn_angle
     cut_radius -= cut_step
 
 # Program is done, shutdown time
-g.append( 'M05 M09' )
-g.append( 'G30' )
-g.append( 'M30' )
-g.append( '%' )
+g.append('M05 M09')
+g.append('G30')
+g.append('M30')
+g.append('%')
 
 print(g.output(), file=out)

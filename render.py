@@ -22,7 +22,6 @@ from shapely.affinity import rotate, translate
 p = configargparse.ArgParser(
     default_config_files=['render.cfg'],
     formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
-    prog="render",
     description="Render G Code gear cutting files.",
     epilog="""
         Render can create animations and/or pictures from a G Code involute
@@ -57,7 +56,7 @@ infile = args.infile
 zoom = args.zoom
 
 if not (picture or animate or svg or stats):
-    parser.print_help()
+    p.print_help()
     exit(-1)
 
 

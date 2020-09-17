@@ -64,7 +64,7 @@ class Gear():
     """The Gear class is used to generate G Code of involute gears."""
 
     def __init__(self, tool, module=1., pressure_angle=20., relief_factor=1.25,
-                 steps=5, root_steps=1, cutter_clearance=2., right_rotary=False):
+                 steps=5, cutter_clearance=2., right_rotary=False):
         if module <= 0:
             raise ValueError('Gear: Module must be greater than 0.')
         if pressure_angle <= 0:
@@ -77,7 +77,6 @@ class Gear():
         self.relief_factor = relief_factor
         self.pressure_angle = radians(pressure_angle)
         self.steps = steps
-        self.root_steps = root_steps
         self.cutter_clearance = cutter_clearance
         self.right_rotary = right_rotary
 
@@ -130,7 +129,6 @@ M30
 
         angle_offset = self.tool.angle / 2. - self.pressure_angle
         z_offset = (circular_pitch / 2. - 2. * sin(self.tool.angle / 2.) * h_dedendum - self.tool.tip_height) / 2.
-        root_incr = z_offset / (self.root_steps + 1)
 
         x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
         mill = self.tool.mill
@@ -218,11 +216,10 @@ M30
 
                 # Center of the slot
                 if z_steps == 0:
-                    for root_step in range(-self.root_steps, self.root_steps+1):
-                        gcode.append(cut.cut(
-                            (angle_direction * degrees(angle + tooth_angle_offset)),
-                            (-angle_direction * (self.tool.radius + pitch_radius - h_dedendum)),
-                            z + root_step * root_incr))
+                    gcode.append(cut.cut(
+                        (angle_direction * degrees(angle + tooth_angle_offset)),
+                        (-angle_direction * (self.tool.radius + pitch_radius - h_dedendum)),
+                        z))
 
                 # Top of the slot
                 if z_steps >= 0:
@@ -304,14 +301,13 @@ def main():
     p.add('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
     p.add('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
     p.add('--ease', '-E', type=int, default=0, help='Tool: number of steps to "ease into" the first cut')
-    p.add('--mill', default='conventional', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
+    p.add('--mill', default='both', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
 
     # Gear type arguments
     p.add('--module', '-m', type=float, default=1., help='Module of the gear')
     p.add('--pressure', '-p', type=float, default=20., help='Pressure angle in degrees')
     p.add('--relief', type=float, default=1.25, help='Relief factor (for the dedendum)')
     p.add('--steps', '-s', type=int, default=5, help='Steps/tooth face')
-    p.add('--roots', '-o', type=int, default=1, help='Number of passes to clean up the root')
     p.add('--clear', '-c', type=float, default=2., help='Cutter clearance from gear blank in mm')
     p.add('--right', '-r', action='store_true', help='Rotary axis is on the right side of the machine')
 
@@ -330,8 +326,8 @@ def main():
                     flood=args.flood, ease=args.ease, mill=args.mill)
 
         gear = Gear(tool, module=args.module, pressure_angle=args.pressure,
-                    relief_factor=args.relief, steps=args.steps, root_steps=args.roots,
-                    cutter_clearance=args.clear, right_rotary=args.right)
+                    relief_factor=args.relief, steps=args.steps, cutter_clearance=args.clear,
+                    right_rotary=args.right)
 
         print(gear.header(), file=out)
         print(gear.generate(args.teeth, args.thick, args.make), file=out)

@@ -22,7 +22,7 @@ p.add('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
 p.add('--feed', '-F', type=float, default=200., help='Tool: feed rate')
 p.add('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
 p.add('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
-p.add('--mill', default='both', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
+p.add('--mill', default='conventional', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
 
 # Blank arguments
 p.add('--thick', '-k', type=float, required=True, help='Thickness of gear blank in mm')
@@ -83,6 +83,7 @@ cut_radius = outer_radius - cut_step
 
 x = x_end if mill=='climb' else x_start
 g.move(x=x)
+x = -x
 
 # Cut the blank to size
 while cut_radius >= inner_radius:
@@ -96,14 +97,14 @@ while cut_radius >= inner_radius:
         g.cut(x=x)
         if mill=='conventional':
             g.move(y=y+cutter_clearance)
-            g.move(x=x_start)
+            g.move(x=-x)
             g.move(y=y)
         elif mill=='climb':
             g.move(y=y+cutter_clearance)
-            g.move(x=x_end)
+            g.move(x=-x)
             g.move(y=y)
         else:
-            x = x_start if x == x_end else x_end        
+            x = -x
         angle += turn_angle
     cut_radius -= cut_step
 

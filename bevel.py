@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
 """
-G Code generator for cutting metric involute gears.
+G Code generator for cutting metric bevel involute gears.
 
-It is currently designed to use double angle shaft cutters or double bevel
-cutters. In the future, the code will be modified to use single angle cutters
-and slitting saws.
+It is currently designed to use double angle shaft cutters, double bevel
+cutters, and slitting saws.
+In the future, the code will be modified to use single angle cutters
 
 All input parameters are specified in millimeters or degrees.
 

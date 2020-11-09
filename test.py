@@ -37,10 +37,10 @@ import matplotlib.pyplot as plt
 import numpy
 
 teeth1 = 15
-teeth2 = 15
+teeth2 = 7
 module = 1.
 face_width = 2.5
-angle = 90.
+angle = 60.
 addendum = module
 dedendum = module * 1.25
 

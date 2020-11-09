@@ -3,11 +3,12 @@
 """
 G Code generator for cutting metric involute gears.
 
-It is currently designed to use double angle shaft cutters or double bevel
-cutters. In the future, the code will be modified to use single angle cutters
-and slitting saws.
+Supported tools:
+    double angle shaft cutters
+    double bevel cutters
+    slitting saws
 
-All input parameters are specified in millimeters or degrees.
+All units are specified in millimeters or degrees.
 
 Copyright 2020 - Michael Dubno - New York
 """
@@ -128,9 +129,10 @@ M30
         outside_diameter = pitch_diameter + 2 * h_addendum
         outside_radius = outside_diameter / 2.
 
-        angle_offset = self.tool.angle / 2. - self.pressure_angle
+        tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
         z_offset = (circular_pitch / 2. - 2. * sin(self.tool.angle / 2.) * h_dedendum - self.tool.tip_height) / 2.
-        root_incr = z_offset / (self.root_steps + 1)
+        z_center = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
+        root_incr = z_center / (self.root_steps + 1)
 
         x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
         mill = self.tool.mill
@@ -152,10 +154,10 @@ M30
         if h_total > self.tool.depth:
             raise ValueError("Cutter depth is too shallow for tooth height")
 
-        # Check to make sure the cutter shaft doesn't hit the gear blank.
+        # Make sure the cutter shaft doesn't hit the gear blank.
         shaft_radius = self.tool.radius - self.tool.depth
         y_point, z_point = pitch_radius, z_max + z_offset
-        y_tool, z_tool = rotate(-angle_offset, y_point, z_point)
+        y_tool, z_tool = rotate(-tool_angle_offset, y_point, z_point)
         y = self.tool.radius + y_tool - h_dedendum
         shaft_clearance = y - outside_radius - shaft_radius
         if shaft_clearance < 0:
@@ -165,14 +167,14 @@ M30
         var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
                  'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
                  'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
-                 'outside_diameter', 'outside_radius', 'z_offset', 'angle_offset', 'x_start',
+                 'outside_diameter', 'outside_radius', 'z_offset', 'tool_angle_offset', 'x_start',
                  'x_end']
         gcode = []
         for var in var_t:
             if var in locals():
-                gcode.append('( %16s: %-70s )' % (var, locals()[var]))
+                gcode.append('( %17s: %-70s )' % (var, locals()[var]))
             else:
-                gcode.append('( %16s: %-70s )' % (var, getattr(self, var)))
+                gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
@@ -197,7 +199,7 @@ M30
                 # Bottom of the slot
                 if z_steps <= 0:
                     y_point, z_point = pitch_radius, z + z_offset
-                    y_tool, z_tool = rotate(angle_offset, y_point, z_point)
+                    y_tool, z_tool = rotate(tool_angle_offset, y_point, z_point)
 
                     # Handle the special case of "easing into the first cut"
                     if self.tool.ease and z_steps == -self.steps:
@@ -207,12 +209,12 @@ M30
                         for ease_step in range(self.tool.ease):
                             y = y_start + y_div * ease_step
                             gcode.append(cut.cut(
-                                (angle_direction * degrees(angle + angle_offset + tooth_angle_offset)),
+                                (angle_direction * degrees(angle + tool_angle_offset + tooth_angle_offset)),
                                 (-angle_direction * y),
                                 z_tool))
 
                     gcode.append(cut.cut(
-                        (angle_direction * degrees(angle + angle_offset + tooth_angle_offset)),
+                        (angle_direction * degrees(angle + tool_angle_offset + tooth_angle_offset)),
                         (-angle_direction * (self.tool.radius + y_tool - h_dedendum)),
                         z_tool))
 
@@ -222,14 +224,14 @@ M30
                         gcode.append(cut.cut(
                             (angle_direction * degrees(angle + tooth_angle_offset)),
                             (-angle_direction * (self.tool.radius + pitch_radius - h_dedendum)),
-                            z + root_step * root_incr))
+                            root_step * root_incr))
 
                 # Top of the slot
                 if z_steps >= 0:
                     y_point, z_point = pitch_radius, z - z_offset
-                    y_tool, z_tool = rotate(-angle_offset, y_point, z_point)
+                    y_tool, z_tool = rotate(-tool_angle_offset, y_point, z_point)
                     gcode.append(cut.cut(
-                        (angle_direction * degrees(angle - angle_offset + tooth_angle_offset)),
+                        (angle_direction * degrees(angle - tool_angle_offset + tooth_angle_offset)),
                         (-angle_direction * (self.tool.radius + y_tool - h_dedendum)),
                         z_tool))
 
@@ -293,6 +295,7 @@ def main():
     p.add('--config', '-X', is_config_file=True, help='Config file path')
 
     # Tool arguments
+    p.add('--tool', '-T', is_config_file=True, help='Tool config file')
     p.add('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
     p.add('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
     p.add('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
@@ -307,6 +310,7 @@ def main():
     p.add('--mill', default='conventional', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
 
     # Gear type arguments
+    p.add('--gear', '-g', is_config_file=True, help='Gear config file')
     p.add('--module', '-m', type=float, default=1., help='Module of the gear')
     p.add('--pressure', '-p', type=float, default=20., help='Pressure angle in degrees')
     p.add('--relief', type=float, default=1.25, help='Relief factor (for the dedendum)')

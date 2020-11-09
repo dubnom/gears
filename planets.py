@@ -15,7 +15,7 @@ planets = [
 totalDiameter = 6 * 25.4
 minModule = .7
 
-print("x y module ratio")
+print("{:10} {:>3} {:>3} {:>8}  {:>6} {:>6} {:>6} {:>6} {:>6}".format('Planet', 'x', 'y','mod', 'err','x Diam', 'y Diam', 'x Rad', 'y rad'), '\n')
 for planet in planets:
     best = ()
     prevError = 1000
@@ -28,5 +28,7 @@ for planet in planets:
                 if module < minModule:
                     continue
                 prevError = error
-                best = (x,y,module,(x+y)*module,round(100*error,2), round(x*module/25.4,1), round(y*module/25.4,1))
-    print(planet[0], best)
+                best = (x,y,module,round(100*error,2), (x+2)*module, (y+2)*module, (x+2)*module/2, (y+2)*module/2)
+#    print(planet[0], best)
+
+    print("{:10} {:3d} {:3d} {:8.5f} {:6.2f}% {:6.2f} {:6.2f} {:6.2f} {:6.2f}".format(planet[0], *best))

@@ -179,9 +179,10 @@ M30
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
         gcode.append('')
-        gcode.append('G0 Z%g' % outside_radius)
-        gcode.append('G0 Y%g' % (-angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance)))
+        gcode.append('G30')
         gcode.append(cut.start())
+        gcode.append('G0 Y%g' % (-angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance)))
+        gcode.append('G0 Z%g' % outside_radius)
 
         # Generate a tooth profile for ever tooth requested
         for tooth in range(teeth_to_make):

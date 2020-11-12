@@ -1,0 +1,16 @@
+mkdir orery
+echo Mercury
+./gears.py -m .89647 --relief 1.4 -t 33 -k 2 -T cutter45.cfg orery/mercury_x.nc 
+./gears.py -m .89647 --relief 1.4 -t 137 -k 2 -T cutter45.cfg orery/mercury_y.nc 
+
+echo Venus
+./gears.py -m .72571 --relief 1.4 -t 80 -k 2 -T cutter45.cfg orery/venus_x.nc 
+./gears.py -m .72571 --relief 1.4 -t 130 -k 2 -T cutter45.cfg orery/venus_y.nc 
+
+echo Earth
+./gears.py -m .70556 --relief 1.4 -t 108 -k 2 -T cutter45.cfg orery/earth_x.nc 
+./gears.py -m .70556 --relief 1.4 -t 108 -k 2 -T cutter45.cfg orery/earth_y.nc 
+
+echo Mars
+./gears.py -m 1.2595 --relief 1.4 -t 79 -k 2 -T cutter45.cfg orery/mars_x.nc 
+./gears.py -m 1.2595 --relief 1.4 -t 42 -k 2 -T cutter45.cfg orery/mars_y.nc 

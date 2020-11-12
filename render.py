@@ -33,6 +33,7 @@ p.add('--verbose', '-v', action='count', default=0, help='Show progress messages
 p.add('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='Output animation file')
 p.add('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
 p.add('--G', '-G', nargs=1, default='gear.svg', metavar='filename', help='Output SVG file')
+p.add('--zerror', '-Z', type=float, default=0., help='Z-axis error in mm')
 p.add('--animate', '-a', action='store_true', help='Generate animation')
 p.add('--picture', '-p', action='store_true', help='Generate picture')
 p.add('--svg', '-g', action='store_true', help='Generate svg file')
@@ -54,6 +55,7 @@ stats = args.stats
 inches = args.inches
 infile = args.infile
 zoom = args.zoom
+zerror = args.zerror
 
 if not (picture or animate or svg or stats):
     p.print_help()
@@ -204,7 +206,7 @@ for line in infile:
             elif axis == 'Y':
                 cutter_y = amt
             elif axis == 'Z':
-                cutter_z = amt
+                cutter_z = amt + zerror
 
 # Create the animation
 if animate:

@@ -130,7 +130,7 @@ M30
         outside_radius = outside_diameter / 2.
 
         tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
-        z_offset = (circular_pitch / 2. - 2. * sin(self.tool.angle / 2.) * h_dedendum - self.tool.tip_height) / 2.
+        # z_offset = (circular_pitch / 2. - 2. * sin(self.tool.angle / 2.) * h_dedendum - self.tool.tip_height) / 2.
         z_center = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
         root_incr = z_center / (self.root_steps + 1)
 
@@ -141,8 +141,10 @@ M30
 
         # Determine the maximum amount of height (or depth) in the Z axis before part of the cutter
         # won't intersect with the gear blank.
-        z_max = min(sqrt(outside_radius**2 - (outside_radius-h_addendum)**2), outside_radius * sin(radians(90.) - self.pressure_angle))
-        z_max += z_offset
+        # FIX: z_max = min(sqrt(outside_radius**2 - (outside_radius-h_addendum)**2), outside_radius * sin(radians(90.) - self.pressure_angle))
+        # FIX: z_max = min(sqrt(outside_radius**2 - (outside_radius-h_addendum)**2), outside_radius * sin(radians(90.) - self.tool.angle / 2.))
+        z_max = sqrt(outside_radius**2 - (outside_radius-h_total)**2) + self.tool.tip_height / 2.
+        # FIX: z_max += z_offset
         z_incr = 0 if self.steps == 0 else z_max / self.steps
 
         # A partial number of teeth can be created if "teeth_to_make" is set,
@@ -156,7 +158,7 @@ M30
 
         # Make sure the cutter shaft doesn't hit the gear blank.
         shaft_radius = self.tool.radius - self.tool.depth
-        y_point, z_point = pitch_radius, z_max + z_offset
+        y_point, z_point = pitch_radius, z_max # FIX + z_offset
         y_tool, z_tool = rotate(-tool_angle_offset, y_point, z_point)
         y = self.tool.radius + y_tool - h_dedendum
         shaft_clearance = y - outside_radius - shaft_radius
@@ -167,7 +169,7 @@ M30
         var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
                  'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
                  'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
-                 'outside_diameter', 'outside_radius', 'z_offset', 'tool_angle_offset', 'x_start',
+                 'outside_diameter', 'outside_radius', 'tool_angle_offset', 'x_start',
                  'x_end']
         gcode = []
         for var in var_t:
@@ -199,13 +201,13 @@ M30
 
                 # Bottom of the slot
                 if z_steps <= 0:
-                    y_point, z_point = pitch_radius, z + z_offset
+                    y_point, z_point = pitch_radius - h_dedendum, z + self.tool.tip_height / 2.
                     y_tool, z_tool = rotate(tool_angle_offset, y_point, z_point)
 
                     # Handle the special case of "easing into the first cut"
-                    if self.tool.ease and z_steps == -self.steps:
-                        y_start = self.tool.radius + y_tool
-                        y_end = self.tool.radius + y_tool - h_dedendum
+                    if False and self.tool.ease and z_steps == -self.steps:     # FIX
+                        y_start = self.tool.radius + y_tool + h_total
+                        y_end = self.tool.radius + y_tool
                         y_div = (y_end - y_start) / self.tool.ease
                         for ease_step in range(self.tool.ease):
                             y = y_start + y_div * ease_step
@@ -216,7 +218,7 @@ M30
 
                     gcode.append(cut.cut(
                         (angle_direction * degrees(angle + tool_angle_offset + tooth_angle_offset)),
-                        (-angle_direction * (self.tool.radius + y_tool - h_dedendum)),
+                        (-angle_direction * (self.tool.radius + y_tool)),
                         z_tool))
 
                 # Center of the slot
@@ -229,11 +231,11 @@ M30
 
                 # Top of the slot
                 if z_steps >= 0:
-                    y_point, z_point = pitch_radius, z - z_offset
+                    y_point, z_point = pitch_radius - h_dedendum, z - self.tool.tip_height / 2.
                     y_tool, z_tool = rotate(-tool_angle_offset, y_point, z_point)
                     gcode.append(cut.cut(
                         (angle_direction * degrees(angle - tool_angle_offset + tooth_angle_offset)),
-                        (-angle_direction * (self.tool.radius + y_tool - h_dedendum)),
+                        (-angle_direction * (self.tool.radius + y_tool)),
                         z_tool))
 
         return '\n'.join(gcode)

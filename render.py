@@ -15,7 +15,7 @@ import sys
 import configargparse
 import matplotlib.pyplot as plt
 from celluloid import Camera
-from shapely.geometry import Polygon, MultiPolygon
+from shapely.geometry import Polygon, MultiPolygon, box
 from shapely.affinity import rotate, translate
 
 # Parse the command line arguments
@@ -69,6 +69,7 @@ parse_rotary = re.compile(r'^\( *right_rotary: (True|False) *\)$')
 parse_tool = re.compile(r'^\( *tool: \(Angle: ([0-9\.]+), Depth: ([0-9\.]+), Radius: ([0-9\.]+), TipHeight: ([0-9\.]+), Flutes: ([0-9]+)\) *\)$')
 parse_feed = re.compile(r'^F([-0-9\.]+)')
 parse_speed = re.compile(r'^S([-0-9\.]+)')
+parse_movecut = re.compile(r'^G([01]+)')
 parse_gcode = r'([AXYZ])([-0-9\.]+)'
 
 # Start up a camera if we're creating an animation
@@ -83,7 +84,7 @@ step_number = 0
 cuttings = []
 v = {}
 
-for line in infile:
+for line_number, line in enumerate(infile):
     l = line.strip()
     mTooth = parse_tooth.match(l)
     mGeneral = parse_general.match(l)
@@ -91,6 +92,7 @@ for line in infile:
     mRotary = parse_rotary.match(l)
     mFeed = parse_feed.match(l)
     mSpeed = parse_speed.match(l)
+    mMoveCut = parse_movecut.match(l)
     mgCode = re.findall(parse_gcode, l)
 
 
@@ -128,6 +130,7 @@ for line in infile:
 
     # GCode
     elif mgCode:
+        move_cut = int(mMoveCut.group(1))
         if step_number == 0:
             # Create all of the shapes the first time real GCode is encountered.
             if verbose:
@@ -138,15 +141,15 @@ for line in infile:
             gear_blank = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
             # Create a polygon to for the pitch circle
-            r = v['outside_diameter'] / 2. - v['h_addendum']
+            r = v['pitch_diameter'] / 2.
             pitch_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
             # Create a polygon to for the dedendum circle
-            r = v['outside_diameter'] / 2. - v['h_addendum'] - v['h_addendum']
+            r = v['pitch_diameter'] / 2. - v['h_addendum']
             dedendum_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
             # Create a polygon to for the clearance circle
-            r = v['outside_diameter'] / 2. - v['h_total']
+            r = v['pitch_diameter'] / 2. - v['h_addendum']
             clearance_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
             # Create a polygon to represent the cutting tool
@@ -191,18 +194,38 @@ for line in infile:
                     amountCut = area_start - gear_blank.area
                     if amountCut > 0.:
                         cuttings.append(amountCut)
+                        if move_cut == 0:
+                            print("Error:", line_number+1, l)
+                    elif move_cut == 1:
+                        print("Delete:", line_number+1, l)
 
                     # Write an animation frame
                     if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
-                        plt.plot(*pitch_circle.exterior.xy, color='g')
-                        plt.plot(*clearance_circle.exterior.xy, color='c')
-                        plt.plot(*gear_blank.exterior.xy, color='b')
-                        plt.plot(*cur_cutter.exterior.xy, color='r')
-                        plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
-                        plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
-                        plt.grid()
-                        plt.axis('equal')
-                        camera.snap()
+                        if zoom:
+                            clip = box(v['outside_radius']-v['h_total']*3, -v['z_max'], v['outside_radius']+v['module']*3, v['z_max'])
+                            try:
+                                plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
+                                plt.plot(*pitch_circle.intersection(clip).exterior.xy, color='g')
+                                plt.plot(*clearance_circle.intersection(clip).exterior.xy, color='c')
+                                plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
+                                plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
+                                #plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
+                                #plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
+                                plt.grid()
+                                plt.axis('equal')
+                                camera.snap()
+                            except AttributeError:
+                                pass
+                        else:
+                            plt.plot(*pitch_circle.exterior.xy, color='g')
+                            plt.plot(*clearance_circle.exterior.xy, color='c')
+                            plt.plot(*gear_blank.exterior.xy, color='b')
+                            plt.plot(*cur_cutter.exterior.xy, color='r')
+                            plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
+                            plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
+                            plt.grid()
+                            plt.axis('equal')
+                            camera.snap()
             elif axis == 'Y':
                 cutter_y = amt
             elif axis == 'Z':
@@ -212,7 +235,7 @@ for line in infile:
 if animate:
     if verbose:
         print('Generating animation "%s"' % animationFile)
-    animation = camera.animate()
+    animation = camera.animate(1000)
     animation.save(animationFile, writer='pillow')
 
 # Create a picture picture of the gear

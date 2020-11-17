@@ -181,9 +181,13 @@ for line_number, line in enumerate(infile):
                 if cutter_y:
                     cur_cutter = translate(cutter, cutter_y, cutter_z)
                     area_start = gear_blank.area
+                    if not gear_blank.is_valid:
+                        gear_blank = gear_blank.buffer(0)
                     gear_blank = gear_blank.difference(cur_cutter)
+
                     # Deal with an acute cutter trimming off a shard
                     if type(gear_blank) == MultiPolygon:
+                        print("Sharding:", line_number+1, l)
                         big_poly, area = None, 0.
                         for polygon in gear_blank:
                             if polygon.area > area:
@@ -240,6 +244,7 @@ if animate:
 
 # Create a picture picture of the gear
 if picture:
+    gear_blank = rotate(gear_blank, cur_angle, origin=(0, 0))
     if verbose:
         print('Generating picture "%s"' % pictureFile)
     fig = plt.figure()

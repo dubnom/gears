@@ -1,16 +1,32 @@
-mkdir orery
+mkdir orrery
 echo Mercury
-./gears.py -m .89647 --relief 1.4 -t 33 -k 2 -T cutter45.cfg orery/mercury_x.nc 
-./gears.py -m .89647 --relief 1.4 -t 137 -k 2 -T cutter45.cfg orery/mercury_y.nc 
+./gears.py -m .89647 -t 33 -k 2 -T saw64th.cfg orrery/mercury_x.nc 
+./render.py orrery/mercury_x.nc -azp -t 6
+cp picture.png pic00.png
+cp animation.gif anim00.gif
+./gears.py -m .89647 -t 33 -k 2 -T saw32nd.cfgorrery/mercury_x.nc 
+./render.py orrery/mercury_x.nc -azp -t 6
+cp picture.png pic32.png
+cp animation.gif anim32.gif
+./gears.py -m .89647 -t 33 -k 2 -T cutter40.cfg orrery/mercury_x.nc 
+./render.py orrery/mercury_x.nc -azp -t 6
+cp picture.png pic40.png
+cp animation.gif anim40.gif
+./gears.py -m .89647 -t 33 -k 2 -T cutter45.cfg orrery/mercury_x.nc 
+./render.py orrery/mercury_x.nc -azp -t 6
+cp picture.png pic45.png
+cp animation.gif anim45.gif
 
-echo Venus
-./gears.py -m .72571 --relief 1.4 -t 80 -k 2 -T cutter45.cfg orery/venus_x.nc 
-./gears.py -m .72571 --relief 1.4 -t 130 -k 2 -T cutter45.cfg orery/venus_y.nc 
+#./gears.py -m .89647 --relief 1.4 -t 137 -k 2 -T cutter45.cfg orrery/mercury_y.nc 
 
-echo Earth
-./gears.py -m .70556 --relief 1.4 -t 108 -k 2 -T cutter45.cfg orery/earth_x.nc 
-./gears.py -m .70556 --relief 1.4 -t 108 -k 2 -T cutter45.cfg orery/earth_y.nc 
+#echo Venus
+#./gears.py -m .72571 --relief 1.4 -t 80 -k 2 -T cutter45.cfg orrery/venus_x.nc 
+#./gears.py -m .72571 --relief 1.4 -t 130 -k 2 -T cutter45.cfg orrery/venus_y.nc 
 
-echo Mars
-./gears.py -m 1.2595 --relief 1.4 -t 79 -k 2 -T cutter45.cfg orery/mars_x.nc 
-./gears.py -m 1.2595 --relief 1.4 -t 42 -k 2 -T cutter45.cfg orery/mars_y.nc 
+#echo Earth
+#./gears.py -m .70556 --relief 1.4 -t 108 -k 2 -T cutter45.cfg orrery/earth_x.nc 
+#./gears.py -m .70556 --relief 1.4 -t 108 -k 2 -T cutter45.cfg orrery/earth_y.nc 
+
+#echo Mars
+#./gears.py -m 1.2595 --relief 1.4 -t 79 -k 2 -T cutter45.cfg orrery/mars_x.nc 
+#./gears.py -m 1.2595 --relief 1.4 -t 42 -k 2 -T cutter45.cfg orrery/mars_y.nc 

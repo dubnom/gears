@@ -208,11 +208,19 @@ for line_number, line in enumerate(infile):
                         if zoom:
                             clip = box(v['outside_radius']-v['h_total']*3, -v['z_max'], v['outside_radius']+v['module']*3, v['z_max'])
                             try:
-                                plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
+                                # plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
                                 plt.plot(*pitch_circle.intersection(clip).exterior.xy, color='g')
                                 plt.plot(*clearance_circle.intersection(clip).exterior.xy, color='c')
-                                plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
-                                plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
+                                show_rotated = False
+                                if show_rotated:
+                                    rotated_gear_blank = rotate(gear_blank, cur_angle, origin=(0, 0))
+                                    plt.plot(*rotated_gear_blank.intersection(clip).exterior.xy, color='b')
+                                    rotated_cutter = rotate(cur_cutter, cur_angle, origin=(0, 0))
+                                    plt.plot(*rotated_cutter.intersection(clip).exterior.xy, color='cyan')
+                                    # plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
+                                else:
+                                    plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
+                                    plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
                                 #plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
                                 #plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
                                 plt.grid()

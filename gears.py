@@ -247,23 +247,16 @@ M30
                         angle_direction * degrees(tooth_angle_offset + angle),
                         -angle_direction * (self.tool.radius + y_point),
                         z_point))
-            # Center of the slot
-            #for z_step in range(-self.root_steps, self.root_steps+1):
-            #    z = z_step * root_incr
-            #    angle = z / (pitch_radius - h_dedendum)
-            #    gcode.append(cut.cut(
-            #        (angle_direction * degrees(angle + tooth_angle_offset)),
-            #        (-angle_direction * (self.tool.radius + pitch_radius - h_dedendum)),
-            #        0))
-            
-            #for z_step in range(-self.root_steps, self.root_steps+1):
-            #    z = z_step * root_incr
-            #    angle = z / pitch_radius
-            #    gcode.append(cut.cut(
-            #        (angle_direction * degrees(tooth_angle_offset + angle)),
-            #        (-angle_direction * (pitch_radius + self.tool.radius - h_dedendum)),
-            #        0))
 
+            # Center of the slot
+            for z_step in range(-self.root_steps, self.root_steps+1):
+                z = z_step * root_incr
+                angle = z / (pitch_radius - h_dedendum)
+                gcode.append(cut.cut(
+                    (angle_direction * degrees(angle + tooth_angle_offset)),
+                    (-angle_direction * (self.tool.radius + pitch_radius - h_dedendum)),
+                    0))
+            
         return '\n'.join(gcode)
 
 

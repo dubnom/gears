@@ -127,6 +127,7 @@ M30
         pitch_radius = pitch_diameter / 2.
         outside_diameter = pitch_diameter + 2 * h_addendum
         outside_radius = outside_diameter / 2.
+        half_tooth = circular_pitch / 4.
 
         tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
         z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
@@ -191,22 +192,24 @@ M30
             # The shape of the tooth (actually the space removed to make the tooth)
             # is created iteratively with a number of steps. More steps means greater
             # accuracy but longer run time.
-            half_tooth = circular_pitch / 4.
 
             # Bottom of the tooth (top of the slot)
             for z_step in range(self.steps+1, -1, -1):
-                # height of the center of the cutting tooth at the pitch radius
+                # center of the cutting tooth
                 z = -z_step * z_incr
+                y = pitch_radius
 
                 # blank angle of the center point of the "cutting tooth"
-                angle = atan2(z, pitch_radius)
+                angle = atan2(z, y)
 
                 # move z to tooth edge
                 z += half_tooth
 
-                # Find the tip of the actual cutter (and new angle)
-                y_point, z_point = rotate(tool_angle_offset, pitch_radius, z)
+                # Find the rotated pitch radius and z of the actual cutter
+                y_point, z_point = rotate(tool_angle_offset, y, z)
                 angle += tool_angle_offset
+
+                # Find the tip of the actual cutter
                 y_point -= cos(self.tool.angle / 2) * h_dedendum
                 z_point -= sin(self.tool.angle / 2) * h_dedendum
 
@@ -217,19 +220,22 @@ M30
                     z_point - self.tool.tip_height / 2.))
 
             # Top of the tooth (bottom of the slot)
-            for z_step in range(self.steps, -1, -1):
+            for z_step in range(self.steps+1, -1, -1):
                 # height of the center of the cutting tooth at the pitch radius
                 z = z_step * z_incr
+                y = pitch_radius
 
                 # blank angle of the center point of the "cutting tooth"
-                angle = atan2(z, pitch_radius)
+                angle = atan2(z, y)
 
                 # move z to pressure_angle edge
                 z -= half_tooth
 
-                # Find the tip of the actual cutter (and new angle)
-                y_point, z_point = rotate(-tool_angle_offset, pitch_radius, z)
+                # Find the rotated pitch radius and z of the actual cutter
+                y_point, z_point = rotate(-tool_angle_offset, y, z)
                 angle -= tool_angle_offset
+
+                # Find the tip of the actual cutter
                 y_point -= cos(self.tool.angle / 2) * h_dedendum
                 z_point += sin(self.tool.angle / 2) * h_dedendum
 

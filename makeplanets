@@ -4,7 +4,7 @@ echo Mercury
 ./render.py orrery/mercury_x.nc -azp -t 6
 cp picture.png pic00.png
 cp animation.gif anim00.gif
-./gears.py -m .89647 -t 33 -k 2 -T saw32nd.cfgorrery/mercury_x.nc 
+./gears.py -m .89647 -t 33 -k 2 -T saw32nd.cfg orrery/mercury_x.nc 
 ./render.py orrery/mercury_x.nc -azp -t 6
 cp picture.png pic32.png
 cp animation.gif anim32.gif

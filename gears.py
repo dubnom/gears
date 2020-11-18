@@ -128,6 +128,7 @@ M30
         outside_diameter = pitch_diameter + 2 * h_addendum
         outside_radius = outside_diameter / 2.
         half_tooth = circular_pitch / 4.
+        half_tool_tip = self.tool.tip_height / 2.
 
         tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
         z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
@@ -211,13 +212,14 @@ M30
 
                 # Find the tip of the actual cutter
                 y_point -= cos(self.tool.angle / 2) * h_dedendum
-                z_point -= sin(self.tool.angle / 2) * h_dedendum
+                z_point -= half_tool_tip + sin(self.tool.angle / 2) * h_dedendum
 
                 # cut
-                gcode.append(cut.cut(
-                    angle_direction * degrees(tooth_angle_offset + angle),
-                    -angle_direction * (self.tool.radius + y_point),
-                    z_point - self.tool.tip_height / 2.))
+                if sqrt(y_point**2 + z_point**2) < outside_radius:
+                    gcode.append(cut.cut(
+                        angle_direction * degrees(tooth_angle_offset + angle),
+                        -angle_direction * (self.tool.radius + y_point),
+                        z_point))
 
             # Top of the tooth (bottom of the slot)
             for z_step in range(self.steps+1, -1, -1):
@@ -237,13 +239,14 @@ M30
 
                 # Find the tip of the actual cutter
                 y_point -= cos(self.tool.angle / 2) * h_dedendum
-                z_point += sin(self.tool.angle / 2) * h_dedendum
+                z_point += half_tool_tip + sin(self.tool.angle / 2) * h_dedendum
 
                 # cut
-                gcode.append(cut.cut(
-                    angle_direction * degrees(tooth_angle_offset + angle),
-                    -angle_direction * (self.tool.radius + y_point),
-                    z_point + self.tool.tip_height / 2.))
+                if sqrt(y_point**2 + z_point**2) < outside_radius:
+                    gcode.append(cut.cut(
+                        angle_direction * degrees(tooth_angle_offset + angle),
+                        -angle_direction * (self.tool.radius + y_point),
+                        z_point))
             # Center of the slot
             #for z_step in range(-self.root_steps, self.root_steps+1):
             #    z = z_step * root_incr

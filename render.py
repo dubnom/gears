@@ -19,6 +19,9 @@ from shapely.geometry import Polygon, MultiPolygon, box
 from shapely.affinity import rotate, translate
 
 # Parse the command line arguments
+from anim.geom import BBox
+from anim.simple import SimpleAnimation
+
 p = configargparse.ArgParser(
     default_config_files=['render.cfg'],
     formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
@@ -76,6 +79,9 @@ parse_gcode = r'([AXYZ])([-0-9\.]+)'
 if animate:
     fig = plt.figure()
     camera = Camera(fig)
+    sa = SimpleAnimation(None)
+else:
+    sa = None
 
 # Run through each line of the file
 cutter_y = cutter_z = cur_angle = 0.
@@ -169,6 +175,12 @@ for line_number, line in enumerate(infile):
                 (-shaft, y),
                 (-shaft, v['outside_radius']),
                 ])
+            if sa and zoom:
+                cx = v['outside_radius']
+                cy = 0
+                zr = max(v['h_total'] * 3, v['z_max'])
+                zr *= 4
+                sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
         # Move and cut based on each axis
         for axis, amt in mgCode:
@@ -205,13 +217,37 @@ for line_number, line in enumerate(infile):
 
                     # Write an animation frame
                     if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
+                        show_rotated = False
+                        with sa.next_step() as dc:
+                            def poly(pp: Polygon, fill=None, outline='black'):
+                                # print(pp.exterior.coords)
+                                dc.polygon(pp.exterior.coords, fill, outline)
+                            if show_rotated:
+                                rotated_gear_blank = rotate(gear_blank, cur_angle, origin=(0, 0))
+                                poly(rotated_gear_blank, 'blue')
+                                rotated_cutter = rotate(cur_cutter, cur_angle, origin=(0, 0))
+                                poly(rotated_cutter, 'red')
+                            else:
+                                poly(gear_blank, 'blue')
+                                poly(cur_cutter, 'red')
+                            poly(pitch_circle, None, 'cyan')
+                            poly(clearance_circle, None, 'yellow')
+
                         if zoom:
                             clip = box(v['outside_radius']-v['h_total']*3, -v['z_max'], v['outside_radius']+v['module']*3, v['z_max'])
                             try:
-                                plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
+                                # plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
                                 plt.plot(*pitch_circle.intersection(clip).exterior.xy, color='g')
                                 plt.plot(*clearance_circle.intersection(clip).exterior.xy, color='c')
-                                plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
+                                if show_rotated:
+                                    rotated_gear_blank = rotate(gear_blank, cur_angle, origin=(0, 0))
+                                    plt.plot(*rotated_gear_blank.intersection(clip).exterior.xy, color='b')
+                                    rotated_cutter = rotate(cur_cutter, cur_angle, origin=(0, 0))
+                                    plt.plot(*rotated_cutter.intersection(clip).exterior.xy, color='cyan')
+                                    # plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
+                                else:
+                                    plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
+                                    plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
                                 #plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
                                 #plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
                                 plt.grid()
@@ -240,6 +276,7 @@ if animate:
         print('Generating animation "%s"' % animationFile)
     animation = camera.animate(1000)
     animation.save(animationFile, writer='pillow')
+    sa.save_animation('/tmp/sa_gears.gif')
 
 # Create a picture picture of the gear
 if picture:

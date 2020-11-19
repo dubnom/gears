@@ -127,13 +127,15 @@ M30
         pitch_radius = pitch_diameter / 2.
         outside_diameter = pitch_diameter + 2 * h_addendum
         outside_radius = outside_diameter / 2.
+
         half_tooth = circular_pitch / 4.
         half_tool_tip = self.tool.tip_height / 2.
-
+        tip_offset_y = cos(self.tool.angle / 2) * h_dedendum
+        tip_offset_z = half_tool_tip + sin(self.tool.angle / 2) * h_dedendum
         tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
+
         z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
         root_incr = z_offset / (self.root_steps + 1)
-        print(z_offset, root_incr, self.root_steps)
 
         x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
         mill = self.tool.mill
@@ -201,7 +203,7 @@ M30
                 y = pitch_radius
 
                 # blank angle of the center point of the "cutting tooth"
-                angle = atan2(z, y)
+                angle = z / y
 
                 # move z to tooth edge
                 z += half_tooth
@@ -211,8 +213,8 @@ M30
                 angle += tool_angle_offset
 
                 # Find the tip of the actual cutter
-                y_point -= cos(self.tool.angle / 2) * h_dedendum
-                z_point -= half_tool_tip + sin(self.tool.angle / 2) * h_dedendum
+                y_point -= tip_offset_y
+                z_point -= tip_offset_z
 
                 # cut
                 if sqrt(y_point**2 + z_point**2) < outside_radius:
@@ -228,7 +230,7 @@ M30
                 y = pitch_radius
 
                 # blank angle of the center point of the "cutting tooth"
-                angle = atan2(z, y)
+                angle = z / y
 
                 # move z to pressure_angle edge
                 z -= half_tooth
@@ -238,8 +240,8 @@ M30
                 angle -= tool_angle_offset
 
                 # Find the tip of the actual cutter
-                y_point -= cos(self.tool.angle / 2) * h_dedendum
-                z_point += half_tool_tip + sin(self.tool.angle / 2) * h_dedendum
+                y_point -= tip_offset_y
+                z_point += tip_offset_z
 
                 # cut
                 if sqrt(y_point**2 + z_point**2) < outside_radius:

@@ -142,10 +142,11 @@ M30
         angle_direction = 1 if self.right_rotary else -1
         x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
 
-        # Determine the maximum amount of height (or depth) in the Z axis before part of the cutter
-        # won't intersect with the gear blank.
-        z_max = sqrt(outside_radius**2 - (outside_radius - h_total)**2)
-        z_incr = z_max / (self.steps + 1)
+        # Determine the maximum amount of height (or depth) in the Z axis before the tip
+        # of the cutter won't intersect with the gear blank.
+        # z_max = sqrt(outside_radius**2 - (outside_radius - h_total)**2) + self.tool.tip_height
+        z_max = outside_radius
+        z_incr = z_max / (self.steps * 2)
 
         # A partial number of teeth can be created if "teeth_to_make" is set,
         # otherwise all of the gears teeth are cut.
@@ -197,7 +198,8 @@ M30
             # accuracy but longer run time.
 
             # Bottom of the tooth (top of the slot)
-            for z_step in range(self.steps+1, -1, -1):
+            #for z_step in range(self.steps+1, -1, -1):
+            for z_step in range(self.steps, -self.steps-1, -1):
                 # center of the cutting tooth
                 z = -z_step * z_incr
                 y = pitch_radius
@@ -224,7 +226,7 @@ M30
                         z_point))
 
             # Top of the tooth (bottom of the slot)
-            for z_step in range(self.steps+1, -1, -1):
+            for z_step in range(self.steps+1, -self.steps-1, -1):
                 # height of the center of the cutting tooth at the pitch radius
                 z = z_step * z_incr
                 y = pitch_radius

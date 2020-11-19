@@ -199,9 +199,9 @@ M30
 
             # Bottom of the tooth (top of the slot)
             #for z_step in range(self.steps+1, -1, -1):
-            for z_step in range(self.steps, -self.steps-1, -1):
+            for z_step in range(-self.steps, self.steps+1):
                 # center of the cutting tooth
-                z = -z_step * z_incr
+                z = z_step * z_incr
                 y = pitch_radius
 
                 # blank angle of the center point of the "cutting tooth"
@@ -226,9 +226,9 @@ M30
                         z_point))
 
             # Top of the tooth (bottom of the slot)
-            for z_step in range(self.steps+1, -self.steps-1, -1):
+            for z_step in range(-self.steps, self.steps+1):
                 # height of the center of the cutting tooth at the pitch radius
-                z = z_step * z_incr
+                z = -z_step * z_incr
                 y = pitch_radius
 
                 # blank angle of the center point of the "cutting tooth"

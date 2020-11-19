@@ -11,8 +11,8 @@ from anim.drawing import DrawingContext
 from anim.geom import BBox, Point
 from anim.transform import Transform
 
-if sys.platform == 'something for windows':
-    TMP_ANIM = '/temp/sa.gif'
+if sys.platform == 'linux':
+    TMP_ANIM = '/tmp/sa.gif'
 else:
     TMP_ANIM = '/tmp/sa.gif'
 
@@ -101,11 +101,11 @@ class SimpleAnimation(object):
             images[0].save(output, save_all=True, append_images=images[1:], disposal=1, duration=ms_per_frame, loop=0)
             # images[0].save(output, save_all=True, append_images=images[1:], disposal=2, duration=ms_per_frame, loop=0)
             os.system('qlmanage -p %r 2&>/dev/null' % output)
-        elif sys.platform == 'something for windows':
+        elif sys.platform == 'linux':
             # Not sure if this will work or not
-            images[0].save('/temp/images.png')
+            images[0].save('/tmp/images.png')
             images[0].save(output, save_all=True, append_images=images[1:], disposal=1, duration=ms_per_frame, loop=0)
-            os.system('start %r' % output)
+            os.system('cmd.exe /c "/linux%s"' % output)
         else:
             raise NotImplementedError('Unknown platform: %s' % sys.platform)
 

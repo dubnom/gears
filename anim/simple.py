@@ -20,7 +20,7 @@ else:
 class StepContext(object):
     """Context used by SimpleAnim.next_step"""
 
-    def __init__(self, sa: 'SimpleAnim', dc: DrawingContext):
+    def __init__(self, sa: 'SimpleAnimation', dc: DrawingContext):
         self.sa = sa
         self.dc = dc
 
@@ -31,7 +31,7 @@ class StepContext(object):
         self.sa.finish_step(self.dc)
 
 
-class SimpleAnim(object):
+class SimpleAnimation(object):
     """Master animation object."""
 
     def __init__(self, draw_func, image_size=(500, 500), draw_bbox=(-250, -250, 250, 250),
@@ -127,7 +127,7 @@ def test_simple():
         draw.line(99, 99, 99, -99, color='yellow')
         draw.line(99, -99, -99, -99, color='yellow')
 
-    sa = SimpleAnim(draw_it, image_size=(400, 400), draw_bbox=(-100, -100, 100, 100), steps=120, t_high=1, frame_display_time=1/60)
+    sa = SimpleAnimation(draw_it, image_size=(400, 400), draw_bbox=(-100, -100, 100, 100), steps=120, t_high=1, frame_display_time=1 / 60)
     sa.animate()
     sa.save_animation(None)
 

@@ -130,9 +130,16 @@ class DrawingContext(object):
         font = ImageFont.truetype('/System/Library/Fonts/SFNSMono.ttf', 40)
         self.draw.text((x, y), text, fill=color, font=font)
 
-    def polygon(self, points: List[Union[Tuple[Number, Number], BasePoint]]):
+    def polygon(self, points: List[Union[Tuple[Number, Number], BasePoint]], fill='blue', outline='black'):
+        """
+        Draw and (optionally fill) a polygon
+        :param points:
+        :param fill: color name or None for no fill
+        :param outline: color name or None for no outline
+        :return:
+        """
         pts = self.matrix.transform_pts(points, True)
-        self.draw.polygon(pts, fill='orange', outline='cyan')
+        self.draw.polygon(pts, fill=fill, outline=outline)
 
     def grid(self, spacing=10, center=(0, 0)):
         unused(spacing, center)
@@ -156,6 +163,10 @@ def test_drawing():
     print('scale_pt(0,0)->', draw.scale_pt(0, 0))
     draw.line(0, -10, 0, 10, 'red')
     draw.line(-10, 0, 10, 0, 'red')
+    pts = [(10, 10), (15, 20), (20, 10)]
+    draw.polygon(pts, 'blue', 'red')
+    draw.polygon([(x+5, y-5) for x, y in pts], None, 'cyan')
+    draw.polygon([(x-5, y+5) for x, y in pts], 'cyan', None)
     draw.show()
 
 

@@ -210,8 +210,8 @@ for line_number, line in enumerate(infile):
 
                 tooth_pts = [(0, -h_d), (w_ad, h_a), (w_ad+w_top, h_a), (w_ad+w_top+w_ad, -h_d),
                              (2 * w_tooth, -h_d)]
-                for rack_tooth in range(-num_teeth, num_teeth+1):
-                    offset = rack_tooth * 2 * w_tooth
+                for rack_tooth in range(-10, 5+1):
+                    offset = rack_tooth * 2 * w_tooth + w_ad + w_top/2
                     rack_pts.extend([(pitch_radius-ty, pitch_radius + tx+offset) for tx, ty in tooth_pts])
                 top = rack_pts[-1][1]
                 bot = rack_pts[0][1]
@@ -281,8 +281,8 @@ for line_number, line in enumerate(infile):
                             poly(pitch_circle, None, 'cyan')
                             poly(clearance_circle, None, 'yellow')
                             r = v['pitch_diameter'] / 2.
-                            ca = cur_angle % tau
-                            rack_shifted = translate(rack_polygon, 0, ca * r, 0)
+                            ca = radians(cur_angle)
+                            rack_shifted = translate(rack_polygon, 0, -ca * r, 0)
                             poly(rack_shifted, None, 'white')
 
                         if zoom:

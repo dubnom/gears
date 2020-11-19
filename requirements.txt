@@ -2,3 +2,5 @@ configargparse
 matplotlib
 shapely
 celluloid
+Pillow
+numpy

@@ -8,7 +8,7 @@ Also calculate and display statistics about the cutting process.
 Copyright 2020 - Michael Dubno - New York
 """
 
-from math import sin, cos, radians, degrees, pi
+from math import sin, cos, radians, degrees, pi, tan, tau
 import statistics
 import re
 import sys
@@ -79,7 +79,7 @@ parse_gcode = r'([AXYZ])([-0-9\.]+)'
 if animate:
     fig = plt.figure()
     camera = Camera(fig)
-    sa = SimpleAnimation(None)
+    sa = SimpleAnimation(None, image_size=(1000, 1000))
 else:
     sa = None
 
@@ -175,11 +175,59 @@ for line_number, line in enumerate(infile):
                 (-shaft, y),
                 (-shaft, v['outside_radius']),
                 ])
+
+            def make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):
+                # Create a polygon for the rack
+                pitch_radius = module * num_teeth / 2
+                w_tooth = half_tooth * 2
+                rack_pts = []
+                h_a = module
+                h_d = module * 1.25
+                h_t = h_a + h_d
+                assert(h_t == h_total)
+
+                # One tooth
+                #      ____          +h_a    # addendum
+                #     /    \
+                #    /      \          0
+                #   /        \
+                #  /          \____  -h_d    # dedendum
+                #  x0  x1  x2  x3
+                #  <>   is tan(pressure_angle) * h_d => w_d
+                #    <> is tan(pressure_angle) * h_a => w_a
+                #  <--> is tan(pressure_angle) * h_t == w_d + w_a => w_ad
+                #    <------> is w_tooth (along pitch radius)
+                #        <------> is also w_tooth (middle of top to middle of bottom)
+                #      <--> is w_tooth - 2 * w_a) => w_top
+                #              <--> is w_tooth - 2 * w_d) => w_bot
+                # Divots at the bottom of the tooth are added to aid visual tracking
+                tan_p = tan(radians(pressure_angle))
+                w_d = tan_p * h_d
+                w_a = tan_p * h_a
+                w_ad = w_a + w_d
+                w_top = w_tooth - 2 * w_a
+                w_bot = w_tooth - 2 * w_d
+
+                tooth_pts = [(0, -h_d), (w_ad, h_a), (w_ad+w_top, h_a), (w_ad+w_top+w_ad, -h_d),
+                             (2 * w_tooth, -h_d)]
+                for rack_tooth in range(-num_teeth, num_teeth+1):
+                    offset = rack_tooth * 2 * w_tooth
+                    rack_pts.extend([(pitch_radius-ty, pitch_radius + tx+offset) for tx, ty in tooth_pts])
+                top = rack_pts[-1][1]
+                bot = rack_pts[0][1]
+                back = module*4 + pitch_radius      # Back of rack
+                rack_pts.extend([(back, top), (back, bot)])
+
+                return Polygon(rack_pts)
+
+            # total hack for mercury, since we don't have these params in this program
+            rack_polygon = make_rack(0.89647, 33, 2.0170575, 0.7040858915409105, 20.0)
+
             if sa and zoom:
                 cx = v['outside_radius']
                 cy = 0
                 zr = max(v['h_total'] * 3, v['z_max'])
-                zr *= 4
+                zr *= 3
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
         # Move and cut based on each axis
@@ -232,6 +280,10 @@ for line_number, line in enumerate(infile):
                                 poly(cur_cutter, 'red')
                             poly(pitch_circle, None, 'cyan')
                             poly(clearance_circle, None, 'yellow')
+                            r = v['pitch_diameter'] / 2.
+                            ca = cur_angle % tau
+                            rack_shifted = translate(rack_polygon, 0, ca * r, 0)
+                            poly(rack_shifted, None, 'white')
 
                         if zoom:
                             clip = box(v['outside_radius']-v['h_total']*3, -v['z_max'], v['outside_radius']+v['module']*3, v['z_max'])

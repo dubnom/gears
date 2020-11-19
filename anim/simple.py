@@ -100,7 +100,11 @@ class SimpleAnimation(object):
             images[0].save('/tmp/images.png')
             images[0].save(output, save_all=True, append_images=images[1:], disposal=1, duration=ms_per_frame, loop=0)
             # images[0].save(output, save_all=True, append_images=images[1:], disposal=2, duration=ms_per_frame, loop=0)
-            os.system('qlmanage -p %r 2&>/dev/null' % output)
+            # os.system('qlmanage -p %r 2&>/dev/null' % output)
+            import pygifsicle
+            pygifsicle.optimize(output, '/tmp/anim_opt.gif')
+            # platform.quicklook('/tmp/anim_opt.gif')
+            os.system('qlmanage -p %r 2&>/dev/null' % '/tmp/anim_opt.gif')
         elif sys.platform == 'linux':
             # Not sure if this will work or not
             images[0].save('/tmp/images.png')

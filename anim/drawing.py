@@ -130,7 +130,7 @@ class DrawingContext(object):
         font = ImageFont.truetype('/System/Library/Fonts/SFNSMono.ttf', 40)
         self.draw.text((x, y), text, fill=color, font=font)
 
-    def polygon(self, points: List[Union[Tuple[Number, Number], BasePoint]], fill='blue', outline='black'):
+    def polygon(self, points: List[Union[Tuple[Number, Number], BasePoint]], fill: Any = 'blue', outline: Any = 'black'):
         """
         Draw and (optionally fill) a polygon
         :param points:
@@ -166,7 +166,7 @@ def test_drawing():
     pts = [(10, 10), (15, 20), (20, 10)]
     draw.polygon(pts, 'blue', 'red')
     draw.polygon([(x+5, y-5) for x, y in pts], None, 'cyan')
-    draw.polygon([(x-5, y+5) for x, y in pts], 'cyan', None)
+    draw.polygon([(x-5, y+5) for x, y in pts], (0, 255, 255), None)
     draw.show()
 
 

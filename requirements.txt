@@ -4,3 +4,4 @@ shapely
 celluloid
 Pillow
 numpy
+pygifsicle

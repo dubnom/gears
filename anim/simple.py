@@ -17,6 +17,20 @@ else:
     TMP_ANIM = '/tmp/sa.gif'
 
 
+class StepContext(object):
+    """Context used by SimpleAnim.next_step"""
+
+    def __init__(self, sa: 'SimpleAnim', dc: DrawingContext):
+        self.sa = sa
+        self.dc = dc
+
+    def __enter__(self):
+        return self.dc
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.sa.finish_step(self.dc)
+
+
 class SimpleAnim(object):
     """Master animation object."""
 
@@ -48,21 +62,31 @@ class SimpleAnim(object):
 
         self.images: List[Image.Image] = []
 
+    def next_step(self) -> StepContext:
+        """Create images, call draw_func for each step"""
+
+        this_image = Image.new('RGBA', self.image_size.xy(), self.background)
+        xf = Transform.canvas_fit(self.image_size.xy(), zoom=1.0, zero_zero=(0, self.image_size.y))
+        xf.scale_bbox(self.model_bbox, BBox(0, 0, *self.image_size))
+        dc = DrawingContext(this_image, xf)
+        return StepContext(self, dc)
+
+    def finish_step(self, dc: DrawingContext):
+        if self.show_steps:
+            dc.show()
+        self.images.append(dc.image())
+
     def animate(self):
         """Create images, call draw_func for each step"""
 
         step_size = (self.t_high - self.t_low) / self.steps
         for step in range(self.steps+1):
-            this_image = Image.new('RGBA', self.image_size.xy(), self.background)
-            xf = Transform.canvas_fit(self.image_size.xy(), zoom=1.0, zero_zero=(0, self.image_size.y))
-            xf.scale_bbox(self.model_bbox, BBox(0, 0, *self.image_size))
-            draw = DrawingContext(this_image, xf)
-
-            step_t = self.t_low + step * step_size
-            self.draw_func(draw, step_t)
+            with self.next_step() as dc:
+                step_t = self.t_low + step * step_size
+                self.draw_func(dc, step_t)
             if self.show_steps:
-                draw.show()
-            self.images.append(draw.image())
+                dc.show()
+            self.images.append(dc.image())
 
     def save_animation(self, output):
         if not output:

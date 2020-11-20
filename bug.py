@@ -42,9 +42,7 @@ def foo(tool_angle, tool_tip_height):
 
     # Determine where the line ended up
 
-    z += half_tool_tip
-
-    y1, z1 = rotate(radians(a), y, z)
+    y1, z1 = rotate(radians(a), y, z + half_tool_tip)
     y2, z2 = y1 + cos(tool_angle/2.) * h_total, z1 + sin(tool_angle/2.) * h_total
     y3, z3 = y1 + cos(tool_angle/2.) * h_total, z1 - sin(tool_angle/2.) * h_total
 
@@ -52,11 +50,16 @@ def foo(tool_angle, tool_tip_height):
     y2, z2 = rotate(-radians(a), y2, z2)
     y3, z3 = rotate(-radians(a), y3, z3)
     
-    line1 = ((y1, z1), (y2, z2))
-    line2 = ((y1, z1), (y3, z3))
-    return (y1, z1), (y2, z2), (y3, z3)
+    # line1 = ((y1, z1), (y2, z2))
+    # line2 = ((y1, z1), (y3, z3))
+    return (a, y, z), (y1, z1), (y2, z2), (y3, z3)
 
 
+def shorten(r, p):
+    if type(r) == float:
+        return round(r, p)
+    else:
+        return tuple(shorten(r1,p) for r1 in r)
 
 ad = 1
 steps = 5
@@ -64,8 +67,8 @@ module = .9
 teeth = 33
 pressure_angle = radians(20)
 
-print(45, foo(radians(45), 0))
-print(40, foo(radians(40), 0))
-print(0, foo(radians(0), .79))
-print(0, foo(radians(0), .39))
+print(45, shorten(foo(radians(45), 0), 4))
+print(40, shorten(foo(radians(40), 0), 4))
+print(0, shorten(foo(radians(0), .79), 4))
+print(0, shorten(foo(radians(0), .39), 4))
 

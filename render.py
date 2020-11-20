@@ -79,7 +79,7 @@ parse_gcode = r'([AXYZ])([-0-9\.]+)'
 if animate:
     fig = plt.figure()
     camera = Camera(fig)
-    sa = SimpleAnimation(None, image_size=(1000, 1000))
+    sa = SimpleAnimation(None, image_size=(500, 500))
 else:
     sa = None
 
@@ -227,7 +227,7 @@ for line_number, line in enumerate(infile):
                 cx = v['outside_radius']
                 cy = 0
                 zr = max(v['h_total'] * 3, v['z_max'])
-                zr *= 3
+                # zr *= 3
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
         # Move and cut based on each axis

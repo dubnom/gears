@@ -31,15 +31,17 @@ def foo(tool_angle, tool_tip_height):
             print(n, '=', eval(n))
     print()
 
+
     # Test a single cut of the 0th tooth
-    z_step = -5 
+    half_tooth = 0
+    z_step = 0 
     print('z_step =', z_step)
     z = z_step * z_incr
     print('z =', z)
     y = pitch_radius
     print('y =', y)
     angle = z / y
-    print('angle =', degrees(angle), cos(angle)*pitch_radius, sin(angle)*pitch_radius)
+    print('angle =', degrees(angle), degrees(atan2(z, y) - angle), cos(angle)*pitch_radius, sin(angle)*pitch_radius)
     z += half_tooth
     print('z =', z)
     y_point, z_point = rotate(tool_angle_offset, y, z)

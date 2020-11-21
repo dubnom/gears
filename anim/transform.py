@@ -82,7 +82,7 @@ class Transformer(ABC):
         """
         ...
 
-    def transform(self, x, y):
+    def transform(self, x, y) -> Tuple[float, float]:
         """Transform (x, y) to (x, y)"""
         pp = self.transform_np_pts(self.xy_to_np_point(x, y))[0]
         return pp[0], pp[1]

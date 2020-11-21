@@ -125,6 +125,13 @@ class DrawingContext(object):
         x2, y2 = self.scale_pt(x2, y2)
         self.draw.line((x1, y1, x2, y2), fill=color, width=width)
 
+    def arc(self, center_xy, radius, start_degrees, end_degrees, color='black', width=1):
+        cx, cy = self.scale_pt(*center_xy)
+        radius = self.matrix.transform_width(radius)
+        box = [cx-radius, cy-radius, cx+radius, cy+radius]
+        print('Arc: ', box)
+        self.draw.arc(box, start_degrees, end_degrees, fill=color, width=width)
+
     def text(self, x, y, text: str, color=(20, 20, 20, 255)):
         # font = ImageFont.truetype('/Library/Fonts/Arial Unicode.ttf', 15)
         font = ImageFont.truetype('/System/Library/Fonts/SFNSMono.ttf', 40)

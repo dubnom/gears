@@ -1,3 +1,5 @@
+from numbers import Number
+from typing import List, Tuple
 import matplotlib.pyplot as plt
 from math import *
 
@@ -13,64 +15,133 @@ def plot(xy, color='black'):
 	plt.plot(*zip(*xy), color)
 
 
-def involute(r, a=0, up=1, c=(0, 0)):
-	# print('inv: r=%3.1f a=%8.5f up=%d' % (r, a, up))
-	# See https://en.wikipedia.org/wiki/Involute#Involutes_of_a_circle
-	# Use arc length as approximation for height.
-	# It will always be a shorter, though.
-	#             al = r/2 * sqr(t)
-	#  therefore, t = sqrt(al/r*2)
-	al = 2.25		# addendum+dedendum
-	tt = sqrt(al/r*2)
-	cx, cy = c
-	pt = lambda t: (r*(cos(t)+(t-a)*sin(t))+cx, r*(sin(t)-(t-a)*cos(t))+cy)
-	steps = 60
-	return [pt(up*step/steps*tt+a) for step in range(steps+1)]
-
-
-def gear(teeth, center=(0, 0), rot: float = 0, module: float = 1):
+class Involute(object):
 	"""
-	Plot a gear
-	:param teeth:	Number of teeth in gear
-	:param center:  Center of gear
-	:param rot: 	Rotation in #teeth
-	:param module:	Module of gear
+		Involute curve.
+		See https://en.wikipedia.org/wiki/Involute#Involutes_of_a_circle
 	"""
-	pressure_angle = 20
-	addendum = module
-	dedendum = module*1.25
-	pitch_radius = module*teeth/2
-	pitch = module*pi
-	rot *= pitch
-	tooth = pitch/2
-	addendum_offset = addendum*tan(radians(pressure_angle))
-	dedendum_offset = dedendum*tan(radians(pressure_angle))
-	print(pitch, tooth, addendum_offset)
-	#teeth = 2
-	plot(circle(pitch_radius, c=center), color='yellow')
-	plot(circle(pitch_radius+addendum, c=center), color='yellow')
-	plot(circle(pitch_radius-dedendum, c=center), color='yellow')
-	plot(circle(pitch_radius-addendum, c=center), color='cyan')
-	plot(circle(2, c=center), color='red')
-	plot(circle(1, c=center), color='blue')
+	def __init__(self, radius, max_radius):
+		self.radius = radius
+		self.max_radius = max_radius
+		self.total_angle = self.calc_angle(self.max_radius)
+		print('Inv: r=%.6f mr=%.6f ta=%.6f' % (self.radius, self.max_radius, self.total_angle))
 
-	tooth_top_hw = tooth/2 - addendum_offset
-	for n in range(teeth):
-		plot(involute(pitch_radius-addendum, a=(n*pitch+rot+tooth_top_hw)/pitch_radius, c=center), 'red')
-		plot(involute(pitch_radius-addendum, a=(n*pitch+rot-tooth_top_hw)/pitch_radius, c=center, up=-1), 'blue')
+	def calc_angle(self, distance) -> float:
+		"""Calculate angle (radians) for corresponding distance (> radius)"""
+		assert(distance > self.radius)
+		return sqrt(distance * distance / (self.radius * self.radius) - 1)
+
+	def calc_point(self, angle, offset=0.0):
+		"""Calculate the x,y for a given angle and offset angle"""
+		x = self.radius * (cos(angle) + (angle - offset) * sin(angle))
+		y = self.radius * (sin(angle) - (angle - offset) * cos(angle))
+		return x, y
+
+	def path(self, steps=10, offset=0.0, up=1, center=(0.0, 0.0)) -> List[Tuple[Number, Number]]:
+		"""Generate path for involute"""
+		zp = (self.calc_point(up*step/steps*self.total_angle+offset, offset=offset) for step in range(0, steps+1))
+		cx, cy = center
+		return [(x+cx, y+cy) for x, y in zp]
 
 
-# print(circle(2))
-# plot(circle(1, (1, -.5)), color='blue')plt.grid()
-gear(19, rot=0.25)
-# gear(30)
-gear(15, (34/2, 0), rot=-0.25)
-plt.axis('equal')
-# Set zoom_radius to zoom in around where gears meet
-zoom_radius = 2
-if zoom_radius:
-	ax = plt.gca()
-	ax.set_xlim(10 - zoom_radius, 10 + zoom_radius)
-	ax.set_ylim(-zoom_radius, zoom_radius)
-plt.show()
+class Gear(object):
+	def __init__(self, teeth=30, center=(0.0, 0.0), rot=0.0, module=1.0, pressure_angle=20.0):
+		"""
+		Plot a gear
+		:param teeth:	Number of teeth in gear
+		:param center:  Center of gear
+		:param rot: 	Rotation in #teeth
+		:param module:	Module of gear
+		:param pressure_angle: Pressure angle
+		"""
+		self.teeth = teeth
+		self.module = module
+		self.center = center
+		self.pitch = self.module*pi
+		self.rot = rot*self.pitch		# Now rotation is in pitch distance
+		self.pressure_angle = radians(pressure_angle)
+		self.pitch_radius = self.module*self.teeth/2
+		self.base_radius = self.pitch_radius * cos(self.pressure_angle)
+		print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
 
+	def gen_poly(self) -> List[Tuple[Number, Number]]:
+		addendum = self.module
+		dedendum = self.module*1.25
+		tooth = self.pitch/2
+		addendum_offset = addendum*tan(self.pressure_angle)
+		dedendum_offset = dedendum*tan(self.pressure_angle)
+		print(self.pitch, tooth, addendum_offset)
+		print('pitch=', self.pitch, ' cp=', tau/self.teeth)
+		points = []
+		br = self.base_radius
+		pr = self.pitch_radius
+		dr = self.pitch_radius-dedendum
+		cx, cy = self.center
+		inv = Involute(self.base_radius, self.pitch_radius+addendum)
+		# Calc pitch point where involute intersects pitch circle and offset
+		pp_inv_angle = inv.calc_angle(self.pitch_radius)
+		ppx, ppy = inv.calc_point(pp_inv_angle)
+		pp_off_angle = atan2(ppy, ppx)
+		# Multiply pp_off_angle by pr to move from angular to pitch space
+		tooth_offset = tooth/2 - pp_off_angle*pr
+
+		for n in range(self.teeth):
+			mid = n*self.pitch + self.rot
+
+			start_angle = (mid - tooth_offset) / pr
+			pts = inv.path(offset=start_angle, center=self.center, up=-1)
+			points.extend(reversed(pts))
+			points.append((dr*cos(start_angle)+cx, dr*sin(start_angle)+cy))
+
+			start_angle = (mid + tooth_offset) / pr
+			points.append((dr*cos(start_angle)+cx, dr*sin(start_angle)+cy))
+			pts = inv.path(offset=start_angle, center=self.center, up=1)
+			points.extend(pts)
+		points.append(points[0])
+
+		return points
+
+	def plot(self, color='red'):
+		addendum = self.module
+		dedendum = self.module*1.25
+		pitch_radius = self.module*self.teeth/2
+
+		plot(circle(pitch_radius, c=self.center), color='green')
+		plot(circle(pitch_radius+addendum, c=self.center), color='yellow')
+		plot(circle(pitch_radius-dedendum, c=self.center), color='yellow')
+		plot(circle(pitch_radius-addendum, c=self.center), color='cyan')
+		plot(circle(self.base_radius, c=self.center), color='orange')
+
+		plot(circle(2*self.module, c=self.center), color='red')
+		plot(circle(self.module, c=self.center), color='blue')
+
+		plot(self.gen_poly(), color=color)
+
+
+def do_gears(rot=0., zoom_radius=0.):
+	# print(circle(2))
+	# plot(circle(1, (1, -.5)), color='blue')
+	# rot = 0.25
+	# rot = 0.0
+	t1 = 9
+	Gear(t1, rot=rot, module=1).plot()
+	print()
+	# gear(30)
+	t2 = 5
+	Gear(t2, center=((t1+t2)/2, 0), rot=-rot).plot()
+	plt.axis('equal')
+	plt.grid()
+	# Set zoom_radius to zoom in around where gears meet
+	if zoom_radius:
+		ax = plt.gca()
+		ax.set_xlim(t1/2 - zoom_radius, t1/2 + zoom_radius)
+		ax.set_ylim(-zoom_radius, zoom_radius)
+	plt.show()
+
+
+# for rot in (n/20 for n in range(21)):
+for rot in [0, 0.125, 0.25, 0.375, 0.5]:
+	do_gears(rot=rot, zoom_radius=2)
+
+for rot in [0, 0.125, 0.25]:
+	do_gears(rot=rot)

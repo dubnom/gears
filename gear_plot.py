@@ -65,6 +65,7 @@ class Gear(object):
 		print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
 
 	def gen_poly(self) -> List[Tuple[Number, Number]]:
+		# TODO-clip involute at bottom to not go below dedendum radius
 		addendum = self.module
 		dedendum = self.module*1.25
 		tooth = self.pitch/2
@@ -108,7 +109,7 @@ class Gear(object):
 
 		plot(circle(pitch_radius, c=self.center), color='green')
 		plot(circle(pitch_radius+addendum, c=self.center), color='yellow')
-		plot(circle(pitch_radius-dedendum, c=self.center), color='yellow')
+		plot(circle(pitch_radius-dedendum, c=self.center), color='blue')
 		plot(circle(pitch_radius-addendum, c=self.center), color='cyan')
 		plot(circle(self.base_radius, c=self.center), color='orange')
 
@@ -123,11 +124,11 @@ def do_gears(rot=0., zoom_radius=0.):
 	# plot(circle(1, (1, -.5)), color='blue')
 	# rot = 0.25
 	# rot = 0.0
-	t1 = 9
+	t1 = 19
 	Gear(t1, rot=rot, module=1).plot()
 	print()
 	# gear(30)
-	t2 = 5
+	t2 = 15
 	Gear(t2, center=((t1+t2)/2, 0), rot=-rot).plot()
 	plt.axis('equal')
 	plt.grid()
@@ -141,7 +142,8 @@ def do_gears(rot=0., zoom_radius=0.):
 
 # for rot in (n/20 for n in range(21)):
 for rot in [0, 0.125, 0.25, 0.375, 0.5]:
-	do_gears(rot=rot, zoom_radius=2)
+	do_gears(rot=rot, zoom_radius=3)
 
-for rot in [0, 0.125, 0.25]:
-	do_gears(rot=rot)
+if True:
+	for rot in [0, 0.125, 0.25, 0.375, 0.5]:
+		do_gears(rot=rot)

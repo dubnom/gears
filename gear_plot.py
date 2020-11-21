@@ -28,35 +28,43 @@ def involute(r, a=0, up=1, c=(0, 0)):
 	return [pt(up*step/steps*tt+a) for step in range(steps+1)]
 
 
-def gear(teeth, center=(0,0)):
-	module = 1
-	pa = 20
-	ad = module
-	dd = module*1.25
-	pr = module*teeth/2
+def gear(teeth, center=(0, 0), rot: float = 0, module: float = 1):
+	"""
+	Plot a gear
+	:param teeth:	Number of teeth in gear
+	:param center:  Center of gear
+	:param rot: 	Rotation in #teeth
+	:param module:	Module of gear
+	"""
+	pressure_angle = 20
+	addendum = module
+	dedendum = module*1.25
+	pitch_radius = module*teeth/2
 	pitch = module*pi
+	rot *= pitch
 	tooth = pitch/2
-	ado = ad*tan(radians(pa))
-	ddo = dd*tan(radians(pa))
-	print(pitch, tooth, ado)
+	addendum_offset = addendum*tan(radians(pressure_angle))
+	dedendum_offset = dedendum*tan(radians(pressure_angle))
+	print(pitch, tooth, addendum_offset)
 	#teeth = 2
-	plot(circle(pr, c=center), color='yellow')
-	plot(circle(pr+ad, c=center), color='yellow')
-	plot(circle(pr-dd, c=center), color='yellow')
-	plot(circle(pr-ad, c=center), color='cyan')
+	plot(circle(pitch_radius, c=center), color='yellow')
+	plot(circle(pitch_radius+addendum, c=center), color='yellow')
+	plot(circle(pitch_radius-dedendum, c=center), color='yellow')
+	plot(circle(pitch_radius-addendum, c=center), color='cyan')
 	plot(circle(2, c=center), color='red')
 	plot(circle(1, c=center), color='blue')
 
-	tooth_top_hw = tooth/2 - ado
+	tooth_top_hw = tooth/2 - addendum_offset
 	for n in range(teeth):
-		plot(involute(pr-ad, a=(n*pitch+tooth_top_hw)/pr, c=center), 'red')
-		plot(involute(pr-ad, a=(n*pitch-tooth_top_hw)/pr, c=center, up=-1), 'blue')
+		plot(involute(pitch_radius-addendum, a=(n*pitch+rot+tooth_top_hw)/pitch_radius, c=center), 'red')
+		plot(involute(pitch_radius-addendum, a=(n*pitch+rot-tooth_top_hw)/pitch_radius, c=center, up=-1), 'blue')
+
 
 # print(circle(2))
 # plot(circle(1, (1, -.5)), color='blue')plt.grid()
-gear(19)
+gear(19, rot=0.25)
 # gear(30)
-gear(15, (34/2, 0))
+gear(15, (34/2, 0), rot=-0.25)
 plt.axis('equal')
 # Set zoom_radius to zoom in around where gears meet
 zoom_radius = 2

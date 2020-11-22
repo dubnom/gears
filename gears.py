@@ -17,7 +17,7 @@ Copyright 2020 - Michael Dubno - New York
 # FIX: Add support for DP
 
 import sys
-from math import sin, cos, atan2, radians, degrees, sqrt, pi
+from math import sin, cos, tan, atan2, radians, degrees, sqrt, pi
 import configargparse
 
 
@@ -130,8 +130,8 @@ M30
 
         half_tooth = circular_pitch / 4.
         half_tool_tip = self.tool.tip_height / 2.
-        tip_offset_y = cos(self.tool.angle / 2) * h_dedendum
-        tip_offset_z = half_tool_tip + sin(self.tool.angle / 2) * h_dedendum
+        tip_offset_y = h_dedendum
+        tip_offset_z = half_tool_tip + tan(self.tool.angle / 2) * h_dedendum
         tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
 
         z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.

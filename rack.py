@@ -17,11 +17,12 @@ class Rack(object):
 
     """
 
-    def __init__(self, module=1, pressure_angle=20.0, relief_factor=1.25):
+    def __init__(self, module=1, pressure_angle=20.0, relief_factor=1.25, tall_tooth=False):
         """
             :param module: gear module
             :param pressure_angle: angle of tooth
             :param relief_factor: extra depth for dedendum
+            :param tall_tooth: True to make addendum equal dedendum for gear cutting simulations
         """
         self.module = module
         self.pressure_angle = pressure_angle
@@ -31,6 +32,8 @@ class Rack(object):
         dedendum = self.module * self.relief_factor
         addendum = self.module
         tan_pa = tan(radians(self.pressure_angle))
+        if tall_tooth:
+            addendum = dedendum
         tip_offset = self.half_tooth - addendum*tan_pa
         base_offset = self.half_tooth + dedendum*tan_pa
         self.tooth_tip_high = Point(-addendum, tip_offset)

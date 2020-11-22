@@ -124,12 +124,16 @@ class Gear(object):
 
     def gen_by_rack(self):
         """Generate the gear shape by moving a rack past the gear"""
-        rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)
+        rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle),
+                    relief_factor=self.relief_factor, tall_tooth=True)
         gear_points = []
         steps = 50
-        z_teeth = 5
+        z_teeth = 3
         rack_x = self.pitch_radius + self.center[0]
         tooth_pts = [rack.tooth_base_high, rack.tooth_tip_high, rack.tooth_tip_low, rack.tooth_base_low]
+        only_one_edge = False
+        if only_one_edge:
+            tooth_pts = tooth_pts[:2]
         for step in range(-steps, steps+1):
             tooth_pos = z_teeth * step / steps
             rack_y = tooth_pos * self.pitch + self.center[1]
@@ -181,12 +185,12 @@ def do_gears(rot=0., zoom_radius=0.):
     # plot(circle(1, (1, -.5)), color='blue')
     # rot = 0.25
     # rot = 0.0
-    t1 = 19
+    t1 = 17
     Gear(t1, rot=rot, module=1).plot()
     print()
     # gear(30)
     t2 = 5
-    # Gear(t2, center=((t1 + t2) / 2, 0), rot=-rot, pressure_line=False).plot()
+    Gear(t2, center=((t1 + t2) / 2, 0), rot=-rot, pressure_line=False).plot()
     plt.axis('equal')
     plt.grid()
     # Set zoom_radius to zoom in around where gears meet
@@ -198,7 +202,9 @@ def do_gears(rot=0., zoom_radius=0.):
 
 
 def main():
+    do_gears(0, zoom_radius=8)
     do_gears(0, zoom_radius=4)
+    do_gears(0, zoom_radius=2)
     do_gears(0, zoom_radius=1)
     return
 

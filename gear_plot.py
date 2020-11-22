@@ -3,6 +3,10 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 from math import *
 
+from anim.geom import Point, Vector
+from anim.transform import Transform
+from rack import Rack
+
 
 def circle(r, c=(0, 0)):
     cx, cy = c
@@ -72,6 +76,7 @@ class Gear(object):
         self.center = center
         self.pitch = self.module * pi
         self.rot = rot * self.pitch  # Now rotation is in pitch distance
+        self.relief_factor = 1.25
         self.pressure_angle = radians(pressure_angle)
         self.pressure_line = pressure_line
         self.pitch_radius = self.module * self.teeth / 2
@@ -117,10 +122,37 @@ class Gear(object):
 
         return points
 
+    def gen_by_rack(self):
+        """Generate the gear shape by moving a rack past the gear"""
+        rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)
+        gear_points = []
+        steps = 50
+        z_teeth = 5
+        rack_x = self.pitch_radius + self.center[0]
+        tooth_pts = [rack.tooth_base_high, rack.tooth_tip_high, rack.tooth_tip_low, rack.tooth_base_low]
+        for step in range(-steps, steps+1):
+            tooth_pos = z_teeth * step / steps
+            rack_y = tooth_pos * self.pitch + self.center[1]
+            rack_pos = Vector(rack_x, rack_y)
+            tt_high = rack.tooth_tip_high + rack_pos
+            tb_high = rack.tooth_base_high + rack_pos
+            gear_rotation = tooth_pos / self.teeth * 360
+            # Now, rotate tt_high back into default gear rotation
+            t = Transform().rotate_about(gear_rotation, Point(*self.center))
+            for pt in tooth_pts:
+                gear_points.append(t.transform_pt(pt+rack_pos))
+        return gear_points
+
+    def gen_tooth(self):
+        rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)
+        tooth_pts = [rack.tooth_base_high, rack.tooth_tip_high, rack.tooth_tip_low, rack.tooth_base_low]
+        offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
+        return [(p+offset).xy() for p in tooth_pts]
+
     def plot(self, color='red'):
         addendum = self.module
         dedendum = self.module * 1.25
-        pitch_radius = self.module * self.teeth / 2
+        pitch_radius = self.pitch_radius
 
         if self.pressure_line:
             dx = self.module*5*sin(self.pressure_angle)
@@ -139,6 +171,8 @@ class Gear(object):
         # plot(circle(2 * self.module, c=self.center), color='red')
         # plot(circle(self.module, c=self.center), color='blue')
 
+        plot(self.gen_by_rack(), color='#808080')
+        plot(self.gen_tooth(), color='green')
         plot(self.gen_poly(), color=color)
 
 
@@ -152,7 +186,7 @@ def do_gears(rot=0., zoom_radius=0.):
     print()
     # gear(30)
     t2 = 5
-    Gear(t2, center=((t1 + t2) / 2, 0), rot=-rot, pressure_line=False).plot()
+    # Gear(t2, center=((t1 + t2) / 2, 0), rot=-rot, pressure_line=False).plot()
     plt.axis('equal')
     plt.grid()
     # Set zoom_radius to zoom in around where gears meet
@@ -164,6 +198,10 @@ def do_gears(rot=0., zoom_radius=0.):
 
 
 def main():
+    do_gears(0, zoom_radius=4)
+    do_gears(0, zoom_radius=1)
+    return
+
     # for rot in (n/20 for n in range(21)):
     for rot in [0, 0.125, 0.25, 0.375, 0.5]:
         do_gears(rot=rot, zoom_radius=5)

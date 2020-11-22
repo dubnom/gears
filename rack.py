@@ -4,10 +4,18 @@
 
 from math import pi, tan, degrees, radians
 from typing import Tuple, List
+from anim.geom import Point
 
 
 class Rack(object):
-    """Parameters and helpers for a rack"""
+    """
+        Parameters and helpers for a rack.
+
+        Rack modeling space:
+            * (0,0) is on the pitch line centered on a tooth
+            * rack is vertical (Y) with tooth pointing to the left (negative X)
+
+    """
 
     def __init__(self, module=1, pressure_angle=20.0, relief_factor=1.25):
         """
@@ -20,14 +28,15 @@ class Rack(object):
         self.relief_factor = relief_factor
         self.circular_pitch = self.module * pi
         self.half_tooth = self.circular_pitch / 4
-
-    def cut_points(self) -> List[Tuple[float, float]]:
-        """Location in tooth space of cut points [high, low]"""
         dedendum = self.module * self.relief_factor
-        pressure_offset = dedendum * tan(radians(self.pressure_angle))
-        cut_high = self.half_tooth - pressure_offset, dedendum
-        cut_low = self.half_tooth + pressure_offset, -dedendum
-        return [cut_high, cut_low]
+        addendum = self.module
+        tan_pa = tan(radians(self.pressure_angle))
+        tip_offset = self.half_tooth - addendum*tan_pa
+        base_offset = self.half_tooth + dedendum*tan_pa
+        self.tooth_tip_high = Point(-addendum, tip_offset)
+        self.tooth_tip_low = Point(-addendum, -tip_offset)
+        self.tooth_base_high = Point(dedendum, base_offset)
+        self.tooth_base_low = Point(dedendum, -base_offset)
 
     def points(self, teeth_in_gear=32, teeth_in_rack=10):
         # def make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):

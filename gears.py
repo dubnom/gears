@@ -17,8 +17,10 @@ Copyright 2020 - Michael Dubno - New York
 # FIX: Add support for DP
 
 import sys
-from math import sin, cos, tan, atan2, radians, degrees, sqrt, pi
+from math import sin, cos, tan, atan2, radians, degrees, sqrt, pi, tau
 import configargparse
+
+import gear_plot
 
 
 def rotate(a, x, y):
@@ -63,8 +65,8 @@ class Tool():
 class Gear():
     """The Gear class is used to generate G Code of involute gears."""
 
-    def __init__(self, tool, module=1., pressure_angle=20., relief_factor=1.25,
-                 steps=5, root_steps=1, cutter_clearance=2., right_rotary=False):
+    def __init__(self, tool, module=1., pressure_angle=20., relief_factor=1.25, steps=5, root_steps=1,
+                 cutter_clearance=2., right_rotary=False, algo='old'):
         if module <= 0:
             raise ValueError('Gear: Module must be greater than 0.')
         if pressure_angle <= 0:
@@ -80,6 +82,7 @@ class Gear():
         self.root_steps = root_steps
         self.cutter_clearance = cutter_clearance
         self.right_rotary = right_rotary
+        self.algo = algo
 
     def header(self):
         """Return the gcode for the top of the file."""
@@ -110,7 +113,127 @@ G30
 M30
 %"""
 
-    def generate(self, teeth, blank_thickness, teeth_to_make=0):
+    def gcode_guts(self, gg: gear_plot.Gear, cut: 'Cut', teeth_to_make) -> str:
+        """Generate the gcode guts"""
+        gcode = []
+        cuts = gg.cuts_for_mill(self.tool.angle)
+        half_tool_tip = self.tool.tip_height / 2
+        # Generate a tooth profile for ever tooth requested
+        teeth_to_make = min(5, teeth_to_make)
+        for tooth in range(teeth_to_make):
+            tooth_angle_offset = 360 * tooth / gg.teeth
+
+            rmin = rmax = cuts[0][0]
+            for r, y, z in cuts:
+                rmin = min(rmin, r)
+                rmax = max(rmax, r)
+
+            gcode.append('')
+            gcode.append("( Tooth: %d  rot:%.2f->%.2f)" % (tooth, rmin, rmax))
+
+            for idx, (rotation, z, y) in enumerate(cuts):
+                # z += half_tool_tip
+                rotation += tooth_angle_offset
+                y += self.tool.radius
+                # TODO-this only does the inside cut
+                # print('G? A%.5f Y%.5f Z%.5f' % (rotation, y, z))
+                y_fix = 0
+                z_fix = 0
+                gcc = cut.cut(-rotation, y+y_fix, z+z_fix)
+                # print(gcc)
+                gcode.append(gcc)
+
+        return '\n'.join(gcode)
+
+    def generate_new(self, teeth, blank_thickness, teeth_to_make=0):
+        """Generate the gcode for cutting a gear."""
+
+        if teeth <= 0:
+            raise ValueError('Gear: Number of teeth must be greater than 0.')
+        if blank_thickness <= 0:
+            raise ValueError('Gear: Blank thickness must be greater than 0.')
+
+        gg = gear_plot.Gear(teeth,
+                            module=self.module, relief_factor=self.relief_factor,
+                            pressure_angle=self.pressure_angle)
+        gg.plot('red')
+        gg.plot_show(10)
+
+        # Calculate the variables used to generate the gear teeth
+        h_addendum = self.module
+        h_dedendum = self.module * self.relief_factor
+        h_total = h_addendum + h_dedendum
+        circular_pitch = self.module * pi
+        pitch_diameter = self.module * teeth
+        pitch_radius = pitch_diameter / 2.
+        outside_diameter = pitch_diameter + 2 * h_addendum
+        outside_radius = outside_diameter / 2.
+
+        half_tooth = circular_pitch / 4.
+        half_tool_tip = self.tool.tip_height / 2.
+        tip_offset_y = h_dedendum
+        tip_offset_z = half_tool_tip + tan(self.tool.angle / 2) * h_dedendum
+        tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
+
+        z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
+        root_incr = z_offset / (self.root_steps + 1)
+
+        x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(
+            self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
+        mill = self.tool.mill
+        angle_direction = 1 if self.right_rotary else -1
+        x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
+
+        # Determine the maximum amount of height (or depth) in the Z axis before the tip
+        # of the cutter won't intersect with the gear blank.
+        # z_max = sqrt(outside_radius**2 - (outside_radius - h_total)**2) + self.tool.tip_height
+        z_max = outside_radius
+        z_incr = z_max / (self.steps * 2)
+
+        # A partial number of teeth can be created if "teeth_to_make" is set,
+        # otherwise all of the gears teeth are cut.
+        if teeth_to_make == 0 or teeth_to_make > teeth:
+            teeth_to_make = teeth
+
+        # Make sure the cutter is big enough
+        if h_total > self.tool.depth:
+            raise ValueError("Cutter depth is too shallow for tooth height")
+
+        # Make sure the cutter shaft doesn't hit the gear blank.
+        shaft_radius = self.tool.radius - self.tool.depth
+        y_point, z_point = pitch_radius, z_max
+        y_tool, z_tool = rotate(-tool_angle_offset, y_point, z_point)
+        y = self.tool.radius + y_tool - h_dedendum
+        shaft_clearance = y - outside_radius - shaft_radius
+        if shaft_clearance < 0:
+            raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
+
+        # Include all of the generating parameters in the G Code header
+        var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
+                 'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
+                 'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
+                 'outside_diameter', 'outside_radius', 'tool_angle_offset', 'x_start',
+                 'x_end']
+        gcode = []
+        for var in var_t:
+            if var in locals():
+                gcode.append('( %17s: %-70s )' % (var, locals()[var]))
+            else:
+                gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
+
+        # Move to safe initial position
+        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
+        gcode.append('')
+        gcode.append('G30')
+        gcode.append(cut.start())
+        gcode.append('G0 Y%g' % (-angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance)))
+        gcode.append('G0 Z%g' % outside_radius)
+
+        gcode.append(self.gcode_guts(gg, cut, teeth_to_make))
+
+        return '\n'.join(gcode)
+
+    def generate_old(self, teeth, blank_thickness, teeth_to_make=0):
         """Generate the gcode for cutting a gear."""
 
         if teeth <= 0:
@@ -263,6 +386,14 @@ M30
             
         return '\n'.join(gcode)
 
+    def generate(self, teeth, blank_thickness, teeth_to_make=0) -> str:
+        if self.algo == 'new':
+            print('Generate: algo=%s -> new' % self.algo)
+            return self.generate_new(teeth, blank_thickness, teeth_to_make)
+        else:
+            print('Generate: algo=%s -> old' % self.algo)
+            return self.generate_old(teeth, blank_thickness, teeth_to_make)
+
 
 class Cut():
     """Cut is used to generate the gcode for the actual cutting and retraction
@@ -300,7 +431,7 @@ class Cut():
             ret = ["G1 X%g" % [self.x_start, self.x_end][self.stroke]]
             self.stroke = (self.stroke + 1) % 2
 
-        return '\n'.join(["G0 A%g Y%g Z%g" % (a, y, z)] + ret)
+        return '\n'.join(["G0 A%.4f Y%.4f Z%.4f" % (a, y, z)] + ret)
 
 
 def main():
@@ -319,6 +450,7 @@ def main():
                 """)
     p.add('out', nargs='?', type=configargparse.FileType('w'), default=sys.stdout)
     p.add('--config', '-X', is_config_file=True, help='Config file path')
+    p.add('--algo', type=str, default='old', help='Which algorithm to use for gcode generation')
 
     # Tool arguments
     p.add('--tool', '-T', is_config_file=True, help='Tool config file')
@@ -360,7 +492,8 @@ def main():
 
         gear = Gear(tool, module=args.module, pressure_angle=args.pressure,
                     relief_factor=args.relief, steps=args.steps, root_steps=args.roots,
-                    cutter_clearance=args.clear, right_rotary=args.right)
+                    cutter_clearance=args.clear, right_rotary=args.right,
+                    algo=args.algo)
 
         print(gear.header(), file=out)
         print(gear.generate(args.teeth, args.thick, args.make), file=out)

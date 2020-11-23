@@ -170,8 +170,10 @@ class Gear(object):
             t = Transform().rotate_about(gear_rotation, center)
             tth, tbh, ttl, tbl = (t.transform_pt(pt+rack_pos, True) for pt in tooth_pts)
             # Filter out unnecessary cuts
-            # TODO-this optimization appears to work as long as #teeth >= 7
+            # TODO-exit optimization appears to work as long as #teeth >= 7
             #   It could probably be base_radius when #teeth > 20
+            # TODO-entry could be optimized by finding the first cut that intersects
+            #   the tip of the gear tooth (can be calculated by involute equation)
             if (tth - center).length() <= (self.tip_radius if step < 0 else self.pitch_radius):
                 high_cuts.append(Line.from_pts(tth, tbh))
             if (ttl - center).length() <= (self.tip_radius if step > 0 else self.pitch_radius):
@@ -193,7 +195,7 @@ class Gear(object):
             cut_angle = cut.direction.angle()
             rotation = tool_angle-cut_angle
             print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
-            t = Transform().rotate(rotation)
+            t = Transform().rotate(-rotation)
             y, z = t.transform_pt(cut.origin)
             cut_params.append((rotation, y, z))
         return cut_params
@@ -227,7 +229,7 @@ class Gear(object):
         # plot(circle(self.module, c=self.center), color='blue')
 
         # plot(self.gen_by_rack(), color='#808080')
-        plot_cuts_in_gear_space = True
+        plot_cuts_in_gear_space = not True
         if plot_cuts_in_gear_space:
             origins = []
             high_cuts, low_cuts = self.gen_cuts_by_rack()
@@ -251,16 +253,28 @@ class Gear(object):
             plot(origins, col)
             plot(self.gen_tooth(), color='green')
 
-        plot_cuts_in_mill_space = not True
+        plot_cuts_in_mill_space = True
         if plot_cuts_in_mill_space:
             tool_angle = 45.0
             cuts = self.cuts_for_mill(tool_angle/2)
             pts = []
             cut_vec_x = 2*cos(radians(tool_angle/2))
             cut_vec_y = 2*sin(radians(tool_angle/2))
-            for rotation, y, z in cuts:
+            for idx, (rotation, y, z) in enumerate(cuts):
                 rot = radians(rotation)
-                plot([(0, 0), (pitch_radius*cos(rot)/2, pitch_radius*sin(rot)/2)], '#8080F0')
+                plot([
+                    (0, 0),
+                    (pitch_radius*cos(rot)*.8, pitch_radius*sin(rot)*.8),
+                    (y, z)
+                ], '#DDDDDD')
+            for idx, (rotation, y, z) in enumerate(cuts):
+                rot = radians(rotation)
+                if idx % 5 == 0:
+                    plot([
+                        (0, 0),
+                        (pitch_radius*cos(rot)*.8, pitch_radius*sin(rot)*.8),
+                        (y, z)
+                    ], '#8080F0')
                 plot([(y, z), (y+cut_vec_x, z+cut_vec_y)], '#808080')
                 # pts.append((y, z))
             plot(pts, 'green')
@@ -273,7 +287,7 @@ def do_gears(rot=0., zoom_radius=0.):
     # plot(circle(1, (1, -.5)), color='blue')
     # rot = 0.25
     # rot = 0.0
-    t1 = 17
+    t1 = 19
     Gear(t1, rot=rot, module=1).plot()
     print()
     # gear(30)
@@ -290,7 +304,7 @@ def do_gears(rot=0., zoom_radius=0.):
 
 
 def main():
-    # do_gears(0); return
+    do_gears(0, zoom_radius=8); do_gears(0, zoom_radius=4); return
 
     do_gears(0, zoom_radius=8)
     do_gears(0, zoom_radius=4)

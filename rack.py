@@ -41,11 +41,11 @@ class Rack(object):
         self.tooth_base_high = Point(dedendum, base_offset)
         self.tooth_base_low = Point(dedendum, -base_offset)
 
-    def points(self, teeth_in_gear=32, teeth_in_rack=10):
+    def points(self, teeth_in_gear=32, teeth_in_rack=10) -> List[Tuple[float, float]]:
         # def make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):
         """
             :param teeth_in_gear: number of teeth in gear (used to locate rack horizontally)
-            :param teeth_in_rack: duh
+            :param teeth_in_rack: duh, ignored
             :return: list of x,y pairs
         """
 

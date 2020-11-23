@@ -1,4 +1,42 @@
+#!/bin/bash
+tools="saw64th.cfg saw32nd.cfg cutter40.cfg cutter45.cfg"
+tools="cutter40.cfg"
+
+declare -a params=(
+  "mercury:-m .89647 -t 33 -k 2 -T"
+  # "venus:-m .72571 --relief 1.4 -t 80 -k 2"
+  # "venus:-m .72571 --relief 1.4 -t 130 -k 2"
+)
+
 mkdir orrery
+
+for param in "${params[@]}"
+do
+  planet=$(echo $param | sed 's/:.*//')
+  args=$(echo $param | sed 's/.*://')
+  echo $planet
+  # echo "planet is $planet  args is $args"
+  for tool in $tools
+  do
+      key=$(echo $tool | sed s/[^0-9]//g)
+      # echo "tool is $tool  key is $key"
+      for algo in old new
+      # for algo in new
+      do
+        # shellcheck disable=SC2086
+        echo RUN: python3 ./gears.py --algo="$algo" $args "$tool" "orrery/${planet}_x_${key}_${algo}.nc"
+        # shellcheck disable=SC2086
+        python3 ./gears.py --algo="$algo" $args "$tool" "orrery/${planet}_x_${key}_${algo}.nc"
+        echo RUN: python3 ./render.py "orrery/${planet}_x_${key}_${algo}.nc" -azp -t 6
+        python3 ./render.py "orrery/${planet}_x_${key}_${algo}.nc" -azp -t 6
+        cp picture.png "pic_${key}_${algo}.png"
+        cp animation.gif "anim_${key}_${algo}.gif"
+        cp /tmp/anim_opt.gif "anim_opt_${key}_${algo}.gif"
+      done
+  done
+done
+exit 0
+
 echo Mercury
 python3 ./gears.py -m .89647 -t 33 -k 2 -T saw64th.cfg orrery/mercury_x.nc
 python3 ./render.py orrery/mercury_x.nc -azp -t 6

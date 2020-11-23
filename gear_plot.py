@@ -3,7 +3,7 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 from math import *
 
-from anim.geom import Point, Vector
+from anim.geom import Point, Vector, Line
 from anim.transform import Transform
 from rack import Rack
 
@@ -81,6 +81,7 @@ class Gear(object):
         self.pressure_line = pressure_line
         self.pitch_radius = self.module * self.teeth / 2
         self.base_radius = self.pitch_radius * cos(self.pressure_angle)
+        self.tip_radius = self.pitch_radius + self.module   # add addendum
         print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
 
     def gen_poly(self) -> List[Tuple[Number, Number]]:
@@ -138,14 +139,62 @@ class Gear(object):
             tooth_pos = z_teeth * step / steps
             rack_y = tooth_pos * self.pitch + self.center[1]
             rack_pos = Vector(rack_x, rack_y)
-            tt_high = rack.tooth_tip_high + rack_pos
-            tb_high = rack.tooth_base_high + rack_pos
             gear_rotation = tooth_pos / self.teeth * 360
-            # Now, rotate tt_high back into default gear rotation
+            # Now, rotate tooth points back into default gear rotation
             t = Transform().rotate_about(gear_rotation, Point(*self.center))
             for pt in tooth_pts:
                 gear_points.append(t.transform_pt(pt+rack_pos))
         return gear_points
+
+    def gen_cuts_by_rack(self) -> Tuple[List[Line], List[Line]]:
+        """
+            Generate a set of cuts by moving a rack past the gear.
+            :return: two lists of segments for cuts
+        """
+        # TODO-if we require center to be 0,0 for generating cuts, then low cuts is reflection of high cuts
+        rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle),
+                    relief_factor=self.relief_factor, tall_tooth=True)
+        high_cuts = []
+        low_cuts = []
+        steps = 25
+        z_teeth = 3
+        center = Point(*self.center)
+        rack_x = self.pitch_radius + center.x
+        tooth_pts = [rack.tooth_tip_high, rack.tooth_base_high, rack.tooth_tip_low, rack.tooth_base_low]
+        for step in range(-steps, steps+1):
+            tooth_pos = z_teeth * step / steps
+            rack_y = tooth_pos * self.pitch + self.center[1]
+            rack_pos = Vector(rack_x, rack_y)
+            gear_rotation = tooth_pos / self.teeth * 360
+            # Now, rotate tooth points back into default gear rotation and generate segments
+            t = Transform().rotate_about(gear_rotation, center)
+            tth, tbh, ttl, tbl = (t.transform_pt(pt+rack_pos, True) for pt in tooth_pts)
+            # TODO-more cuts could be filtered out, but not sure how to compute
+            if (tth - center).length() <= self.tip_radius:
+                high_cuts.append(Line.from_pts(tth, tbh))
+            if (ttl - center).length() <= self.tip_radius:
+                low_cuts.append(Line.from_pts(ttl, tbl))
+        # Cut from flattest to steepest
+        low_cuts = list(reversed(low_cuts))
+        return high_cuts, low_cuts
+
+    def cuts_for_mill(self, tool_angle) -> List[Tuple[float, float, float]]:
+        """
+            Generate raw coordinates for milling.
+
+            :return: [(rotation-in-degrees, depth-into-gear, height),] aka a, y, z
+        """
+        assert(self.center == (0, 0))
+        high_cuts, low_cuts = self.gen_cuts_by_rack()
+        cut_params = []
+        for cut in high_cuts:
+            cut_angle = cut.direction.angle()
+            rotation = tool_angle-cut_angle
+            print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
+            t = Transform().rotate(rotation)
+            y, z = t.transform_pt(cut.origin)
+            cut_params.append((rotation, y, z))
+        return cut_params
 
     def gen_tooth(self):
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)
@@ -175,8 +224,32 @@ class Gear(object):
         # plot(circle(2 * self.module, c=self.center), color='red')
         # plot(circle(self.module, c=self.center), color='blue')
 
-        plot(self.gen_by_rack(), color='#808080')
-        plot(self.gen_tooth(), color='green')
+        # plot(self.gen_by_rack(), color='#808080')
+        plot_cuts_in_gear_space = False
+        if plot_cuts_in_gear_space:
+            high_cuts, low_cuts = self.gen_cuts_by_rack()
+            for idx, cut in enumerate(high_cuts):
+                val = int(idx/len(high_cuts)*256)
+                plot([cut.p1.xy(), cut.p2.xy()], '#%02x0000' % val)
+            for idx, cut in enumerate(low_cuts):
+                val = int(idx/len(low_cuts)*256)
+                plot([cut.p1.xy(), cut.p2.xy()], '#00%02x00' % val)
+            plot(self.gen_tooth(), color='green')
+
+        plot_cuts_in_mill_space = True
+        if plot_cuts_in_mill_space:
+            tool_angle = 45.0
+            cuts = self.cuts_for_mill(tool_angle/2)
+            pts = []
+            cut_vec_x = 2*cos(radians(tool_angle/2))
+            cut_vec_y = 2*sin(radians(tool_angle/2))
+            for rotation, y, z in cuts:
+                rot = radians(rotation)
+                plot([(0, 0), (pitch_radius*cos(rot)/2, pitch_radius*sin(rot)/2)], '#8080F0')
+                plot([(y, z), (y+cut_vec_x, z+cut_vec_y)], '#808080')
+                # pts.append((y, z))
+            plot(pts, 'green')
+
         plot(self.gen_poly(), color=color)
 
 
@@ -190,7 +263,7 @@ def do_gears(rot=0., zoom_radius=0.):
     print()
     # gear(30)
     t2 = 5
-    Gear(t2, center=((t1 + t2) / 2, 0), rot=-rot, pressure_line=False).plot()
+    # Gear(t2, center=((t1 + t2) / 2, 0), rot=-rot, pressure_line=False).plot()
     plt.axis('equal')
     plt.grid()
     # Set zoom_radius to zoom in around where gears meet
@@ -202,6 +275,8 @@ def do_gears(rot=0., zoom_radius=0.):
 
 
 def main():
+    do_gears(0); return
+
     do_gears(0, zoom_radius=8)
     do_gears(0, zoom_radius=4)
     do_gears(0, zoom_radius=2)

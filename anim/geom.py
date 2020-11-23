@@ -142,6 +142,9 @@ class Vector(typing.SupportsRound):
     def length(self) -> float:
         return math.hypot(*self.xy())
 
+    def angle(self):
+        return math.degrees(math.atan2(self.y, self.x))
+
     def unit(self) -> 'Vector':
         """Return the unit version of this vector"""
         length = self.length()
@@ -789,6 +792,14 @@ class Line(object):
             self.direction = direction
         else:
             self.direction = direction - origin
+
+    @property
+    def p1(self):
+        return self.origin
+
+    @property
+    def p2(self):
+        return self.origin + self.direction
 
     @classmethod
     def from_pts(cls, p1: BasePoint, p2: BasePoint):

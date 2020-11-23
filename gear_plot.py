@@ -60,7 +60,8 @@ class Involute(object):
 
 
 class Gear(object):
-    def __init__(self, teeth=30, center=(0.0, 0.0), rot=0.0, module=1.0,
+    def __init__(self, teeth=30, center=(0.0, 0.0), rot=0.0,
+                 module=1.0, relief_factor=1.25,
                  pressure_angle=20.0, pressure_line=True):
         """
             Plot a gear
@@ -76,7 +77,7 @@ class Gear(object):
         self.center = center
         self.pitch = self.module * pi
         self.rot = rot * self.pitch  # Now rotation is in pitch distance
-        self.relief_factor = 1.25
+        self.relief_factor = relief_factor
         self.pressure_angle = radians(pressure_angle)
         self.pressure_line = pressure_line
         self.pitch_radius = self.module * self.teeth / 2
@@ -156,7 +157,7 @@ class Gear(object):
                     relief_factor=self.relief_factor, tall_tooth=True)
         high_cuts = []
         low_cuts = []
-        steps = 25
+        steps = 30
         z_teeth = 3
         center = Point(*self.center)
         rack_x = self.pitch_radius + center.x
@@ -182,21 +183,22 @@ class Gear(object):
         low_cuts = list(reversed(low_cuts))
         return high_cuts, low_cuts
 
-    def cuts_for_mill(self, tool_angle) -> List[Tuple[float, float, float]]:
+    def cuts_for_mill(self, tool_angle: float) -> List[Tuple[float, float, float]]:
         """
             Generate raw coordinates for milling.
 
-            :return: [(rotation-in-degrees, depth-into-gear, height),] aka a, y, z
+            :return: [(rotation-in-degrees, height, depth-into-gear),] aka a, y, z
         """
+        tool_angle /= 2
         assert(self.center == (0, 0))
         high_cuts, low_cuts = self.gen_cuts_by_rack()
         cut_params = []
         for cut in high_cuts:
             cut_angle = cut.direction.angle()
             rotation = tool_angle-cut_angle
-            print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
+            # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
             t = Transform().rotate(-rotation)
-            y, z = t.transform_pt(cut.origin)
+            z, y = t.transform_pt(cut.origin)
             cut_params.append((rotation, y, z))
         return cut_params
 
@@ -210,7 +212,7 @@ class Gear(object):
         # TODO-this only does one tooth
         # TODO-cuts for mill only does one side right now
         # TODO-verify that Y is into/out of gear and Z is perpendicular (roughly) along rack direction
-        cuts = self.cuts_for_mill(tool_angle / 2)
+        cuts = self.cuts_for_mill(tool_angle)
         print('\nGood luck!')
 
         for idx, (rotation, y, z) in enumerate(cuts):
@@ -264,21 +266,21 @@ class Gear(object):
                 # plot([cut.p1.xy(), cut.p2.xy()], color)
                 origins.append(cut.origin)
             plot(origins, col)
-            plot(self.gen_tooth(), color='green')
+            plot(self.gen_tooth(), 'green')
 
         plot_cuts_in_mill_space = True
         if plot_cuts_in_mill_space:
-            tool_angle = 45.0
+            tool_angle = 40.0
             cuts = self.cuts_for_mill(tool_angle/2)
             pts = []
-            cut_vec_x = 2*cos(radians(tool_angle/2))
+            cut_vec_z = 2*cos(radians(tool_angle/2))
             cut_vec_y = 2*sin(radians(tool_angle/2))
             for idx, (rotation, y, z) in enumerate(cuts):
                 rot = radians(rotation)
                 plot([
                     (0, 0),
                     (pitch_radius*cos(rot)*.8, pitch_radius*sin(rot)*.8),
-                    (y, z)
+                    (z, y)
                 ], '#DDDDDD')
             for idx, (rotation, y, z) in enumerate(cuts):
                 rot = radians(rotation)
@@ -286,14 +288,24 @@ class Gear(object):
                     plot([
                         (0, 0),
                         (pitch_radius*cos(rot)*.8, pitch_radius*sin(rot)*.8),
-                        (y, z)
+                        (z, y)
                     ], '#8080F0')
-                plot([(y, z), (y+cut_vec_x, z+cut_vec_y)], '#808080')
-                # pts.append((y, z))
+                plot([(z, y), (z+cut_vec_z, y+cut_vec_y)], '#808080')
+                # print('rot: %9.5f  z: %9.5f  y: %9.5f' % (rotation, z, y))
             plot(pts, 'green')
 
         plot(self.gen_poly(), color=color)
-        self.gen_gcode()
+        # self.gen_gcode()
+
+    def plot_show(self, zoom_radius=0):
+        plt.axis('equal')
+        plt.grid()
+        # Set zoom_radius to zoom in around where gears meet
+        if zoom_radius:
+            ax = plt.gca()
+            ax.set_xlim(self.teeth / 2 - zoom_radius, self.teeth / 2 + zoom_radius)
+            ax.set_ylim(-zoom_radius, zoom_radius)
+        plt.show()
 
 
 def do_gears(rot=0., zoom_radius=0.):

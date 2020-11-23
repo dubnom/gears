@@ -169,10 +169,12 @@ class Gear(object):
             # Now, rotate tooth points back into default gear rotation and generate segments
             t = Transform().rotate_about(gear_rotation, center)
             tth, tbh, ttl, tbl = (t.transform_pt(pt+rack_pos, True) for pt in tooth_pts)
-            # TODO-more cuts could be filtered out, but not sure how to compute
-            if (tth - center).length() <= self.tip_radius:
+            # Filter out unnecessary cuts
+            # TODO-this optimization appears to work as long as #teeth >= 7
+            #   It could probably be base_radius when #teeth > 20
+            if (tth - center).length() <= (self.tip_radius if step < 0 else self.pitch_radius):
                 high_cuts.append(Line.from_pts(tth, tbh))
-            if (ttl - center).length() <= self.tip_radius:
+            if (ttl - center).length() <= (self.tip_radius if step > 0 else self.pitch_radius):
                 low_cuts.append(Line.from_pts(ttl, tbl))
         # Cut from flattest to steepest
         low_cuts = list(reversed(low_cuts))
@@ -212,8 +214,8 @@ class Gear(object):
             dy = self.module*5*cos(self.pressure_angle)
             cx = pitch_radius + self.center[0]
             cy = 0 + self.center[1]
-            plot([(cx+dx, cy+dy), (cx-dx, cy-dy)], color='purple')
-            plot([(cx-dx, cy+dy), (cx+dx, cy-dy)], color='purple')
+            plot([(cx+dx, cy+dy), (cx-dx, cy-dy)], color='#FFA0FF')
+            plot([(cx-dx, cy+dy), (cx+dx, cy-dy)], color='#FFA0FF')
 
         plot(circle(pitch_radius, c=self.center), color='green')
         plot(circle(pitch_radius + addendum, c=self.center), color='yellow')
@@ -225,18 +227,31 @@ class Gear(object):
         # plot(circle(self.module, c=self.center), color='blue')
 
         # plot(self.gen_by_rack(), color='#808080')
-        plot_cuts_in_gear_space = False
+        plot_cuts_in_gear_space = True
         if plot_cuts_in_gear_space:
+            origins = []
             high_cuts, low_cuts = self.gen_cuts_by_rack()
+            col = '#808080'
             for idx, cut in enumerate(high_cuts):
-                val = int(idx/len(high_cuts)*256)
-                plot([cut.p1.xy(), cut.p2.xy()], '#%02x0000' % val)
+                val = int(idx/len(high_cuts)*128+128)
+                col = '#2020FF' if idx % 5 == 0 else '#%02x8080' % val
+                if idx == len(high_cuts)-1:
+                    col = 'orange'
+                plot([cut.p1.xy(), cut.p2.xy()], col)
+                origins.append(cut.origin)
+            plot(origins, col)
+            origins = []
             for idx, cut in enumerate(low_cuts):
-                val = int(idx/len(low_cuts)*256)
-                plot([cut.p1.xy(), cut.p2.xy()], '#00%02x00' % val)
+                val = int(idx/len(low_cuts)*128+128)
+                col = '#2020FF' if idx % 5 == 0 else '#80%02x80' % val
+                if idx == len(low_cuts)-1:
+                    col = 'orange'
+                # plot([cut.p1.xy(), cut.p2.xy()], color)
+                origins.append(cut.origin)
+            plot(origins, col)
             plot(self.gen_tooth(), color='green')
 
-        plot_cuts_in_mill_space = True
+        plot_cuts_in_mill_space = not True
         if plot_cuts_in_mill_space:
             tool_angle = 45.0
             cuts = self.cuts_for_mill(tool_angle/2)
@@ -275,7 +290,7 @@ def do_gears(rot=0., zoom_radius=0.):
 
 
 def main():
-    do_gears(0); return
+    # do_gears(0); return
 
     do_gears(0, zoom_radius=8)
     do_gears(0, zoom_radius=4)

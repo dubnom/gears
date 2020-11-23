@@ -206,6 +206,19 @@ class Gear(object):
         offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
         return [(p+offset).xy() for p in tooth_pts]
 
+    def gen_gcode(self, tool_angle=45.0, tool_tip_height=10):
+        # TODO-this only does one tooth
+        # TODO-cuts for mill only does one side right now
+        # TODO-verify that Y is into/out of gear and Z is perpendicular (roughly) along rack direction
+        cuts = self.cuts_for_mill(tool_angle / 2)
+        print('\nGood luck!')
+
+        for idx, (rotation, y, z) in enumerate(cuts):
+            z += tool_tip_height/2
+            # TODO-this only does the inside cut
+            print('G? A%.5f Y%.5f Z%.5f' % (rotation, y, z))
+        print('G end')
+
     def plot(self, color='red'):
         addendum = self.module
         dedendum = self.module * 1.25
@@ -280,6 +293,7 @@ class Gear(object):
             plot(pts, 'green')
 
         plot(self.gen_poly(), color=color)
+        self.gen_gcode()
 
 
 def do_gears(rot=0., zoom_radius=0.):

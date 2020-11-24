@@ -2,5 +2,4 @@
 *.nc
 *.gif
 *.png
-./.idea/
 ./venv/

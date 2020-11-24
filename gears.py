@@ -151,9 +151,9 @@ M30
 
         gg = gear_plot.Gear(teeth,
                             module=self.module, relief_factor=self.relief_factor,
-                            pressure_angle=self.pressure_angle)
+                            pressure_angle=degrees(self.pressure_angle))
         gg.plot('red', tool_angle=self.tool.angle)
-        gg.plot_show(10)
+        gg.plot_show(2)
 
         # Calculate the variables used to generate the gear teeth
         h_addendum = self.module

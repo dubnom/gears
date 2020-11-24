@@ -228,7 +228,7 @@ for line_number, line in enumerate(infile):
             # rack_polygon = make_rack(0.89647, 33, 2.0170575, 0.7040858915409105, 20.0)
             gg = gear_plot.Gear(v['teeth'],
                                 module=v['module'], relief_factor=v['relief_factor'],
-                                pressure_angle=v['pressure_angle'])
+                                pressure_angle=degrees(v['pressure_angle']))
             gg_poly = gg.gen_poly()
 
             if sa and zoom:
@@ -371,9 +371,8 @@ if picture:
         plt.plot(*dedendum_circle.exterior.xy, color='m')
         plt.plot(*gear_blank.exterior.xy, color='b')
         plt.plot(*zip(*gg_poly), color='#DDDDDD')
-        plt.grid()
-        plt.axis('equal')
-        plt.show()
+        plt.plot(*zip(*gg.gen_tooth()), 'green')
+        gg.plot_show(2)
 
 # Create an svg file of only the gear
 if svg:

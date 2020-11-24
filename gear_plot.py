@@ -224,7 +224,7 @@ class Gear(object):
         offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
         return [(p+offset).xy() for p in tooth_pts]
 
-    def plot(self, color='red', tool_angle=40.0):
+    def plot(self, color='red', tool_angle=40.0, gear_space=True, mill_space=False):
         addendum = self.module
         dedendum = self.module * 1.25
         pitch_radius = self.pitch_radius
@@ -247,8 +247,7 @@ class Gear(object):
         # plot(circle(self.module, c=self.center), color='blue')
 
         # plot(self.gen_by_rack(), color='#808080')
-        plot_cuts_in_gear_space = not True
-        if plot_cuts_in_gear_space:
+        if gear_space:
             origins = []
             high_cuts, low_cuts = self.gen_cuts_by_rack()
             col = '#808080'
@@ -271,8 +270,7 @@ class Gear(object):
             plot(origins, col)
             plot(self.gen_tooth(), 'green')
 
-        plot_cuts_in_mill_space = True
-        if plot_cuts_in_mill_space:
+        if mill_space:
             cuts = self.cuts_for_mill(tool_angle)
             pts = []
             cut_vec_z = 2*cos(radians(tool_angle/2))

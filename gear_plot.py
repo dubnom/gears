@@ -1,3 +1,4 @@
+import itertools
 from numbers import Number
 from typing import List, Tuple
 import matplotlib.pyplot as plt
@@ -152,13 +153,17 @@ class Gear(object):
             Generate a set of cuts by moving a rack past the gear.
             :return: two lists of segments for cuts
         """
-        # TODO-if we require center to be 0,0 for generating cuts, then low cuts is reflection of high cuts
+        # If we require center to be 0,0 for generating cuts, then low cuts is reflection of high cuts
+        assert(self.center == (0, 0))
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle),
                     relief_factor=self.relief_factor, tall_tooth=True)
         high_cuts = []
         low_cuts = []
-        steps = 30
-        z_teeth = 3
+        # TODO-this should be calculated based on when the rack intersects the tip circle
+        #     -for large gears, this will be a long track
+        #     -consider having smaller steps near the center of the gear as these steps likely matter more
+        z_teeth = 15
+        steps = z_teeth * 5
         center = Point(*self.center)
         rack_x = self.pitch_radius + center.x
         tooth_pts = [rack.tooth_tip_high, rack.tooth_base_high, rack.tooth_tip_low, rack.tooth_base_low]
@@ -183,24 +188,34 @@ class Gear(object):
         low_cuts = list(reversed(low_cuts))
         return high_cuts, low_cuts
 
-    def cuts_for_mill(self, tool_angle: float) -> List[Tuple[float, float, float]]:
+    def cuts_for_mill(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
         """
             Generate raw coordinates for milling.
 
             :return: [(rotation-in-degrees, height, depth-into-gear),] aka a, y, z
         """
         tool_angle /= 2
+        # tool_tip_height = 0
+        half_tool_tip = tool_tip_height/2
         assert(self.center == (0, 0))
         high_cuts, low_cuts = self.gen_cuts_by_rack()
-        cut_params = []
+        high_params = []
+        low_params = []
         for cut in high_cuts:
             cut_angle = cut.direction.angle()
             rotation = tool_angle-cut_angle
             # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
             t = Transform().rotate(-rotation)
             z, y = t.transform_pt(cut.origin)
-            cut_params.append((rotation, y, z))
-        return cut_params
+            high_params.append((rotation, y, z+half_tool_tip))
+        for cut in low_cuts:
+            cut_angle = cut.direction.angle()
+            rotation = -tool_angle-cut_angle
+            # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
+            t = Transform().rotate(-rotation)
+            z, y = t.transform_pt(cut.origin)
+            low_params.append((rotation, y, z-half_tool_tip))
+        return high_params + low_params
 
     def gen_tooth(self):
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)
@@ -208,20 +223,7 @@ class Gear(object):
         offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
         return [(p+offset).xy() for p in tooth_pts]
 
-    def gen_gcode(self, tool_angle=45.0, tool_tip_height=10):
-        # TODO-this only does one tooth
-        # TODO-cuts for mill only does one side right now
-        # TODO-verify that Y is into/out of gear and Z is perpendicular (roughly) along rack direction
-        cuts = self.cuts_for_mill(tool_angle)
-        print('\nGood luck!')
-
-        for idx, (rotation, y, z) in enumerate(cuts):
-            z += tool_tip_height/2
-            # TODO-this only does the inside cut
-            print('G? A%.5f Y%.5f Z%.5f' % (rotation, y, z))
-        print('G end')
-
-    def plot(self, color='red'):
+    def plot(self, color='red', tool_angle=40.0):
         addendum = self.module
         dedendum = self.module * 1.25
         pitch_radius = self.pitch_radius
@@ -270,8 +272,7 @@ class Gear(object):
 
         plot_cuts_in_mill_space = True
         if plot_cuts_in_mill_space:
-            tool_angle = 40.0
-            cuts = self.cuts_for_mill(tool_angle/2)
+            cuts = self.cuts_for_mill(tool_angle)
             pts = []
             cut_vec_z = 2*cos(radians(tool_angle/2))
             cut_vec_y = 2*sin(radians(tool_angle/2))

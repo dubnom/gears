@@ -116,8 +116,8 @@ M30
     def gcode_guts(self, gg: gear_plot.Gear, cut: 'Cut', teeth_to_make) -> str:
         """Generate the gcode guts"""
         gcode = []
-        cuts = gg.cuts_for_mill(self.tool.angle)
         half_tool_tip = self.tool.tip_height / 2
+        cuts = gg.cuts_for_mill(self.tool.angle, half_tool_tip)
         # Generate a tooth profile for ever tooth requested
         teeth_to_make = min(5, teeth_to_make)
         for tooth in range(teeth_to_make):
@@ -135,11 +135,10 @@ M30
                 # z += half_tool_tip
                 rotation += tooth_angle_offset
                 y += self.tool.radius
+                z -= half_tool_tip
                 # TODO-this only does the inside cut
                 # print('G? A%.5f Y%.5f Z%.5f' % (rotation, y, z))
-                y_fix = 0
-                z_fix = 0
-                gcc = cut.cut(-rotation, y+y_fix, z+z_fix)
+                gcc = cut.cut(-rotation, y, z)
                 # print(gcc)
                 gcode.append(gcc)
 
@@ -156,7 +155,7 @@ M30
         gg = gear_plot.Gear(teeth,
                             module=self.module, relief_factor=self.relief_factor,
                             pressure_angle=self.pressure_angle)
-        gg.plot('red')
+        gg.plot('red', tool_angle=self.tool.angle)
         gg.plot_show(10)
 
         # Calculate the variables used to generate the gear teeth

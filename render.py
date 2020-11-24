@@ -19,6 +19,7 @@ from shapely.geometry import Polygon, MultiPolygon, box
 from shapely.affinity import rotate, translate
 
 # Parse the command line arguments
+import gear_plot
 from anim.geom import BBox
 from anim.simple import SimpleAnimation
 
@@ -155,7 +156,7 @@ for line_number, line in enumerate(infile):
             dedendum_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
             # Create a polygon to for the clearance circle
-            r = v['pitch_diameter'] / 2. - v['h_addendum']
+            r = v['pitch_diameter'] / 2. - v['h_dedendum']
             clearance_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
 
             # Create a polygon to represent the cutting tool
@@ -221,7 +222,14 @@ for line_number, line in enumerate(infile):
                 return Polygon(rack_pts)
 
             # total hack for mercury, since we don't have these params in this program
-            rack_polygon = make_rack(0.89647, 33, 2.0170575, 0.7040858915409105, 20.0)
+            # TODO-need half_tooth?  (use new rack code?)
+            v['teeth'] = int(v['teeth'])
+            rack_polygon = make_rack(v['module'], v['teeth'], v['h_total'], 0.7040858915409105, 20.0)
+            # rack_polygon = make_rack(0.89647, 33, 2.0170575, 0.7040858915409105, 20.0)
+            gg = gear_plot.Gear(v['teeth'],
+                                module=v['module'], relief_factor=v['relief_factor'],
+                                pressure_angle=v['pressure_angle'])
+            gg_poly = gg.gen_poly()
 
             if sa and zoom:
                 cx = v['outside_radius']
@@ -265,7 +273,7 @@ for line_number, line in enumerate(infile):
 
                     # Write an animation frame
                     if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
-                        show_rotated = False
+                        show_rotated = not False
                         with sa.next_step() as dc:
                             def poly(pp: Polygon, fill=None, outline='black'):
                                 # print(pp.exterior.coords)
@@ -280,6 +288,7 @@ for line_number, line in enumerate(infile):
                                 poly(cur_cutter, 'red')
                             poly(pitch_circle, None, 'cyan')
                             poly(clearance_circle, None, 'yellow')
+                            dc.polygon(gg_poly, None, 'green')
                             r = v['pitch_diameter'] / 2.
                             ca = radians(cur_angle)
                             rack_shifted = translate(rack_polygon, 0, -ca * r, 0)
@@ -354,6 +363,17 @@ if picture:
         plt.grid()
     plt.axis('equal')
     plt.savefig(pictureFile)
+
+    if sys.platform == 'darwin':
+        # Redo plot and display for interactive viewing and zooming
+        plt.plot(*pitch_circle.exterior.xy, color='g')
+        plt.plot(*clearance_circle.exterior.xy, color='c')
+        plt.plot(*dedendum_circle.exterior.xy, color='m')
+        plt.plot(*gear_blank.exterior.xy, color='b')
+        plt.plot(*zip(*gg_poly), color='#DDDDDD')
+        plt.grid()
+        plt.axis('equal')
+        plt.show()
 
 # Create an svg file of only the gear
 if svg:

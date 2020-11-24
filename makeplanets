@@ -1,6 +1,8 @@
 #!/bin/bash
 tools="saw64th.cfg saw32nd.cfg cutter40.cfg cutter45.cfg"
-tools="cutter40.cfg"
+# tools="cutter40.cfg"
+algos="old new"
+# algos="new"
 
 declare -a params=(
   "mercury:-m .89647 -t 33 -k 2 -T"
@@ -20,8 +22,7 @@ do
   do
       key=$(echo $tool | sed s/[^0-9]//g)
       # echo "tool is $tool  key is $key"
-      for algo in old new
-      # for algo in new
+      for algo in $algos
       do
         # shellcheck disable=SC2086
         echo RUN: python3 ./gears.py --algo="$algo" $args "$tool" "orrery/${planet}_x_${key}_${algo}.nc"

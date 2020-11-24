@@ -3,10 +3,10 @@ tools="saw64th.cfg saw32nd.cfg cutter40.cfg cutter45.cfg"
 # tools="cutter40.cfg"
 tools="saw32nd.cfg"
 algos="old new"
-algos="new"
+algos="old"
 
 declare -a params=(
-  "mercury:-m .89647 -t 33 -k 2 -T"
+  "mercury:-m .89647 -s 7 -t 33 -k 2 -T"
   # "venus:-m .72571 --relief 1.4 -t 80 -k 2"
   # "venus:-m .72571 --relief 1.4 -t 130 -k 2"
 )

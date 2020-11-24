@@ -162,7 +162,7 @@ for line_number, line in enumerate(infile):
             # Create a polygon to represent the cutting tool
             direction = 1 if right_rotary else -1
             half_tip = tool_tip_height / 2.
-            y = half_tip + sin(radians(tool_angle / 2.)) * tool_depth
+            y = half_tip + tan(radians(tool_angle / 2.)) * tool_depth
             shaft = tool_radius - tool_depth
             cutter = Polygon([
                 (shaft, v['outside_radius']),

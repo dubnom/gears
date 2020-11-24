@@ -124,6 +124,7 @@ for line_number, line in enumerate(infile):
         tool_angle = float(mTool.group(1))
         tool_depth = float(mTool.group(2))
         tool_radius = float(mTool.group(3))
+        # tool_radius += 0.1
         tool_tip_height = float(mTool.group(4))
         tool_flutes = int(mTool.group(5))
 
@@ -173,6 +174,19 @@ for line_number, line in enumerate(infile):
                 (-shaft, -y),
                 (-tool_radius, -half_tip),
                 (-tool_radius, half_tip),
+                (-shaft, y),
+                (-shaft, v['outside_radius']),
+                ])
+            extra = 0.2
+            extra_cutter = Polygon([
+                (shaft, v['outside_radius']),
+                (shaft, y),
+                (tool_radius+extra, half_tip),
+                (tool_radius+extra, -half_tip),
+                (shaft, -y),
+                (-shaft, -y),
+                (-tool_radius-extra, -half_tip),
+                (-tool_radius-extra, half_tip),
                 (-shaft, y),
                 (-shaft, v['outside_radius']),
                 ])
@@ -235,7 +249,7 @@ for line_number, line in enumerate(infile):
                 cx = v['outside_radius']
                 cy = 0
                 zr = max(v['h_total'] * 3, v['z_max'])
-                zr /= 3
+                zr /= 4
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
         # Move and cut based on each axis
@@ -283,6 +297,9 @@ for line_number, line in enumerate(infile):
                                 poly(rotated_gear_blank, 'blue')
                                 rotated_cutter = rotate(cur_cutter, cur_angle, origin=(0, 0))
                                 poly(rotated_cutter, 'red')
+                                cur_extra = translate(extra_cutter, cutter_y, cutter_z)
+                                rotated_extra = rotate(cur_extra, cur_angle, origin=(0, 0))
+                                poly(rotated_extra, None, '#FF8080')
                             else:
                                 poly(gear_blank, 'blue')
                                 poly(cur_cutter, 'red')

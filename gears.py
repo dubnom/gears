@@ -29,7 +29,17 @@ def rotate(a, x, y):
 
 
 class Tool():
-    """The Tool class holds the specifications of the cutting tool."""
+    r"""
+        The Tool class holds the specifications of the cutting tool.
+          /\
+         /  \
+         |   |
+         |   ---------
+         |   ---------
+         |   |
+         \  /
+          \/
+    """
 
     def __init__(self, angle=40., depth=3., radius=10., tip_height=0.,
                  number=1, rpm=2000, feed=200, flutes=4, mist=False, flood=False,
@@ -382,10 +392,109 @@ M30
             
         return '\n'.join(gcode)
 
+    def generate_alignment_cuts(self, teeth, blank_thickness, teeth_to_make=0):
+        """Generate the gcode for creating alignment cuts."""
+
+        if teeth <= 0:
+            raise ValueError('Gear: Number of teeth must be greater than 0.')
+        if blank_thickness <= 0:
+            raise ValueError('Gear: Blank thickness must be greater than 0.')
+
+        # Calculate the variables used to generate the gear teeth
+        h_addendum = self.module
+        h_dedendum = self.module * self.relief_factor
+        h_total = h_addendum + h_dedendum
+        circular_pitch = self.module * pi
+        pitch_diameter = self.module * teeth
+        pitch_radius = pitch_diameter / 2.
+        outside_diameter = pitch_diameter + 2 * h_addendum
+        outside_radius = outside_diameter / 2.
+
+        half_tooth = circular_pitch / 4.
+        half_tool_tip = self.tool.tip_height / 2.
+        tip_offset_y = h_dedendum
+        tip_offset_z = half_tool_tip + tan(self.tool.angle / 2) * h_dedendum
+        tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
+
+        z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
+        root_incr = z_offset / (self.root_steps + 1)
+
+        x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
+        mill = self.tool.mill
+        angle_direction = 1 if self.right_rotary else -1
+        x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
+
+        # Determine the maximum amount of height (or depth) in the Z axis before the tip
+        # of the cutter won't intersect with the gear blank.
+        # z_max = sqrt(outside_radius**2 - (outside_radius - h_total)**2) + self.tool.tip_height
+        z_max = outside_radius
+        z_incr = z_max / (self.steps * 2)
+
+        # A partial number of teeth can be created if "teeth_to_make" is set,
+        # otherwise all of the gears teeth are cut.
+        if teeth_to_make == 0 or teeth_to_make > teeth:
+            teeth_to_make = teeth
+
+        # Make sure the cutter is big enough
+        if h_total > self.tool.depth:
+            raise ValueError("Cutter depth is too shallow for tooth height")
+
+        # Make sure the cutter shaft doesn't hit the gear blank.
+        shaft_radius = self.tool.radius - self.tool.depth
+        y_point, z_point = pitch_radius, z_max
+        y_tool, z_tool = rotate(-tool_angle_offset, y_point, z_point)
+        y = self.tool.radius + y_tool - h_dedendum
+        shaft_clearance = y - outside_radius - shaft_radius
+        if shaft_clearance < 0:
+            raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
+
+        # Include all of the generating parameters in the G Code header
+        var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
+                 'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
+                 'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
+                 'outside_diameter', 'outside_radius', 'tool_angle_offset', 'x_start',
+                 'x_end']
+        gcode = []
+        for var in var_t:
+            if var in locals():
+                gcode.append('( %17s: %-70s )' % (var, locals()[var]))
+            else:
+                gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
+
+        # Move to safe initial position
+        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
+        gcode.append('')
+        gcode.append('G30')
+        gcode.append(cut.start())
+        gcode.append('G0 Y%g' % (-angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance)))
+        gcode.append('G0 Z%g' % outside_radius)
+
+        # Generate a tooth profile for ever tooth requested
+        for tooth in range(teeth_to_make):
+            tooth_angle_offset = tau * tooth / teeth
+            gcode.append('')
+            gcode.append("( Tooth: %d)" % tooth)
+
+            # Make two small cuts at 90 degrees to each other to
+            # verify alignment of tools
+            for align_dir in [-1, 1]:
+                angle = align_dir * (radians(45) + self.tool.angle / 2)
+                # y_point, z_point = rotate(angle, pitch_radius, tooth_angle_offset)
+                y_point, z_point = rotate(angle, pitch_radius, 0)
+                gcode.append(cut.cut(
+                    angle_direction * degrees(angle + tooth_angle_offset),
+                    -angle_direction * (self.tool.radius + y_point),  #- h_addendum + y_point + tip_offset_y),
+                    z_point + align_dir * tip_offset_z))
+
+        return '\n'.join(gcode)
+
     def generate(self, teeth, blank_thickness, teeth_to_make=0) -> str:
         if self.algo == 'new':
             print('Generate: algo=%s -> new' % self.algo)
             return self.generate_new(teeth, blank_thickness, teeth_to_make)
+        elif self.algo == 'align':
+            print('Generate: algo=%s -> alignment' % self.algo)
+            return self.generate_alignment_cuts(teeth, blank_thickness, teeth_to_make)
         else:
             print('Generate: algo=%s -> old' % self.algo)
             return self.generate_old(teeth, blank_thickness, teeth_to_make)
@@ -462,6 +571,9 @@ def main():
     p.add('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
     p.add('--mill', default='conventional', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
 
+    # Alignment test
+    p.add('--align', type=bool, default=False, help='Generate alignment cuts')
+
     # Gear type arguments
     p.add('--gear', '-g', is_config_file=True, help='Gear config file')
     p.add('--module', '-m', type=float, default=1., help='Module of the gear')
@@ -489,7 +601,7 @@ def main():
         gear = Gear(tool, module=args.module, pressure_angle=args.pressure,
                     relief_factor=args.relief, steps=args.steps, root_steps=args.roots,
                     cutter_clearance=args.clear, right_rotary=args.right,
-                    algo=args.algo)
+                    algo='align' if args.align else args.algo)
 
         print(gear.header(), file=out)
         print(gear.generate(args.teeth, args.thick, args.make), file=out)

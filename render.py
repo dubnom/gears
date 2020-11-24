@@ -235,7 +235,7 @@ for line_number, line in enumerate(infile):
                 cx = v['outside_radius']
                 cy = 0
                 zr = max(v['h_total'] * 3, v['z_max'])
-                # zr *= 3
+                zr /= 3
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
         # Move and cut based on each axis

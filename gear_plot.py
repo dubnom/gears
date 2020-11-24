@@ -194,6 +194,7 @@ class Gear(object):
 
             :return: [(rotation-in-degrees, height, depth-into-gear),] aka a, y, z
         """
+        # print('cuts_for_mill: ta=%.3f tth=%.3f' % (tool_angle, tool_tip_height))
         tool_angle /= 2
         # tool_tip_height = 0
         half_tool_tip = tool_tip_height/2

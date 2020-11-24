@@ -117,7 +117,7 @@ M30
         """Generate the gcode guts"""
         gcode = []
         half_tool_tip = self.tool.tip_height / 2
-        cuts = gg.cuts_for_mill(self.tool.angle, half_tool_tip)
+        cuts = gg.cuts_for_mill(degrees(self.tool.angle), half_tool_tip)
         # Generate a tooth profile for ever tooth requested
         teeth_to_make = min(5, teeth_to_make)
         for tooth in range(teeth_to_make):
@@ -132,11 +132,8 @@ M30
             gcode.append("( Tooth: %d  rot:%.2f->%.2f)" % (tooth, rmin, rmax))
 
             for idx, (rotation, z, y) in enumerate(cuts):
-                # z += half_tool_tip
                 rotation += tooth_angle_offset
                 y += self.tool.radius
-                z -= half_tool_tip
-                # TODO-this only does the inside cut
                 # print('G? A%.5f Y%.5f Z%.5f' % (rotation, y, z))
                 gcc = cut.cut(-rotation, y, z)
                 # print(gcc)

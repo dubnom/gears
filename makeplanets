@@ -7,12 +7,13 @@ algos="old"
 
 declare -a params=(
   "mercury_align:-m .89647 -s 7 --align=True --make=2 -t 33 -k 2 -T"
-  # "mercury:-m .89647 -s 7 -t 33 -k 2 -T"
+  "mercury:-m .89647 -s 7 -t 33 -k 2 -T"
   # "venus:-m .72571 --relief 1.4 -t 80 -k 2"
   # "venus:-m .72571 --relief 1.4 -t 130 -k 2"
 )
 
-mkdir orrery
+if [ ! -d images ]; then mkdir images; fi
+if [ ! -d orrery ]; then mkdir orrery; fi
 
 for param in "${params[@]}"
 do
@@ -26,15 +27,17 @@ do
       # echo "tool is $tool  key is $key"
       for algo in $algos
       do
+        if [[ ${planet} =~ "align" ]]; then algo=align; fi
+        nc_file="orrery/${planet}_${key}_${algo}.nc"
         # shellcheck disable=SC2086
-        echo RUN: python3 ./gears.py --algo="$algo" $args "$tool" "orrery/${planet}_x_${key}_${algo}.nc"
+        echo RUN: python3 ./gears.py --algo="$algo" $args "$tool" "$nc_file"
         # shellcheck disable=SC2086
-        python3 ./gears.py --algo="$algo" $args "$tool" "orrery/${planet}_x_${key}_${algo}.nc"
-        echo RUN: python3 ./render.py "orrery/${planet}_x_${key}_${algo}.nc" -azp -t 6
-        python3 ./render.py "orrery/${planet}_x_${key}_${algo}.nc" -azp -t 6
-        cp picture.png "pic_${key}_${algo}.png"
-        cp animation.gif "anim_${key}_${algo}.gif"
-        cp /tmp/anim_opt.gif "anim_opt_${key}_${algo}.gif"
+        python3 ./gears.py --algo="$algo" $args "$tool" "$nc_file"
+        echo RUN: python3 ./render.py "$nc_file" -azp -t 6
+        python3 ./render.py "$nc_file" -azp -t 6
+        mv picture.png "images/pic_${key}_${algo}.png"
+        mv animation.gif "images/anim_${key}_${algo}.gif"
+        mv /tmp/anim_opt.gif "images/anim_opt_${key}_${algo}.gif"
       done
   done
 done

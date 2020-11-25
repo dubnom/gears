@@ -322,13 +322,17 @@ M30
             gcode.append('')
             gcode.append("( Tooth: %d)" % tooth)
 
+            # For testing, set this to limit the steps and eliminate center clearing
+            # debug_cuts = [-2]
+            debug_cuts = None
+
             # The shape of the tooth (actually the space removed to make the tooth)
             # is created iteratively with a number of steps. More steps means greater
             # accuracy but longer run time.
 
             # Bottom of the tooth (top of the slot)
             #for z_step in range(self.steps+1, -1, -1):
-            for z_step in range(-self.steps, self.steps+1):
+            for z_step in debug_cuts or range(-self.steps, self.steps+1):
                 # center of the cutting tooth
                 z = z_step * z_incr
                 y = pitch_radius
@@ -359,7 +363,7 @@ M30
                         z_point))
 
             # Top of the tooth (bottom of the slot)
-            for z_step in range(-self.steps, self.steps+1):
+            for z_step in debug_cuts or range(-self.steps, self.steps+1):
                 # height of the center of the cutting tooth at the pitch radius
                 z = -z_step * z_incr
                 y = pitch_radius
@@ -391,6 +395,8 @@ M30
 
             # Center of the slot
             for z_step in range(-self.root_steps, self.root_steps+1):
+                if debug_cuts:
+                    break
                 z = z_step * root_incr
                 angle = z / (pitch_radius - h_dedendum)
                 gcode.append(cut.cut(

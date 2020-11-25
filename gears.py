@@ -123,6 +123,20 @@ G30
 M30
 %"""
 
+    def gcode_vars(self, locals_to_dump):
+        """Include all of the generating parameters in the G Code header"""
+
+        var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
+                 'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
+                 'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
+                 'outside_diameter', 'outside_radius', 'tool_angle_offset', 'x_start',
+                 'x_end']
+        gcode = []
+        for var in var_t:
+            value = locals_to_dump[var] if var in locals_to_dump else getattr(self, var)
+            gcode.append('( %17s: %-70s )' % (var, value))
+        return '\n'.join(gcode)
+
     def gcode_guts(self, gg: gear_plot.Gear, cut: 'Cut', teeth_to_make) -> str:
         """Generate the gcode guts"""
         gcode = []
@@ -215,18 +229,7 @@ M30
         if shaft_clearance < 0:
             raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
-        # Include all of the generating parameters in the G Code header
-        var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
-                 'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
-                 'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
-                 'outside_diameter', 'outside_radius', 'tool_angle_offset', 'x_start',
-                 'x_end']
-        gcode = []
-        for var in var_t:
-            if var in locals():
-                gcode.append('( %17s: %-70s )' % (var, locals()[var]))
-            else:
-                gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
+        gcode = [self.gcode_vars(locals())]
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
@@ -293,18 +296,7 @@ M30
         if shaft_clearance < 0:
             raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
-        # Include all of the generating parameters in the G Code header
-        var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
-                 'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
-                 'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
-                 'outside_diameter', 'outside_radius', 'tool_angle_offset', 'x_start',
-                 'x_end']
-        gcode = []
-        for var in var_t:
-            if var in locals():
-                gcode.append('( %17s: %-70s )' % (var, locals()[var]))
-            else:
-                gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
+        gcode = [self.gcode_vars(locals())]
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
@@ -457,18 +449,7 @@ M30
         if shaft_clearance < 0:
             raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
-        # Include all of the generating parameters in the G Code header
-        var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
-                 'pressure_angle', 'steps', 'cutter_clearance', 'right_rotary', 'h_addendum',
-                 'h_dedendum', 'h_total', 'circular_pitch', 'pitch_diameter',
-                 'outside_diameter', 'outside_radius', 'tool_angle_offset', 'x_start',
-                 'x_end']
-        gcode = []
-        for var in var_t:
-            if var in locals():
-                gcode.append('( %17s: %-70s )' % (var, locals()[var]))
-            else:
-                gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
+        gcode = [self.gcode_vars(locals())]
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,

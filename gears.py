@@ -491,14 +491,15 @@ M30
 
             # Make two small cuts at 90 degrees to each other to
             # verify alignment of tools
-            for align_dir in [-1, 1]:
-                angle = align_dir * (radians(45) + self.tool.angle / 2)
-                # y_point, z_point = rotate(angle, pitch_radius, tooth_angle_offset)
+            for align_dir in [1, -1]:
+                angle = align_dir * (self.tool.angle / 2 - radians(45))
+
                 y_point, z_point = rotate(angle, pitch_radius, 0)
+                z_point -= align_dir * half_tool_tip
                 gcode.append(cut.cut(
                     angle_direction * degrees(angle + tooth_angle_offset),
-                    -angle_direction * (self.tool.radius + y_point),  #- h_addendum + y_point + tip_offset_y),
-                    z_point + align_dir * tip_offset_z))
+                    -angle_direction * (self.tool.radius + y_point),
+                    z_point))
 
         return '\n'.join(gcode)
 

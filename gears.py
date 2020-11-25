@@ -339,13 +339,17 @@ M30
                 # move z to tooth edge
                 z += half_tooth
 
+                h_d = cos(angle) * h_dedendum
+                t_tip_offset_y = h_d
+                t_tip_offset_z = half_tool_tip + tan(self.tool.angle / 2) * h_d
+
                 # Find the rotated pitch radius and z of the actual cutter
                 y_point, z_point = rotate(tool_angle_offset, y, z)
                 angle += tool_angle_offset
 
                 # Find the tip of the actual cutter
-                y_point -= tip_offset_y
-                z_point -= tip_offset_z
+                y_point -= t_tip_offset_y
+                z_point -= t_tip_offset_z
 
                 # cut
                 if sqrt(y_point**2 + z_point**2) < outside_radius:
@@ -366,13 +370,17 @@ M30
                 # move z to pressure_angle edge
                 z -= half_tooth
 
+                h_d = cos(angle) * h_dedendum
+                t_tip_offset_y = h_d
+                t_tip_offset_z = half_tool_tip + tan(self.tool.angle / 2) * h_d
+
                 # Find the rotated pitch radius and z of the actual cutter
                 y_point, z_point = rotate(-tool_angle_offset, y, z)
                 angle -= tool_angle_offset
 
                 # Find the tip of the actual cutter
-                y_point -= tip_offset_y
-                z_point += tip_offset_z
+                y_point -= t_tip_offset_y
+                z_point += t_tip_offset_z
 
                 # cut
                 if sqrt(y_point**2 + z_point**2) < outside_radius:

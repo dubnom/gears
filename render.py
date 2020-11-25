@@ -381,7 +381,7 @@ if picture:
     plt.axis('equal')
     plt.savefig(pictureFile)
 
-    if sys.platform == 'darwin':
+    if sys.platform == 'darwin' and gear_plot.SHOW_INTERACTIVE:
         # Redo plot and display for interactive viewing and zooming
         plt.plot(*pitch_circle.exterior.xy, color='g')
         plt.plot(*clearance_circle.exterior.xy, color='c')

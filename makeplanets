@@ -25,9 +25,9 @@ do
   do
       key=$(echo $tool | sed s/[^0-9]//g)
       # echo "tool is $tool  key is $key"
-      for algo in $algos
+      if [[ ${planet} =~ "align" ]]; then algos_to_use=align; else algos_to_use=$algos; fi
+      for algo in $algos_to_use
       do
-        if [[ ${planet} =~ "align" ]]; then algo=align; fi
         nc_file="orrery/${planet}_${key}_${algo}.nc"
         # shellcheck disable=SC2086
         echo RUN: python3 ./gears.py --algo="$algo" $args "$tool" "$nc_file"

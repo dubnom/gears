@@ -1,4 +1,4 @@
-import itertools
+import os
 from numbers import Number
 from typing import List, Tuple
 import matplotlib.pyplot as plt
@@ -7,6 +7,9 @@ from math import *
 from anim.geom import Point, Vector, Line
 from anim.transform import Transform
 from rack import Rack
+
+# setenv SHOW_INTERACTIVE to 1 or true to display interactive plots
+SHOW_INTERACTIVE = os.environ.get('SHOW_INTERACTIVE', 'false').lower() in {'1', 'true'}
 
 
 def circle(r, c=(0, 0)):

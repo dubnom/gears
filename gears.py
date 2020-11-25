@@ -529,51 +529,31 @@ class Cut():
         gcode = [
             '',
             'G30',
-            # TODO-should Y move be performed first?
-            'G0 X%.4f' % starting_x,
             'G0 Y%g' % self.y_backoff_full,
+            'G0 X%.4f' % starting_x,
             'G0 Z%g' % self.outside_radius
         ]
         return '\n'.join(gcode)
 
     def cut(self, a, y, z):
         """Create gcode for the cut/return stroke."""
+        # This code is very cautious and only makes A or Z moves if Y is at fully safe point
         if self.mill == 'climb':
             ret = ["G1 X%.4f" % self.x_start,
-                   "G0 Y%.4f" % (y + self.y_backoff),
-                   "G0 X%.4f" % self.x_end,
-                   "G0 Y%.4f" % y]
+                   "G0 Y%.4f" % self.y_backoff_full,
+                   "G0 X%.4f" % self.x_end]
         elif self.mill == 'conventional':
             ret = ["G1 X%.4f" % self.x_end,
-                   "G0 Y%.4f" % (y + self.y_backoff),
-                   "G0 X%.4f" % self.x_start,
-                   "G0 Y%.4f" % y]
+                   "G0 Y%.4f" % self.y_backoff_full,
+                   "G0 X%.4f" % self.x_start]
         else:
-            ret = ["G1 X%.4f" % [self.x_start, self.x_end][self.stroke]]
+            assert "This has not been tested" == "yes, it has not"
+            ret = ["G1 X%.4f" % [self.x_start, self.x_end][self.stroke],
+                   "G0 Y%.4f" % self.y_backoff_full]
             self.stroke = (self.stroke + 1) % 2
 
-        return '\n'.join(["G0 A%.4f Y%.4f Z%.4f" % (a, y, z)] + ret)
-
-    def cut_new(self, a, y, z):
-        """Create gcode for the cut/return stroke."""
-        # TODO-could avoid the full backoff by remembering last position and checking for intersection during G0 move
-        if self.mill == 'climb':
-            # Do cut, backoff a little in just Y, then return to initial X and fully-safe Y
-            ret = ["G1 X%.4f" % self.x_start,
-                   "G0 Y%.4f" % (y + self.y_backoff),
-                   "G0 X%.4f Y%.4f" % (self.x_end, self.y_backoff_full)]
-        elif self.mill == 'conventional':
-            ret = ["G1 X%.4f" % self.x_end,
-                   "G0 Y%.4f" % (y + self.y_backoff),
-                   "G0 X%.4f Y%.4f" % (self.x_start, self.y_backoff_full)]
-        else:
-            ret = [
-                "G1 X%.4f" % [self.x_start, self.x_end][self.stroke],
-                "G0 Y%.4f" % self.y_backoff_full,
-            ]
-            self.stroke = (self.stroke + 1) % 2
-
-        return '\n'.join(["G0 A%.4f Y%.4f Z%.4f" % (a, y, z)] + ret)
+        align_for_cut = ["G0 A%.4f Z%.4f" % (a, z), "G0 Y%.4f" % y]
+        return '\n'.join(align_for_cut + ret)
 
 
 def main():

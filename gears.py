@@ -229,12 +229,9 @@ M30
                 gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
 
         # Move to safe initial position
-        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
-        gcode.append('')
-        gcode.append('G30')
+        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
+                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance), outside_radius)
         gcode.append(cut.start())
-        gcode.append('G0 Y%g' % (-angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance)))
-        gcode.append('G0 Z%g' % outside_radius)
 
         gcode.append(self.gcode_guts(gg, cut, teeth_to_make))
 
@@ -310,12 +307,9 @@ M30
                 gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
 
         # Move to safe initial position
-        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
-        gcode.append('')
-        gcode.append('G30')
+        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
+                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance), outside_radius)
         gcode.append(cut.start())
-        gcode.append('G0 Y%g' % (-angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance)))
-        gcode.append('G0 Z%g' % outside_radius)
 
         # Generate a tooth profile for ever tooth requested
         for tooth in range(teeth_to_make):
@@ -477,12 +471,9 @@ M30
                 gcode.append('( %17s: %-70s )' % (var, getattr(self, var)))
 
         # Move to safe initial position
-        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance)
-        gcode.append('')
-        gcode.append('G30')
+        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
+                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance), outside_radius)
         gcode.append(cut.start())
-        gcode.append('G0 Y%g' % (-angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance)))
-        gcode.append('G0 Z%g' % outside_radius)
 
         # Generate a tooth profile for ever tooth requested
         for tooth in range(teeth_to_make):
@@ -523,33 +514,63 @@ class Cut():
     setups of the rotary table on the left or right side.
     """
 
-    def __init__(self, mill, x_start, x_end, y_backoff):
+    def __init__(self, mill, x_start, x_end, y_backoff, y_backoff_full, outside_radius):
         self.mill = mill
         self.x_start = x_start
         self.x_end = x_end
         self.y_backoff = y_backoff
         self.stroke = 0
+        self.y_backoff_full = y_backoff_full
+        self.outside_radius = outside_radius
 
-    def start(self):
+    def start(self) -> str:
         """Return the starting gcode."""
-        if self.mill == 'climb':
-            return "G0 X%g" % self.x_end
-        return "G0 X%g" % self.x_start
+        starting_x = self.x_end if self.mill == 'climb' else self.x_start
+        gcode = [
+            '',
+            'G30',
+            # TODO-should Y move be performed first?
+            'G0 X%.4f' % starting_x,
+            'G0 Y%g' % self.y_backoff_full,
+            'G0 Z%g' % self.outside_radius
+        ]
+        return '\n'.join(gcode)
 
     def cut(self, a, y, z):
         """Create gcode for the cut/return stroke."""
         if self.mill == 'climb':
-            ret = ["G1 X%g" % self.x_start,
-                   "G0 Y%g" % (y + self.y_backoff),
-                   "G0 X%g" % self.x_end,
-                   "G0 Y%g" % y]
+            ret = ["G1 X%.4f" % self.x_start,
+                   "G0 Y%.4f" % (y + self.y_backoff),
+                   "G0 X%.4f" % self.x_end,
+                   "G0 Y%.4f" % y]
         elif self.mill == 'conventional':
-            ret = ["G1 X%g" % self.x_end,
-                   "G0 Y%g" % (y + self.y_backoff),
-                   "G0 X%g" % self.x_start,
-                   "G0 Y%g" % y]
+            ret = ["G1 X%.4f" % self.x_end,
+                   "G0 Y%.4f" % (y + self.y_backoff),
+                   "G0 X%.4f" % self.x_start,
+                   "G0 Y%.4f" % y]
         else:
-            ret = ["G1 X%g" % [self.x_start, self.x_end][self.stroke]]
+            ret = ["G1 X%.4f" % [self.x_start, self.x_end][self.stroke]]
+            self.stroke = (self.stroke + 1) % 2
+
+        return '\n'.join(["G0 A%.4f Y%.4f Z%.4f" % (a, y, z)] + ret)
+
+    def cut_new(self, a, y, z):
+        """Create gcode for the cut/return stroke."""
+        # TODO-could avoid the full backoff by remembering last position and checking for intersection during G0 move
+        if self.mill == 'climb':
+            # Do cut, backoff a little in just Y, then return to initial X and fully-safe Y
+            ret = ["G1 X%.4f" % self.x_start,
+                   "G0 Y%.4f" % (y + self.y_backoff),
+                   "G0 X%.4f Y%.4f" % (self.x_end, self.y_backoff_full)]
+        elif self.mill == 'conventional':
+            ret = ["G1 X%.4f" % self.x_end,
+                   "G0 Y%.4f" % (y + self.y_backoff),
+                   "G0 X%.4f Y%.4f" % (self.x_start, self.y_backoff_full)]
+        else:
+            ret = [
+                "G1 X%.4f" % [self.x_start, self.x_end][self.stroke],
+                "G0 Y%.4f" % self.y_backoff_full,
+            ]
             self.stroke = (self.stroke + 1) % 2
 
         return '\n'.join(["G0 A%.4f Y%.4f Z%.4f" % (a, y, z)] + ret)

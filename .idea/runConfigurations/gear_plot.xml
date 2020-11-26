@@ -5,6 +5,8 @@
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
+      <env name="PYCHARM_MATPLOTLIB_INTERACTIVE" value="0" />
+      <env name="PYCHARM_DEBUG" value="0" />
     </envs>
     <option name="SDK_HOME" value="" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />

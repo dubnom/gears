@@ -165,28 +165,52 @@ class Gear(object):
         # TODO-this should be calculated based on when the rack intersects the tip circle
         #     -for large gears, this will be a long track
         #     -consider having smaller steps near the center of the gear as these steps likely matter more
-        z_teeth = 15
+        z_teeth = 35
         steps = z_teeth * 5
-        center = Point(*self.center)
-        rack_x = self.pitch_radius + center.x
-        tooth_pts = [rack.tooth_tip_high, rack.tooth_base_high, rack.tooth_tip_low, rack.tooth_base_low]
+        rack_x = self.pitch_radius
+        overshoot = self.module * 0.25
+        pressure_center = Point(self.pitch_radius, 0)
+        pressure_vector_high = Vector(-sin(self.pressure_angle), cos(self.pressure_angle))*5000
+        pressure_line_high = Line(pressure_center-pressure_vector_high, 2*pressure_vector_high)
+        center = Point(0, 0)
         for step in range(-steps, steps+1):
             tooth_pos = z_teeth * step / steps
-            rack_y = tooth_pos * self.pitch + self.center[1]
+            rack_y = tooth_pos * self.pitch
             rack_pos = Vector(rack_x, rack_y)
             gear_rotation = tooth_pos / self.teeth * 360
+            rack_tooth_edge_high = rack.tooth_edge_high + rack_pos
+            # The cut never needs to cross the pressure line, since that
+            # is where the rack contacts the gear.
+            intersection = pressure_line_high.segment_intersection(rack_tooth_edge_high)
+            tth_max = rack.tooth_tip_high+rack_pos
+            tth = intersection[0] if intersection else tth_max
+            if pressure_line_high.parallel(rack_tooth_edge_high):
+                print('%4d: Parallel' % step)
+            # where, t1, t2 = intersection
+            # print('intersection: %.4f,%.4f %.4f %.4f' % (where.x, where.y, t1, t2))
+            tbh = rack.tooth_base_high+rack_pos
+
             # Now, rotate tooth points back into default gear rotation and generate segments
             t = Transform().rotate_about(gear_rotation, center)
-            tth, tbh, ttl, tbl = (t.transform_pt(pt+rack_pos, True) for pt in tooth_pts)
+            tth, tbh, tth_max = (t.transform_pt(pt, True) for pt in [tth, tbh, tth_max])
+
             # Filter out unnecessary cuts
             # TODO-exit optimization appears to work as long as #teeth >= 7
             #   It could probably be base_radius when #teeth > 20
             # TODO-entry could be optimized by finding the first cut that intersects
             #   the tip of the gear tooth (can be calculated by involute equation)
-            if (tth - center).length() <= (self.tip_radius if step < 0 else self.pitch_radius):
-                high_cuts.append(Line.from_pts(tth, tbh))
-            if (ttl - center).length() <= (self.tip_radius if step > 0 else self.pitch_radius):
-                low_cuts.append(Line.from_pts(ttl, tbl))
+            # if (tth - center).length() <= (self.tip_radius if step < 0 else self.pitch_radius):
+            if (tth - center).length() <= self.pitch_radius+2*self.module:
+                print('%4d: Append with%s intersection' % (step, '' if intersection else 'out'))
+                if True or intersection:
+                    # This looks like a good cut, so compute cut with small amount of overshoot
+                    extra = tth_max - tth
+                    if extra.length() < overshoot:
+                        tth = tth_max
+                    else:
+                        tth = tth + extra.unit() * overshoot
+                    high_cuts.append(Line.from_pts(tth, tbh))
+
         # Cut from flattest to steepest
         low_cuts = list(reversed(low_cuts))
         return high_cuts, low_cuts
@@ -210,15 +234,15 @@ class Gear(object):
             rotation = tool_angle-cut_angle
             # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
             t = Transform().rotate(-rotation)
-            z, y = t.transform_pt(cut.origin)
-            high_params.append((rotation, y, z+half_tool_tip))
+            y, z = t.transform_pt(cut.origin)
+            high_params.append((rotation, y, z-half_tool_tip))
         for cut in low_cuts:
             cut_angle = cut.direction.angle()
             rotation = -tool_angle-cut_angle
             # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
             t = Transform().rotate(-rotation)
-            z, y = t.transform_pt(cut.origin)
-            low_params.append((rotation, y, z-half_tool_tip))
+            y, z = t.transform_pt(cut.origin)
+            low_params.append((rotation, y, z+half_tool_tip))
         return high_params + low_params
 
     def gen_tooth(self):
@@ -227,10 +251,12 @@ class Gear(object):
         offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
         return [(p+offset).xy() for p in tooth_pts]
 
-    def plot(self, color='red', tool_angle=40.0, gear_space=True, mill_space=False):
+    def plot(self, color='red', tool_angle=40.0, gear_space=None, mill_space=None):
         addendum = self.module
         dedendum = self.module * 1.25
         pitch_radius = self.pitch_radius
+        if mill_space is None and gear_space is None:
+            gear_space = True
 
         if self.pressure_line:
             dx = self.module*5*sin(self.pressure_angle)
@@ -259,9 +285,9 @@ class Gear(object):
                 col = '#2020FF' if idx % 5 == 0 else '#%02x8080' % val
                 if idx == len(high_cuts)-1:
                     col = 'orange'
-                plot([cut.p1.xy(), cut.p2.xy()], col)
+                plot([cut.p2.xy(), cut.p1.xy(), (cut.p1+cut.direction.normal().unit()*0.25).xy()], col)
                 origins.append(cut.origin)
-            plot(origins, col)
+            # plot(origins, col)
             origins = []
             for idx, cut in enumerate(low_cuts):
                 val = int(idx/len(low_cuts)*128+128)
@@ -317,6 +343,7 @@ def do_gears(rot=0., zoom_radius=0.):
     # rot = 0.25
     # rot = 0.0
     t1 = 19
+    # Gear(t1, rot=rot, module=1).plot(mill_space=True)
     Gear(t1, rot=rot, module=1).plot()
     print()
     # gear(30)
@@ -333,12 +360,11 @@ def do_gears(rot=0., zoom_radius=0.):
 
 
 def main():
-    do_gears(0, zoom_radius=8); do_gears(0, zoom_radius=4); return
-
-    do_gears(0, zoom_radius=8)
-    do_gears(0, zoom_radius=4)
-    do_gears(0, zoom_radius=2)
-    do_gears(0, zoom_radius=1)
+    radii = [8, 4, 2, 1]
+    radii = [8, 4]
+    radii = [2]
+    for radius in radii:
+        do_gears(rot=0, zoom_radius=radius)
     return
 
     # for rot in (n/20 for n in range(21)):

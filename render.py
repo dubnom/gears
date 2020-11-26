@@ -22,6 +22,13 @@ from shapely.affinity import rotate, translate
 import gear_plot
 from anim.geom import BBox
 from anim.simple import SimpleAnimation
+from rack import Rack
+
+
+def circle(radius):
+    """Generate a circle Polygon() with radius"""
+    return Polygon([(radius * cos(radians(a)), radius * sin(radians(a))) for a in range(0, 360, 1)])
+
 
 p = configargparse.ArgParser(
     default_config_files=['render.cfg'],
@@ -145,20 +152,16 @@ for line_number, line in enumerate(infile):
                 print('Header has been read')
 
             # Create a polygon to represent the gear blank
-            r = v['outside_diameter'] / 2.
-            gear_blank = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
+            gear_blank = circle(v['outside_diameter'] / 2)
 
             # Create a polygon to for the pitch circle
-            r = v['pitch_diameter'] / 2.
-            pitch_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
+            pitch_circle = circle(v['pitch_diameter'] / 2)
 
             # Create a polygon to for the dedendum circle
-            r = v['pitch_diameter'] / 2. - v['h_addendum']
-            dedendum_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
+            dedendum_circle = circle(v['pitch_diameter'] / 2 - v['h_addendum'])
 
             # Create a polygon to for the clearance circle
-            r = v['pitch_diameter'] / 2. - v['h_dedendum']
-            clearance_circle = Polygon([(r*cos(radians(a)), r*sin(radians(a))) for a in range(0, 360, 1)])
+            clearance_circle = circle(v['pitch_diameter'] / 2 - v['h_dedendum'])
 
             # Create a polygon to represent the cutting tool
             direction = 1 if right_rotary else -1
@@ -191,59 +194,16 @@ for line_number, line in enumerate(infile):
                 (-shaft, v['outside_radius']),
                 ])
 
-            def make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):
-                # Create a polygon for the rack
-                pitch_radius = module * num_teeth / 2
-                w_tooth = half_tooth * 2
-                rack_pts = []
-                h_a = module
-                h_d = module * 1.25
-                h_t = h_a + h_d
-                assert(h_t == h_total)
-
-                # One tooth
-                #      ____          +h_a    # addendum
-                #     /    \
-                #    /      \          0
-                #   /        \
-                #  /          \____  -h_d    # dedendum
-                #  x0  x1  x2  x3
-                #  <>   is tan(pressure_angle) * h_d => w_d
-                #    <> is tan(pressure_angle) * h_a => w_a
-                #  <--> is tan(pressure_angle) * h_t == w_d + w_a => w_ad
-                #    <------> is w_tooth (along pitch radius)
-                #        <------> is also w_tooth (middle of top to middle of bottom)
-                #      <--> is w_tooth - 2 * w_a) => w_top
-                #              <--> is w_tooth - 2 * w_d) => w_bot
-                # Divots at the bottom of the tooth are added to aid visual tracking
-                tan_p = tan(radians(pressure_angle))
-                w_d = tan_p * h_d
-                w_a = tan_p * h_a
-                w_ad = w_a + w_d
-                w_top = w_tooth - 2 * w_a
-                w_bot = w_tooth - 2 * w_d
-
-                tooth_pts = [(0, -h_d), (w_ad, h_a), (w_ad+w_top, h_a), (w_ad+w_top+w_ad, -h_d),
-                             (2 * w_tooth, -h_d)]
-                for rack_tooth in range(-10, 5+1):
-                    offset = rack_tooth * 2 * w_tooth + w_ad + w_top/2
-                    rack_pts.extend([(pitch_radius-ty, pitch_radius + tx+offset) for tx, ty in tooth_pts])
-                top = rack_pts[-1][1]
-                bot = rack_pts[0][1]
-                back = module*4 + pitch_radius      # Back of rack
-                rack_pts.extend([(back, top), (back, bot)])
-
-                return Polygon(rack_pts)
-
             # total hack for mercury, since we don't have these params in this program
             # TODO-need half_tooth?  (use new rack code?)
             v['teeth'] = int(v['teeth'])
-            rack_polygon = make_rack(v['module'], v['teeth'], v['h_total'], 0.7040858915409105, 20.0)
-            # rack_polygon = make_rack(0.89647, 33, 2.0170575, 0.7040858915409105, 20.0)
+            gg_rack = Rack(v['module'], degrees(v['pressure_angle']))
+            rack_polygon = Polygon(gg_rack.points(v['teeth']))
             gg = gear_plot.Gear(v['teeth'],
                                 module=v['module'], relief_factor=v['relief_factor'],
                                 pressure_angle=degrees(v['pressure_angle']))
             gg_poly = gg.gen_poly()
+            gg_base_circle = circle(gg.base_radius)
 
             if sa and zoom:
                 cx = v['outside_radius']
@@ -287,7 +247,7 @@ for line_number, line in enumerate(infile):
 
                     # Write an animation frame
                     if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
-                        show_rotated = not False
+                        show_rotated = False
                         with sa.next_step() as dc:
                             def poly(pp: Polygon, fill=None, outline='black'):
                                 # print(pp.exterior.coords)
@@ -305,11 +265,16 @@ for line_number, line in enumerate(infile):
                                 poly(cur_cutter, 'red')
                             poly(pitch_circle, None, 'cyan')
                             poly(clearance_circle, None, 'yellow')
-                            dc.polygon(gg_poly, None, 'green')
+                            poly(gg_base_circle, None, 'brown')
+                            if show_rotated:
+                                dc.polygon(gg_poly, None, 'green')
+                            else:
+                                rotated_gg = rotate(Polygon(gg_poly), -cur_angle, origin=(0, 0))
+                                poly(rotated_gg, None, 'green')
                             r = v['pitch_diameter'] / 2.
                             ca = radians(cur_angle)
                             rack_shifted = translate(rack_polygon, 0, -ca * r, 0)
-                            poly(rack_shifted, None, 'white')
+                            # poly(rack_shifted, None, 'white')
 
                         if zoom:
                             clip = box(v['outside_radius']-v['h_total']*3, -v['z_max'], v['outside_radius']+v['module']*3, v['z_max'])

@@ -784,6 +784,10 @@ class BBox(object):
         return iter(self.as_tuple())
 
 
+class ParallelLineError(Exception):
+    pass
+
+
 class Line(object):
     """Infinite length line or line segment"""
     def __init__(self, origin: BasePoint, direction: Union[BasePoint, Vector]):
@@ -801,6 +805,12 @@ class Line(object):
     def p2(self):
         return self.origin + self.direction
 
+    def __add__(self, vector: 'Vector') -> 'Line':
+        return Line(self.origin + vector, self.direction)
+
+    def __sub__(self, vector: 'Vector') -> 'Line':
+        return Line(self.origin - vector, self.direction)
+
     @classmethod
     def from_pts(cls, p1: BasePoint, p2: BasePoint):
         return Line(p1, p2-p1)
@@ -813,11 +823,12 @@ class Line(object):
         dot = to_point.dot(d_unit)
         return self.origin + d_unit*dot
 
-    def intersection(self, other: 'Line'):
-        """Return intersection point or None"""
+    def intersection(self, other: 'Line') -> BasePoint:
+        """Return intersection point.  raise ValueError for parallel lines"""
         if self.direction.cross(other.direction) == 0:
             # Parallel
-            raise ValueError('parallel lines')
+            # TODO-could be same line
+            raise ParallelLineError('parallel lines')
         normal = self.direction.normal()
         t_other = normal.dot(self.origin-other.origin) / normal.dot(other.direction)
         return other.origin + other.direction*t_other
@@ -828,14 +839,14 @@ class Line(object):
     def parallel(self, other):
         return self.direction.cross(other.direction) == 0
 
-    def segment_intersection(self, other: 'Line') -> Optional[Tuple[Point, Number, Number]]:
+    def segment_intersection(self, other: 'Line') -> Optional[Tuple[Point, float, float]]:
         """Return None or (intersection point, t_self, t_other)"""
         if not self.segment_bbox().overlaps(other.segment_bbox()):
             return None
         if self.parallel(other):
             # Parallel
-            # TODO-Could still intersect at point or along segment
-            raise ValueError('parallel lines')
+            # TODO-Could still intersect at end point or overlapping segment
+            raise ParallelLineError('parallel lines')
         self_normal = self.direction.normal()
         t_other = self_normal.dot(self.origin-other.origin)/self_normal.dot(other.direction)
         if t_other < 0 or t_other > 1:

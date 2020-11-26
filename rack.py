@@ -4,7 +4,7 @@
 
 from math import pi, tan, degrees, radians
 from typing import Tuple, List
-from anim.geom import Point
+from anim.geom import Point, Line, Vector
 
 
 class Rack(object):
@@ -40,6 +40,8 @@ class Rack(object):
         self.tooth_tip_low = Point(-addendum, -tip_offset)
         self.tooth_base_high = Point(dedendum, base_offset)
         self.tooth_base_low = Point(dedendum, -base_offset)
+        self.tooth_edge_high = Line.from_pts(self.tooth_tip_high, self.tooth_base_high)
+        self.tooth_edge_low = Line.from_pts(self.tooth_tip_low, self.tooth_base_low)
 
     def points(self, teeth_in_gear=32, teeth_in_rack=10) -> List[Tuple[float, float]]:
         # def make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):
@@ -52,9 +54,20 @@ class Rack(object):
         pitch_radius = self.module * teeth_in_gear / 2
         w_tooth = self.half_tooth * 2
         rack_pts = []
-        h_a = self.module
-        h_d = self.module * self.relief_factor
-        h_t = h_a + h_d
+        tooth_pts = [self.tooth_base_high, self.tooth_tip_high, self.tooth_tip_low, self.tooth_base_low]
+        steps = (teeth_in_rack+1)//2
+        for step in range(-steps, steps+1):
+            offset = Vector(pitch_radius, -step*self.circular_pitch)
+            for tp in tooth_pts:
+                rack_pts.append((tp+offset).xy())
+
+        # Add a back to the rack to make a closed polygon
+        top = rack_pts[-1][1]
+        bot = rack_pts[0][1]
+        back = self.module * 4 + pitch_radius
+        rack_pts.extend([(back, top), (back, bot)])
+
+        return rack_pts
 
         # One tooth
         #      ____          +h_a    # addendum
@@ -71,30 +84,9 @@ class Rack(object):
         #        <------> is also w_tooth (middle of top to middle of bottom)
         #      <--> is w_tooth - 2 * w_a) => w_top                  |x2-x1|
         #              <--> is w_tooth - 2 * w_d) => w_bot          |x4-x3|
-        # TODO-Add divots at the bottom of the tooth are added to aid visual tracking
-        tan_p = tan(radians(self.pressure_angle))
-        w_d = tan_p * h_d
-        w_a = tan_p * h_a
-        w_ad = w_a + w_d
-        w_top = w_tooth - 2 * w_a
-        w_bot = w_tooth - 2 * w_d
-
-        tooth_pts = [(0, -h_d), (w_ad, h_a), (w_ad + w_top, h_a), (w_ad + w_top + w_ad, -h_d),
-                     (2 * w_tooth, -h_d)]
-        for rack_tooth in range(-10, 5 + 1):
-            offset = rack_tooth * 2 * w_tooth + w_ad + w_top / 2
-            rack_pts.extend([(pitch_radius - ty, pitch_radius + tx + offset) for tx, ty in tooth_pts])
-
-        # Add a back to the rack to make a closed polygon
-        top = rack_pts[-1][1]
-        bot = rack_pts[0][1]
-        back = self.module * 4 + pitch_radius
-        rack_pts.extend([(back, top), (back, bot)])
-
-        return rack_pts
 
 
-def make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):
+def if_unused_then_delete_make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):
     """
     Create a list of x, y pairs representing a rack in the Y direction
 

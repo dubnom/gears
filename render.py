@@ -206,10 +206,11 @@ for line_number, line in enumerate(infile):
             gg_base_circle = circle(gg.base_radius)
 
             if sa and zoom:
-                cx = v['outside_radius']
+                # cx = v['outside_radius']
+                cx = v['pitch_diameter'] / 2
                 cy = 0
-                zr = max(v['h_total'] * 3, v['z_max'])
-                zr /= 4
+                # zr = max(v['h_total'] * 3, v['z_max'])
+                zr = v['h_total'] * 0.9
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
         # Move and cut based on each axis
@@ -247,7 +248,7 @@ for line_number, line in enumerate(infile):
 
                     # Write an animation frame
                     if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
-                        show_rotated = False
+                        show_rotated = True
                         with sa.next_step() as dc:
                             def poly(pp: Polygon, fill=None, outline='black'):
                                 # print(pp.exterior.coords)

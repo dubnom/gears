@@ -161,7 +161,6 @@ class Gear(object):
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle),
                     relief_factor=self.relief_factor, tall_tooth=True)
         high_cuts = []
-        low_cuts = []
         # TODO-this should be calculated based on when the rack intersects the tip circle
         #     -for large gears, this will be a long track
         #     -consider having smaller steps near the center of the gear as these steps likely matter more
@@ -195,24 +194,18 @@ class Gear(object):
             tth, tbh, tth_max = (t.transform_pt(pt, True) for pt in [tth, tbh, tth_max])
 
             # Filter out unnecessary cuts
-            # TODO-exit optimization appears to work as long as #teeth >= 7
-            #   It could probably be base_radius when #teeth > 20
-            # TODO-entry could be optimized by finding the first cut that intersects
-            #   the tip of the gear tooth (can be calculated by involute equation)
-            # if (tth - center).length() <= (self.tip_radius if step < 0 else self.pitch_radius):
-            if (tth - center).length() <= self.pitch_radius+2*self.module:
-                print('%4d: Append with%s intersection' % (step, '' if intersection else 'out'))
-                if True or intersection:
-                    # This looks like a good cut, so compute cut with small amount of overshoot
-                    extra = tth_max - tth
-                    if extra.length() < overshoot:
-                        tth = tth_max
-                    else:
-                        tth = tth + extra.unit() * overshoot
-                    high_cuts.append(Line.from_pts(tth, tbh))
+            # TODO-what about undercut?
+            if intersection:
+                # This looks like a good cut, so compute cut with small amount of overshoot
+                extra = tth_max - tth
+                if extra.length() < overshoot:
+                    tth = tth_max
+                else:
+                    tth = tth + extra.unit() * overshoot
+                high_cuts.append(Line.from_pts(tth, tbh))
 
         # Cut from flattest to steepest
-        low_cuts = list(reversed(low_cuts))
+        low_cuts = [Line(Point(hc.origin.x, -hc.origin.y), Vector(hc.direction.x, -hc.direction.y)) for hc in high_cuts]
         return high_cuts, low_cuts
 
     def cuts_for_mill(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:

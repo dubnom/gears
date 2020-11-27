@@ -162,10 +162,11 @@ class Gear(object):
                     relief_factor=self.relief_factor, tall_tooth=True)
         high_cuts = []
         # TODO-this should be calculated based on when the rack intersects the tip circle
+        #     -actually, it can be calculated based on the first and last intersection with the pressure line
         #     -for large gears, this will be a long track
         #     -consider having smaller steps near the center of the gear as these steps likely matter more
         z_teeth = 35
-        steps = z_teeth * 5
+        steps = z_teeth * 4
         rack_x = self.pitch_radius
         overshoot = self.module * 0.25
         pressure_center = Point(self.pitch_radius, 0)
@@ -219,7 +220,25 @@ class Gear(object):
         # tool_tip_height = 0
         half_tool_tip = tool_tip_height/2
         assert(self.center == (0, 0))
+
         high_cuts, low_cuts = self.gen_cuts_by_rack()
+
+        # Clear the center
+        # Distance is always
+        center_params = []
+        root_top_cut = Line(high_cuts[-1].origin, Vector(1, 0))
+        root_width = (high_cuts[-1].origin-low_cuts[-1].origin).length()
+        root_cut_width = root_width-tool_tip_height
+        # TODO-take into account tool_angle and pointy tools
+        assert tool_angle == 0.0
+        assert tool_tip_height != 0.0
+        root_steps = int(root_width / tool_tip_height)
+        root_depth = self.pitch_radius-self.module*self.relief_factor
+        for step in range(0, root_steps+1):
+            z = root_top_cut.origin.y - step/root_steps*root_cut_width
+            # center_params.append((0, root_depth, z))
+            center_params.append((0, root_depth, z-half_tool_tip))
+
         high_params = []
         low_params = []
         for cut in high_cuts:
@@ -236,7 +255,7 @@ class Gear(object):
             t = Transform().rotate(-rotation)
             y, z = t.transform_pt(cut.origin)
             low_params.append((rotation, y, z+half_tool_tip))
-        return high_params + low_params
+        return center_params + high_params + low_params
 
     def gen_tooth(self):
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)

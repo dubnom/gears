@@ -1,9 +1,9 @@
 #!/bin/bash
 tools="saw64th.cfg saw32nd.cfg cutter40.cfg cutter45.cfg"
 # tools="cutter40.cfg"
-tools="saw32nd.cfg"
+tools="saw64th.cfg saw32nd.cfg"
 algos="old new"
-algos="old"
+algos="new"
 
 declare -a params=(
   "mercury_align:-m .89647 -s 7 --align=True --make=2 -t 33 -k 2 -T"

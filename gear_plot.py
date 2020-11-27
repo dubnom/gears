@@ -248,14 +248,14 @@ class Gear(object):
             t = Transform().rotate(-rotation)
             y, z = t.transform_pt(cut.origin)
             high_params.append((rotation, y, z-half_tool_tip))
-        for cut in low_cuts:
+        for cut in reversed(low_cuts):
             cut_angle = cut.direction.angle()
             rotation = -tool_angle-cut_angle
             # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
             t = Transform().rotate(-rotation)
             y, z = t.transform_pt(cut.origin)
             low_params.append((rotation, y, z+half_tool_tip))
-        return center_params + high_params + low_params
+        return high_params + center_params + low_params
 
     def gen_tooth(self):
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)

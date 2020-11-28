@@ -151,8 +151,8 @@ for line_number, line in enumerate(infile):
             if verbose:
                 print('Header has been read')
 
-            # Create a polygon to represent the gear blank
-            gear_blank = circle(v['outside_diameter'] / 2)
+            # Create a polygon to represent the gear blank (just slightly larger than the finished gear)
+            gear_blank = circle(v['outside_diameter'] / 2 + v['module'] / 2)
 
             # Create a polygon to for the pitch circle
             pitch_circle = circle(v['pitch_diameter'] / 2)
@@ -211,6 +211,7 @@ for line_number, line in enumerate(infile):
                 cy = 0
                 # zr = max(v['h_total'] * 3, v['z_max'])
                 zr = v['h_total'] * 0.9
+                zr = v['h_total'] * 2
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
         # Move and cut based on each axis

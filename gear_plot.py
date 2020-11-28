@@ -239,6 +239,24 @@ class Gear(object):
             # center_params.append((0, root_depth, z))
             center_params.append((0, root_depth, z-half_tool_tip))
 
+        # Clear the tip
+        tip_params = []
+        tooth_angle = 360 / self.teeth
+        t = Transform().rotate(tooth_angle)
+        tip_cut = Line(low_cuts[-1].p2, t.transform_pt(high_cuts[-1].p2, True))
+        tip_width = self.pitch / 4
+        tip_cut_width = tip_width
+        # TODO-take into account tool_angle and pointy tools
+        assert tool_angle == 0.0
+        assert tool_tip_height != 0.0
+        tip_steps = int(tip_width / tool_tip_height / 2) + 1
+        tip_height = self.pitch_radius+self.module
+        tip_angle = tooth_angle / 2
+        for step in range(-tip_steps, tip_steps+1):
+            z = 0 - step/tip_steps*tip_cut_width/2
+            tip_params.append((tip_angle, tip_height, z-half_tool_tip))
+
+
         high_params = []
         low_params = []
         for cut in high_cuts:
@@ -255,7 +273,7 @@ class Gear(object):
             t = Transform().rotate(-rotation)
             y, z = t.transform_pt(cut.origin)
             low_params.append((rotation, y, z+half_tool_tip))
-        return high_params + center_params + low_params
+        return high_params + center_params + list(reversed(low_params)) + tip_params
 
     def gen_tooth(self):
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)

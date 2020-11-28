@@ -13,7 +13,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="gears" />
-    <option name="PARAMETERS" value="--algo=new -m .89647 -t 33 -k 2 -T saw64th.cfg orrery/mercury_64_new.nc" />
+    <option name="PARAMETERS" value="--algo=new --make=3 -m .89647 -t 33 -k 2 -T saw64th.cfg orrery/mercury_64_new.nc" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="true" />

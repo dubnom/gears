@@ -2,12 +2,14 @@
 tools="saw64th.cfg saw32nd.cfg cutter40.cfg cutter45.cfg"
 # tools="cutter40.cfg"
 tools="saw0293.cfg saw64th.cfg saw32nd.cfg"
+# tools="saw0293.cfg"
 algos="old new"
 algos="new"
 
 declare -a params=(
   # "mercury_align:-m .89647 -s 7 --align=True --make=2 -t 33 -k 2 -T"
   "mercury:-m .89647 -s 7 -t 33 -k 2 -T"
+  # "mercury_clearance_optimized:-m .89647 -s 7 -t 33 -k 2 --clear_max_angle=5.0 -T"
   # "venus:-m .72571 --relief 1.4 -t 80 -k 2"
   # "venus:-m .72571 --relief 1.4 -t 130 -k 2"
 )

@@ -76,7 +76,7 @@ class Gear():
     """The Gear class is used to generate G Code of involute gears."""
 
     def __init__(self, tool, module=1., pressure_angle=20., relief_factor=1.25, steps=5, root_steps=1,
-                 cutter_clearance=2., right_rotary=False, algo='old'):
+                 cutter_clearance=2., clear_max_angle=0., right_rotary=False, algo='old'):
         if module <= 0:
             raise ValueError('Gear: Module must be greater than 0.')
         if pressure_angle <= 0:
@@ -91,6 +91,7 @@ class Gear():
         self.steps = steps
         self.root_steps = root_steps
         self.cutter_clearance = cutter_clearance
+        self.clear_max_angle = clear_max_angle
         self.right_rotary = right_rotary
         self.algo = algo
 
@@ -142,17 +143,11 @@ M30
         gcode = []
         cuts = gg.cuts_for_mill(degrees(self.tool.angle), self.tool.tip_height)
         # Generate a tooth profile for ever tooth requested
-        teeth_to_make = min(5, teeth_to_make)
         for tooth in range(teeth_to_make):
             tooth_angle_offset = 360 * tooth / gg.teeth
 
-            rmin = rmax = cuts[0][0]
-            for r, y, z in cuts:
-                rmin = min(rmin, r)
-                rmax = max(rmax, r)
-
             gcode.append('')
-            gcode.append("( Tooth: %d  rot:%.2f->%.2f)" % (tooth, rmin, rmax))
+            gcode.append("( Tooth: %d )" % tooth)
 
             for idx, (rotation, y, z) in enumerate(cuts):
                 rotation += tooth_angle_offset
@@ -232,7 +227,8 @@ M30
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
-                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance), outside_radius)
+                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance),
+                  outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
         gcode.append(self.gcode_guts(gg, cut, teeth_to_make))
@@ -299,7 +295,8 @@ M30
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
-                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance), outside_radius)
+                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance),
+                  outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
         # Generate a tooth profile for ever tooth requested
@@ -444,7 +441,8 @@ M30
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
-                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance), outside_radius)
+                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance),
+                  outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
         # Generate a tooth profile for ever tooth requested
@@ -486,7 +484,7 @@ class Cut():
     setups of the rotary table on the left or right side.
     """
 
-    def __init__(self, mill, x_start, x_end, y_backoff, y_backoff_full, outside_radius):
+    def __init__(self, mill, x_start, x_end, y_backoff, y_backoff_full, outside_radius, clear_max_angle=0.0):
         self.mill = mill
         self.x_start = x_start
         self.x_end = x_end
@@ -494,6 +492,8 @@ class Cut():
         self.stroke = 0
         self.y_backoff_full = y_backoff_full
         self.outside_radius = outside_radius
+        self.clear_max_angle = clear_max_angle
+        self.last_angle = 0.0
 
     def start(self) -> str:
         """Return the starting gcode."""
@@ -501,31 +501,42 @@ class Cut():
         gcode = [
             '',
             'G30',
-            'G0 Y%g' % self.y_backoff_full,
+            'G0 Y%.4f' % self.y_backoff_full,
             'G0 X%.4f' % starting_x,
-            'G0 Z%g' % self.outside_radius
+            'G0 Z%.4f' % self.outside_radius,
+            'G0 A%.4f' % 0.0
         ]
         return '\n'.join(gcode)
 
     def cut(self, a, y, z):
         """Create gcode for the cut/return stroke."""
-        # This code is very cautious and only makes A or Z moves if Y is at fully safe point
-        if self.mill == 'climb':
-            ret = ["G1 X%.4f" % self.x_start,
-                   "G0 Y%.4f" % self.y_backoff_full,
-                   "G0 X%.4f" % self.x_end]
-        elif self.mill == 'conventional':
-            ret = ["G1 X%.4f" % self.x_end,
-                   "G0 Y%.4f" % self.y_backoff_full,
-                   "G0 X%.4f" % self.x_start]
+        if self.clear_max_angle > 0:
+            y_backoff = y + self.y_backoff
         else:
+            # This code is very cautious and only makes A or Z moves if Y is at fully safe point
+            y_backoff = self.y_backoff_full
+        if self.mill == 'climb':
+            do_cut = ["G1 X%.4f" % self.x_start,
+                      "G0 Y%.4f" % y_backoff,
+                      "G0 X%.4f" % self.x_end]
+        elif self.mill == 'conventional':
+            do_cut = ["G1 X%.4f" % self.x_end,
+                      "G0 Y%.4f" % y_backoff,
+                      "G0 X%.4f" % self.x_start]
+        else:
+            # TODO-test this and remove the assert
             assert "This has not been tested" == "yes, it has not"
-            ret = ["G1 X%.4f" % [self.x_start, self.x_end][self.stroke],
-                   "G0 Y%.4f" % self.y_backoff_full]
+            do_cut = ["G1 X%.4f" % [self.x_start, self.x_end][self.stroke],
+                      "G0 Y%.4f" % self.y_backoff_full]
             self.stroke = (self.stroke + 1) % 2
 
-        align_for_cut = ["G0 A%.4f Z%.4f" % (a, z), "G0 Y%.4f" % y]
-        return '\n'.join(align_for_cut + ret)
+        align_for_cut = []
+        if abs(a-self.last_angle) > self.clear_max_angle:
+            align_for_cut.append("G0 Y%.4f" % self.y_backoff_full)
+        self.last_angle = a
+        align_for_cut.append("G0 A%.4f Z%.4f" % (a, z))
+        align_for_cut.append("G0 Y%.4f" % y)
+        return '\n'.join(align_for_cut + do_cut)
 
 
 def main():
@@ -571,6 +582,7 @@ def main():
     p.add('--steps', '-s', type=int, default=5, help='Steps/tooth face')
     p.add('--roots', '-o', type=int, default=1, help='Number of passes to clean up the root')
     p.add('--clear', '-c', type=float, default=2., help='Cutter clearance from gear blank in mm')
+    p.add('--clear_max_angle', type=float, default=0., help='Use full clearance clearance if rotation more than this')
     p.add('--right', '-r', action='store_true', help='Rotary axis is on the right side of the machine')
 
     # Specific gear arguments
@@ -589,7 +601,7 @@ def main():
 
         gear = Gear(tool, module=args.module, pressure_angle=args.pressure,
                     relief_factor=args.relief, steps=args.steps, root_steps=args.roots,
-                    cutter_clearance=args.clear, right_rotary=args.right,
+                    cutter_clearance=args.clear, right_rotary=args.right, clear_max_angle=args.clear_max_angle,
                     algo='align' if args.align else args.algo)
 
         print(gear.header(), file=out)

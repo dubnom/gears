@@ -138,7 +138,7 @@ M30
             gcode.append('( %17s: %-70s )' % (var, value))
         return '\n'.join(gcode)
 
-    def gcode_guts(self, gg: gear_plot.Gear, cut: 'Cut', teeth_to_make) -> str:
+    def gcode_guts(self, gg: gear_plot.GearInvolute, cut: 'Cut', teeth_to_make) -> str:
         """Generate the gcode guts"""
         gcode = []
         cuts = gg.cuts_for_mill(degrees(self.tool.angle), self.tool.tip_height)
@@ -167,7 +167,7 @@ M30
         if blank_thickness <= 0:
             raise ValueError('Gear: Blank thickness must be greater than 0.')
 
-        gg = gear_plot.Gear(teeth,
+        gg = gear_plot.GearInvolute(teeth,
                             module=self.module, relief_factor=self.relief_factor,
                             pressure_angle=degrees(self.pressure_angle))
         if gear_plot.SHOW_INTERACTIVE:

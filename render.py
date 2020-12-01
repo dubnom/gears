@@ -199,9 +199,9 @@ for line_number, line in enumerate(infile):
             v['teeth'] = int(v['teeth'])
             gg_rack = Rack(v['module'], degrees(v['pressure_angle']))
             rack_polygon = Polygon(gg_rack.points(v['teeth']))
-            gg = gear_plot.Gear(v['teeth'],
-                                module=v['module'], relief_factor=v['relief_factor'],
-                                pressure_angle=degrees(v['pressure_angle']))
+            gg = gear_plot.GearInvolute(v['teeth'],
+                                        module=v['module'], relief_factor=v['relief_factor'],
+                                        pressure_angle=degrees(v['pressure_angle']))
             gg_poly = gg.gen_poly()
             gg_base_circle = circle(gg.base_radius)
 

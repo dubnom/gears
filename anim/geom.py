@@ -14,12 +14,13 @@ from .typing import *
 
 Points = Iterable[Union['BasePoint', Number, Tuple[Number, Number]]]
 PointList = Iterable['BasePoint']
+XYList = List[Tuple[float, float]]
 ImagePathType = type(ImagePath.Path([]))
 
 
 __all__ = [
     'BasePoint',
-    'Point', 'Points', 'PointList', 'PointCalc', 'PointRelative',
+    'Point', 'Points', 'PointList', 'XYList', 'PointCalc', 'PointRelative',
     'Vector', 'VectorRelative',
     'BBox', 'Line',
     'ImagePathType',

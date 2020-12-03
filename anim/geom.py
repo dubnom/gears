@@ -80,11 +80,11 @@ class Vector(typing.SupportsRound):
     """
         The difference of two points.
         Operations supported:
-            P-P -> V
-            V+-P -> P
-            P+-V -> P
-            V+-V -> V
-            V*/N -> V
+            * P-P -> V
+            * V+-P -> P
+            * P+-V -> P
+            * V+-V -> V
+            * V*/N -> V
         Not allowed: P+P, P*N
     """
 
@@ -798,6 +798,17 @@ class Line(object):
         else:
             self.direction = direction - origin
 
+    def __str__(self):
+        return '%s @ %s' % (self.origin.round(2), self.direction.round(2))
+
+    def __repr__(self):
+        return 'Line(%r, %r)' % (self.origin, self.direction)
+
+    def __eq__(self, other):
+        return type(self) is type(other) and \
+               self.origin == other.origin and \
+               self.direction == other.direction
+
     @property
     def p1(self):
         return self.origin
@@ -805,6 +816,10 @@ class Line(object):
     @property
     def p2(self):
         return self.origin + self.direction
+
+    @property
+    def midpoint(self):
+        return self.origin + self.direction * 0.5
 
     def __add__(self, vector: 'Vector') -> 'Line':
         return Line(self.origin + vector, self.direction)

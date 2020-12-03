@@ -5,3 +5,4 @@ celluloid
 Pillow
 numpy
 pygifsicle
+scipy

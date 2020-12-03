@@ -27,16 +27,28 @@ class Involute(object):
             self.min_radius = min_radius
         self.start_angle = self.calc_angle(self.min_radius)
         self.end_angle = self.calc_angle(self.max_radius)
-        print('Inv: r=%.6f mnr=%.6f mxr=%.6f sa=%.6f ea=%.6f' %
-              (self.radius, self.min_radius, self.max_radius, self.start_angle, self.end_angle))
+        debug_print = False
+        if debug_print:
+            print('Inv: r=%.6f mnr=%.6f mxr=%.6f sa=%.6f ea=%.6f' %
+                  (self.radius, self.min_radius, self.max_radius, self.start_angle, self.end_angle))
 
     def calc_angle(self, distance) -> float:
         """Calculate angle (radians) for corresponding distance (> radius)"""
-        assert (distance >= self.radius)
+        assert distance >= self.radius
         return sqrt(distance * distance / (self.radius * self.radius) - 1)
 
-    def calc_point(self, angle, offset=0.0):
-        """Calculate the x,y for a given angle and offset angle"""
+    def calc_point(self, angle, offset=0.0, offset_r=0.0, offset_n=0.0):
+        """
+            Calculate the x,y for a given angle and offset angle
+            :param angle:       Angle in radians
+            :param offset:      Angular offset in radians
+            :param offset_r:    Offset along radial direction for final point
+            :param offset_n:    Offset normal (CCW) to radial direction
+            :return:
+        """
+        """"""
+        # x = r * cos(a) + r*(a-oa) * sin(a)
+        # x = (r-or) * cos(a) + r*(a-oa-on) * sin(a)
         x = self.radius * (cos(angle) + (angle - offset) * sin(angle))
         y = self.radius * (sin(angle) - (angle - offset) * cos(angle))
         return x, y
@@ -51,7 +63,7 @@ class Involute(object):
 
 
 class GearInvolute(object):
-    def __init__(self, teeth=30, center=(0.0, 0.0), rot=0.0,
+    def __init__(self, teeth=30, center=Point(0, 0), rot=0.0,
                  module=1.0, relief_factor=1.25,
                  pressure_angle=20.0, pressure_line=True):
         """
@@ -145,9 +157,9 @@ class GearInvolute(object):
             :return: two lists of segments for cuts
         """
         # If we require center to be 0,0 for generating cuts, then low cuts is reflection of high cuts
-        assert(self.center == (0, 0))
+        assert(self.center == Point(0, 0))
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle),
-                    relief_factor=self.relief_factor, tall_tooth=True)
+                    relief_factor=self.relief_factor, tall_tooth=not True)
         high_cuts = []
         # TODO-this should be calculated based on when the rack intersects the tip circle
         #     -actually, it can be calculated based on the first and last intersection with the pressure line
@@ -207,7 +219,7 @@ class GearInvolute(object):
         tool_angle /= 2
         # tool_tip_height = 0
         half_tool_tip = tool_tip_height/2
-        assert(self.center == (0, 0))
+        assert(self.center == Point(0, 0))
 
         high_cuts, low_cuts = self.gen_cuts_by_rack()
 
@@ -278,8 +290,8 @@ class GearInvolute(object):
         if self.pressure_line:
             dx = self.module*5*sin(self.pressure_angle)
             dy = self.module*5*cos(self.pressure_angle)
-            cx = pitch_radius + self.center[0]
-            cy = 0 + self.center[1]
+            cx = pitch_radius + self.center.x
+            cy = 0 + self.center.y
             plot([(cx+dx, cy+dy), (cx-dx, cy-dy)], color='#FFA0FF')
             plot([(cx-dx, cy+dy), (cx+dx, cy-dy)], color='#FFA0FF')
 

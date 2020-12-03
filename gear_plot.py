@@ -1,13 +1,17 @@
 import os
 from typing import List, Tuple, NamedTuple
 import matplotlib.pyplot as plt
+import scipy.optimize
+from math import cos, sin, tan, tau, pi, radians, hypot, atan2, sqrt
 
 from anim.geom import polygon_area, iter_rotate, Line, Vector, Point
-from gear_base import PointList, plot
+from gear_base import PointList, plot, t_range, circle
 from gear_cycloidal import CycloidalPair
-from gear_involute import GearInvolute, InvolutePair
+from gear_involute import GearInvolute, InvolutePair, Involute
 
 # setenv SHOW_INTERACTIVE to 1 or true to display interactive plots
+from rack import Rack
+
 SHOW_INTERACTIVE = os.environ.get('SHOW_INTERACTIVE', 'false').lower() in {'1', 'true'}
 COLOR_MAP = {
     'undercut': 'red',
@@ -272,12 +276,163 @@ def test_cuts():
     plot_classified_cuts(poly, 0)
 
 
+def pplot(rt, color='black', plotter=None):
+    """Polar plot of r, theta"""
+    plotter = plotter or plt
+    xy = [(r*cos(t), r*sin(t)) for r, t in rt]
+    plotter.plot(*zip(*xy), color)
+
+
+def test_inv(num_teeth=None):
+    def inv(radius=0.0, angle=0.0, offset_angle=0.0, offset_radius=0.0, offset_norm=0.0, clip=None):
+        # x = r * cos(a) + r*(a-oa) * sin(a)
+        # x = (r-or) * cos(a) + r*(a-oa-on) * sin(a)
+        x = (radius-offset_radius) * cos(angle) + (radius*(angle - offset_angle)-offset_norm) * sin(angle)
+        y = (radius-offset_radius) * sin(angle) - (radius*(angle - offset_angle)-offset_norm) * cos(angle)
+        # y = self.radius * (sin(angle) - (angle - offset) * cos(angle))
+        return (x, y) if clip is None or hypot(x, y) < clip else None
+
+    def pp(t_l, t_h, fn, radius=None):
+        curve = list(filter(None, [fn(t) for t in t_range(50, t_l, t_h)]))
+        if radius:
+            if t_l + t_h < 0:
+                curve = [(Vector(*curve[0]).unit()*radius).xy()] + curve
+            else:
+                curve = curve + [(Vector(*curve[-1]).unit() * radius).xy()]
+        return curve
+
+    module = 1
+    num_teeth = num_teeth or 17
+
+    tooth_angle = tau / num_teeth / 2
+    half_tooth_angle = tooth_angle / 2
+    pitch_radius = module * num_teeth / 2
+    pitch = module * pi
+    pressure_angle = 20
+    base_radius = pitch_radius*cos(radians(pressure_angle))
+    addendum = module
+    half_tooth = pitch / 4
+    rack = Rack(module=module, pressure_angle=pressure_angle)
+    tip_half_tooth = half_tooth - addendum*tan(radians(pressure_angle))
+    # print('tht: ', tip_half_tooth)
+    # print('rack.tth: ', rack.tooth_tip_high)
+    tr = pitch_radius + addendum
+    dr = pitch_radius - addendum * 1.25
+    tall_addendum = addendum * 1.25
+    tall_tip_half_tooth = half_tooth - tall_addendum * tan(radians(pressure_angle))
+
+    # Calc pitch point where involute intersects pitch circle and offset
+    involute = Involute(base_radius, tr, dr)
+    pp_inv_angle = involute.calc_angle(pitch_radius)
+    ppx, ppy = involute.calc_point(pp_inv_angle)
+    pp_off_angle = atan2(ppy, ppx)
+    # Multiply pp_off_angle by pr to move from angular to pitch space
+    tooth_offset_angle = half_tooth_angle - pp_off_angle
+
+    def f_tooth_edge(theta):
+        offset_angle = 0
+        oa = offset_angle - tooth_offset_angle
+        tr = pitch_radius*20
+        return inv(angle=theta - oa, radius=base_radius, offset_angle=-oa, clip=tr)
+
+    def f_undercut_edge(t):
+        offset_angle = 0
+        cr = pitch_radius*200
+        return inv(angle=t + offset_angle, radius=pitch_radius, offset_angle=offset_angle,
+                                      offset_radius=addendum, offset_norm=tip_half_tooth, clip=cr)
+
+    def solve_this_radius(t):
+        x, y = f_undercut_edge(t)
+        x2, y2 = f_tooth_edge(atan2(y, x))
+        return hypot(x, y) - hypot(x2, y2)
+
+    def solve_this_distance(t):
+        x, y = f_undercut_edge(t)
+        x2, y2 = f_tooth_edge(atan2(y, x))
+        return hypot(x-x2, y-y2)
+
+    def solve_this(fn, low, high, epsilon=1e-8):
+        found: scipy.optimize.RootResults
+        found = scipy.optimize.root_scalar(fn, bracket=(low, high), method='brentq', xtol=epsilon)
+        # print(found)
+        if not found.converged:
+            print('Not-solved')
+        return found.root
+
+    solution = solve_this(solve_this_radius, -2, 0)
+    better_solution: scipy.optimize.OptimizeResult
+    better_solution = scipy.optimize.minimize_scalar(
+        solve_this_distance, bounds=(solution-0.3, solution+0.3), tol=1e-8)
+    print('Solved [%3d]: %9.4f %9.4f %9.4f %9.4f' % (
+        num_teeth, solution, better_solution.x,
+        solve_this_distance(solution), solve_this_distance(better_solution.x)))
+    if num_teeth != 7:
+        return
+    print(better_solution)
+
+    plot([(solution, -1), (solution, 1)])
+    curve = [(t, solve_this_distance(t)) for t in t_range(50, solution-1, solution+1)]
+    plot(curve, 'green')
+    curve = [(t, solve_this_radius(t)) for t in t_range(50, solution-1, solution+1)]
+    plot(curve, 'blue')
+    plt.show()
+
+    # tip_half_tooth = half_tooth - addendum * tan(radians(pressure_angle))
+    #print('tth: ', tip_half_tooth)
+    tl, th = 0, 1
+    tl, th = pi/2-0.1, pi/2+0.1
+    tl, th = pi/2-0.1, pi/2+0.1
+    # for tc in [0, tau, 2*tau]:
+    plot(circle(pitch_radius), 'grey')
+    plot(circle(base_radius), 'orange')
+    plot(circle(tr), 'yellow')
+    plot(circle(dr), 'yellow')
+    undercut_point = Point(*f_undercut_edge(solution))
+    print('Undercut at ', undercut_point)
+    plot(circle(0.1, undercut_point), 'pink')
+
+    def cross(r, c, color='black'):
+        u = Vector(r, r)
+        d = Vector(r, -r)
+        plot([c-u, c+u, c, c-d, c+d], color)
+    cross(0.05, undercut_point, 'pink')
+    # print('ht/pr:', half_tooth / pitch_radius, ' hta rad:', half_tooth_angle)
+    for tc in [0]:
+        th, tl = tc-1, tc+1
+        th, tl = tc-2, tc+2
+        # th, tl = tc-6, tc+6
+        for offset_angle in t_range(num_teeth, 0, tau, False):
+            oa = offset_angle - tooth_offset_angle
+            plot(pp(0, th, lambda t: inv(angle=t+oa, radius=base_radius, offset_angle=oa, clip=tr), radius=dr), 'darkgreen')
+            plot(pp(tl, 0, lambda t: inv(angle=t-oa, radius=base_radius, offset_angle=-oa, clip=tr), radius=dr), 'darkblue')
+            # plot(pp(th, tl, lambda t: inv(angle=t+offset_angle, radius=base_radius, offset_angle=offset_angle)), 'black')
+            cr = pitch_radius+addendum*0.3
+
+
+            plot(pp(tl/4, th, lambda t: inv(angle=t+offset_angle, radius=pitch_radius, offset_angle=offset_angle,
+                                            offset_radius=tall_addendum, offset_norm=tall_tip_half_tooth, clip=cr)), 'lightblue')
+            plot(pp(tl, th/4, lambda t: inv(angle=t-offset_angle, radius=pitch_radius, offset_angle=-offset_angle,
+                                            offset_radius=tall_addendum, offset_norm=-tall_tip_half_tooth, clip=cr)), 'lightgreen')
+            plot(pp(tl/4, th, lambda t: inv(angle=t+offset_angle, radius=pitch_radius, offset_angle=offset_angle,
+                                            offset_radius=addendum, offset_norm=tip_half_tooth, clip=cr)), 'blue')
+            plot(pp(tl, th/4, lambda t: inv(angle=t-offset_angle, radius=pitch_radius, offset_angle=-offset_angle,
+                                            offset_radius=addendum, offset_norm=-tip_half_tooth, clip=cr)), 'green')
+    # pplot(pp(-1, 1, lambda t: (pitch_radius * (1 - t * tan(radians(pressure_angle))), t)), 'pink')
+    gi = GearInvolute(teeth=num_teeth, module=module, pressure_angle=pressure_angle)
+    # gi.plot('red', gear_space=True)
+    # plot(pp(-1, 1, lambda t: (pitch_radius - t * tan(radians(pressure_angle)), t)), 'red')
+    plt.axis('equal')
+    plt.show()
+
+
 def main():
+    [test_inv(n) for n in range(3, 34)]; return
+    test_inv(); return
     #test_cuts(); return
-    plot_classified_cuts(CycloidalPair(40, 17).pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4); return
-    plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
-    do_pinions(zoom_radius=5, cycloidal=not False); return
-    # do_gears(zoom_radius=5, pinion_teeth=7, cycloidal=True, animate=True)
+    #plot_classified_cuts(CycloidalPair(40, 17).pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4); return
+    #plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
+    #do_pinions(zoom_radius=5, cycloidal=not False); return
+    do_gears(zoom_radius=5, pinion_teeth=7, cycloidal=True, animate=True)
     do_gears(zoom_radius=7, pinion_teeth=18, animate=True, cycloidal=False); return
     for pt in [5, 6, 7, 8, 9, 10, 11]:
         do_gears(zoom_radius=5, pinion_teeth=pt)

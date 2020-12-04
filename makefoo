@@ -1,3 +1,3 @@
 # SHOW_INTERACTIVE=True
-python3 ./gears.py -t 137 -k 1 --pinion_teeth=33 --cycloidal=pinion --algo=new --make=2 -T saw32nd.cfg orrery/foo.nc
+python3 ./gears.py -t 137 -k 1 --pinion_teeth=33 --cycloidal=pinion --algo=new --make=33 -T saw32nd.cfg orrery/foo.nc
 python3 ./render.py orrery/foo.nc -azp -t 6

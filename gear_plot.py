@@ -236,6 +236,15 @@ def cut_params_from_polygon(poly: PointList, tool_angle, tool_tip_height=0.0) ->
     half_tool_tip = tool_tip_height / 2
     classified = classify_cuts(poly, tool_angle, tool_tip_height)
 
+    # Rotate classified cuts until we find a the first edge after an "in" edge
+    orig_len = len(classified)
+    last_in = -1
+    while classified[last_in].kind != "in":
+        last_in -= 1
+    if last_in != -1:
+        classified = classified[last_in+1:] + classified[:last_in+1]
+    assert len(classified) == orig_len
+
     cut_params = []
     for cut in classified:
         cuts = []
@@ -263,8 +272,14 @@ def cut_params_from_polygon(poly: PointList, tool_angle, tool_tip_height=0.0) ->
                     cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat'))
             else:
                 # Will need multiple cuts to fill entire line
-                print('TODO: Iterate for multiple cuts: %s' % cut)
-                cuts.append((cut.line, 'flat-short'))
+                cut_len = cut.line.direction.length()
+                cuts_required = ceil(cut_len/tool_tip_height)
+                cut_dir = cut.line.direction.unit()
+                for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
+                    cut_start = cut.line.p1 + t * cut_dir
+                    cut_end = cut_start + cut_dir * tool_tip_height
+                    cuts.append((Line(cut_end, -1 * normal), 'flat'))
+
         else:
             cuts.append((cut.cut_line, cut.kind))
 
@@ -318,6 +333,53 @@ def do_gears(rot=0., zoom_radius=0., cycloidal=True, wheel_teeth=40, pinion_teet
         pinion = pair.pinion()
 
     if animate:
+        from anim.viewer import PlotViewer
+        rotation = [0]
+        if cycloidal:
+            extra = 0.08 if pinion.teeth < 10 else 0.05
+        else:
+            extra = 0.5 if pinion.teeth % 2 == 0 else 0.0
+
+        def update(ax):
+            wheel.set_zoom(zoom_radius=zoom_radius, plotter=ax)
+            wheel.plot('blue', rotation=rotation[0], plotter=ax)
+            pinion.plot('green', rotation=-rotation[0] + extra, plotter=ax)
+            rotation[0] += 0.01
+        pv = PlotViewer(update_func=update)
+        pv.mainloop()       # never returns
+
+    else:
+        wheel.plot('blue', rotation=rot)
+        if pinion:
+            pinion.plot('green')
+        wheel.plot_show(zoom_radius)
+
+
+def all_gears(zoom_radius=0., cycloidal=True, animate=False):
+    import gear_config
+    assert cycloidal
+
+    for planet, (x, y, module) in gear_config.GEARS.items():
+        if x > y:
+            pair = CycloidalPair(x, y, module=module)
+            gear_x = pair.wheel()
+            gear_y = pair.pinion()
+        elif x == y:
+            pair = CycloidalPair(x, y, module=module)
+            gear_x = pair.wheel()
+            gear_y = pair.wheel()
+            gear_y.center = pair.pinion().center
+            gear_y = pair.pinion()
+        else:
+            pair = CycloidalPair(y, x, module=module)
+            gear_x = pair.pinion()
+            gear_y = pair.wheel()
+
+        gear_x.plot()
+        gear_y.plot(color='green')
+    gear_x.plot_show()
+
+    if False and animate:
         from anim.viewer import PlotViewer
         rotation = [0]
         if cycloidal:
@@ -505,6 +567,7 @@ def main():
     # [test_inv(n) for n in range(3, 34)]; return
     # test_inv(); return
     # test_cuts(); return
+    all_gears(); return
     do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
 
     cp = CycloidalPair(137, 33)

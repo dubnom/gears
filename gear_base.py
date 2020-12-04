@@ -1,4 +1,4 @@
-from math import sin, cos, tau
+from math import sin, cos, tau, radians
 from typing import List, Union, Tuple
 
 from matplotlib import pyplot as plt
@@ -9,7 +9,7 @@ from anim.transform import Transform
 __all__ = [
     'PointList', 'PointUnionList', 'check_point_list',
     't_range',
-    'path_rotate', 'path_translate', 'circle', 'plot',
+    'path_rotate', 'path_translate', 'circle', 'arc', 'plot',
     'GearInstance',
 ]
 PointList = List[BasePoint]
@@ -44,10 +44,16 @@ def path_translate(path: PointList, dxy: Union[Point, Vector], as_pt=False) -> P
         return [(p + dxy).xy() for p in path]
 
 
+def arc(r, sa, ea, c=Point(0, 0)) -> XYList:
+    """Generate an arc of radius r about c as a list of x,y pairs"""
+    steps = int(abs(ea-sa)+1)
+    return [(r * cos(t) + c.x, r * sin(t) + c.y) for t in t_range(steps, radians(sa), radians(ea))]
+
+
 def circle(r, c=Point(0, 0)) -> XYList:
     """Generate a circle of radius r about c as a list of x,y pairs"""
     steps = 360
-    return [(r * sin(t) + c.x, r * cos(t) + c.y) for t in t_range(steps, 0, tau)]
+    return [(r * cos(t) + c.x, r * sin(t) + c.y) for t in t_range(steps, 0, tau)]
 
 
 def plot(xy, color='black', plotter=None):
@@ -77,7 +83,7 @@ class GearInstance:
             :return:
         """
         rotation *= 360 / self.teeth
-        plot(circle(self.pitch_radius, self.center), 'green', plotter=plotter)
+        plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
         plot(path_translate(path_rotate(self.poly, rotation, True), self.center), color, plotter=plotter)
 
     def set_zoom(self, zoom_radius=0.0, plotter=None):

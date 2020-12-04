@@ -2,11 +2,11 @@ import os
 from typing import List, Tuple, NamedTuple
 import matplotlib.pyplot as plt
 import scipy.optimize
-from math import cos, sin, tan, tau, pi, radians, hypot, atan2, sqrt
+from math import cos, sin, tan, tau, pi, radians, hypot, atan2, sqrt, degrees, ceil
 
 from anim.geom import polygon_area, iter_rotate, Line, Vector, Point
 from anim.transform import Transform
-from gear_base import PointList, plot, t_range, circle
+from gear_base import PointList, plot, t_range, circle, arc
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvolutePair, Involute
 
@@ -158,6 +158,19 @@ class CutError(Exception):
 
 def plot_classified_cuts(poly: PointList, tool_angle, tool_tip_height=0.0):
     classified = classify_cuts(poly, tool_angle, tool_tip_height)
+    check_cut = not True
+    if check_cut:
+        # classified = classified[:16]      # for pinion
+        classified = classified[:17]        # for wheel
+        check_a = classified[-2].cut_line
+        check_b = classified[-7].cut_line
+        check_line = Line(check_a.p1, check_b.p2)
+        check_angle = check_a.direction.angle()-check_line.direction.angle()
+        plot([check_a.p2, check_line.p1, check_line.p2], 'pink')
+        print(check_a.direction.angle(), check_line.direction.angle())
+        plot(arc(check_a.direction.length()*0.7, check_a.direction.angle(), check_line.direction.angle(), check_a.p1), 'pink')
+        plt.text(*(check_line.p1+Vector(1.2, 0.0)).xy(), '%.1f deg' % check_angle,
+                 bbox=dict(facecolor='white', alpha=0.5))
 
     for cut in classified:
         normal = cut.cut_line.direction.unit().normal() * cut.z_offset
@@ -181,9 +194,13 @@ def plot_classified_cuts(poly: PointList, tool_angle, tool_tip_height=0.0):
                     # Leave cut in middle
                     cuts.append((cut.line, 'flat'))
             else:
-                # Will need multiple cuts to fill entire line
-                print('TODO: Iterate for multiple cuts: %s' % cut)
-                cuts.append((cut.line, 'undercut'))
+                cut_len = cut.line.direction.length()
+                cuts_required = ceil(cut_len/tool_tip_height)
+                cut_dir = cut.line.direction.unit()
+                for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
+                    cut_start = cut.line.p1 + t * cut_dir
+                    cut_end = cut_start + cut_dir * tool_tip_height
+                    cuts.append((Line(cut_start, cut_end), 'flat'))
             for cut_line, kind in cuts:
                 du = cut_line.direction.unit() * tool_tip_height / 2
                 mid = cut_line.midpoint
@@ -201,8 +218,10 @@ def plot_classified_cuts(poly: PointList, tool_angle, tool_tip_height=0.0):
             plot([pm2, pm1, cut.cut_line.p1, cut.cut_line.p2], COLOR_MAP[cut.kind])
     plt.axis('equal')
     plt.show()
-    for r, y, z in cut_params_from_polygon(poly, tool_angle, tool_tip_height):
-        print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
+    print_fake_gcode = False
+    if print_fake_gcode:
+        for r, y, z in cut_params_from_polygon(poly, tool_angle, tool_tip_height):
+            print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
 
 def cut_params_from_polygon(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
@@ -466,7 +485,6 @@ def test_inv(num_teeth=None):
             # plot(pp(th, tl, lambda t: inv(angle=t+offset_angle, radius=base_radius, offset_angle=offset_angle)), 'black')
             cr = pitch_radius+addendum*0.3
 
-
             plot(pp(tl/4, th, lambda t: inv(angle=t+offset_angle, radius=pitch_radius, offset_angle=offset_angle,
                                             offset_radius=tall_addendum, offset_norm=tall_tip_half_tooth, clip=cr)), 'lightblue')
             plot(pp(tl, th/4, lambda t: inv(angle=t-offset_angle, radius=pitch_radius, offset_angle=-offset_angle,
@@ -487,6 +505,12 @@ def main():
     # [test_inv(n) for n in range(3, 34)]; return
     # test_inv(); return
     # test_cuts(); return
+    do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
+
+    cp = CycloidalPair(137, 33)
+    plot_classified_cuts(cp.wheel().poly, tool_angle=0.0, tool_tip_height=1/32*25.4)
+    plot_classified_cuts(cp.pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4)
+    return
     plot_classified_cuts(CycloidalPair(40, 17).pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4); return
     #plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
     #do_pinions(zoom_radius=5, cycloidal=not False); return

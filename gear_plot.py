@@ -5,6 +5,7 @@ import scipy.optimize
 from math import cos, sin, tan, tau, pi, radians, hypot, atan2, sqrt
 
 from anim.geom import polygon_area, iter_rotate, Line, Vector, Point
+from anim.transform import Transform
 from gear_base import PointList, plot, t_range, circle
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvolutePair, Involute
@@ -144,7 +145,7 @@ def classify_cuts(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[Clas
 
     cuts[0].convex_p1 = cuts[-1].convex_p2
 
-    debug_print = not False
+    debug_print = False
     if debug_print:
         for cut in cuts[:20]:
             print(cut)
@@ -155,7 +156,7 @@ class CutError(Exception):
     pass
 
 
-def plot_classified_cuts(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
+def plot_classified_cuts(poly: PointList, tool_angle, tool_tip_height=0.0):
     classified = classify_cuts(poly, tool_angle, tool_tip_height)
 
     for cut in classified:
@@ -200,10 +201,67 @@ def plot_classified_cuts(poly: PointList, tool_angle, tool_tip_height=0.0) -> Li
             plot([pm2, pm1, cut.cut_line.p1, cut.cut_line.p2], COLOR_MAP[cut.kind])
     plt.axis('equal')
     plt.show()
+    for r, y, z in cut_params_from_polygon(poly, tool_angle, tool_tip_height):
+        print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
-    return []
 
+def cut_params_from_polygon(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
+    """
+        Generate list of (rotation, y-position, z-position) from polygon
+        :param poly:                Polygon to cut
+        :param tool_angle:          In radians
+        :param tool_tip_height:     Tool tip height
+        :return: List of (r, y, z)
+    """
+    assert tool_angle == 0
+    half_tool_tip = tool_tip_height / 2
+    classified = classify_cuts(poly, tool_angle, tool_tip_height)
 
+    cut_params = []
+    for cut in classified:
+        cuts = []
+        if cut.kind == 'undercut':
+            raise ValueError("Can't do undercuts yet")
+        elif cut.flat():
+            normal = cut.cut_line.direction.unit().normal() * cut.z_offset
+            du = cut.line.direction.unit() * tool_tip_height
+            length = cut.line.direction.length()
+            if length == 0:
+                continue
+            elif cut.line.direction.length() < tool_tip_height:
+                # Cut shorter than saw kerf
+                if not cut.convex_p1 and not cut.convex_p2:
+                    print('ERROR: Cut is too narrow for saw width: %s / saw: %.4f' % (cut, tool_tip_height))
+                    print('   length: %.8f' % length)
+                    raise ValueError('ERROR: Cut is too narrow for saw width: %s / saw: %.4f' % (cut, tool_tip_height))
+                if not cut.convex_p1:
+                    # Align cut to p1
+                    cuts.append((Line(cut.line.p1 + du, -1 * normal), 'flat'))
+                elif not cut.convex_p2:
+                    cuts.append((Line(cut.line.p2, -1 * normal), 'flat'))
+                else:
+                    # Leave cut in middle
+                    cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat'))
+            else:
+                # Will need multiple cuts to fill entire line
+                print('TODO: Iterate for multiple cuts: %s' % cut)
+                cuts.append((cut.line, 'flat-short'))
+        else:
+            cuts.append((cut.cut_line, cut.kind))
+
+        for c, kind in cuts:
+            cut_angle = c.direction.angle()
+            rotation = tool_angle - cut_angle
+            # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
+            t = Transform().rotate(-rotation)
+            y, z = t.transform_pt(c.origin)
+            if kind in {'in', 'descending'}:
+                z = z + half_tool_tip
+            else:
+                z = z - half_tool_tip
+            cut_params.append((rotation, y, z))
+
+    return cut_params
 
 
 def do_pinions(zoom_radius=0., cycloidal=True):
@@ -426,10 +484,10 @@ def test_inv(num_teeth=None):
 
 
 def main():
-    [test_inv(n) for n in range(3, 34)]; return
-    test_inv(); return
-    #test_cuts(); return
-    #plot_classified_cuts(CycloidalPair(40, 17).pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4); return
+    # [test_inv(n) for n in range(3, 34)]; return
+    # test_inv(); return
+    # test_cuts(); return
+    plot_classified_cuts(CycloidalPair(40, 17).pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4); return
     #plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
     #do_pinions(zoom_radius=5, cycloidal=not False); return
     do_gears(zoom_radius=5, pinion_teeth=7, cycloidal=True, animate=True)

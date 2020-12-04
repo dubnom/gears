@@ -22,6 +22,7 @@ from shapely.affinity import rotate, translate
 import gear_plot
 from anim.geom import BBox
 from anim.simple import SimpleAnimation
+from gear_cycloidal import CycloidalPair
 from rack import Rack
 
 
@@ -204,6 +205,10 @@ for line_number, line in enumerate(infile):
                                         pressure_angle=degrees(v['pressure_angle']))
             gg_poly = gg.gen_poly()
             gg_base_circle = circle(gg.base_radius)
+            debug_cycloidal = True
+            if debug_cycloidal:
+                cp = CycloidalPair(wheel_teeth=35, pinion_teeth=7, module=v['module'])
+                gg_poly = cp.pinion().poly
 
             if sa and zoom:
                 # cx = v['outside_radius']

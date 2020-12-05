@@ -1,12 +1,12 @@
 import os
-from typing import List, Tuple, NamedTuple
+from typing import List, Tuple, Optional
 import matplotlib.pyplot as plt
 import scipy.optimize
-from math import cos, sin, tan, tau, pi, radians, hypot, atan2, sqrt, degrees, ceil
+from math import cos, sin, tan, tau, pi, radians, hypot, atan2, ceil
 
 from anim.geom import polygon_area, iter_rotate, Line, Vector, Point
 from anim.transform import Transform
-from gear_base import PointList, plot, t_range, circle, arc
+from gear_base import PointList, plot, t_range, circle, arc, GearInstance
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvolutePair, Involute
 
@@ -24,11 +24,27 @@ COLOR_MAP = {
 }
 
 
+class CutDetail:
+    """
+        Detail information for generating GCODE
+    """
+    def __init__(self, line: Line, kind: str, angle: float, y: float, z: float):
+        self.line = line
+        self.kind = kind
+        self.angle = angle
+        self.y = y
+        self.z = z
+
+    def __str__(self):
+        return 'CutDetail(%s, %s, %.4f, %.4f, %.4f)' % (self.line, self.kind, self.angle, self.y, self.z)
+
+
 class ClassifiedCut:
     """
         A cut classified by direction
     """
-    def __init__(self, line: Line, kind: str, convex_p1: bool, convex_p2: bool, overshoot: float, z_offset: float):
+    def __init__(self, line: Line, kind: str,
+                 convex_p1: bool, convex_p2: bool, overshoot: float, z_offset: float):
         """
             :param line:        Line segment in CCW direction
             :param kind:        in/out/ascending/descending/flat/undercut
@@ -45,6 +61,7 @@ class ClassifiedCut:
         self.z_offset = z_offset
         # cut_line is reversed if this is an inward cut
         self.cut_line = Line(line.p2, line.p1) if self.inward() else self.line
+        self.cut_details: List[CutDetail] = []
 
     def __str__(self):
         c1 = 'convex1' if self.convex_p1 else 'concave1'
@@ -68,9 +85,9 @@ class ClassifiedCut:
         return self.kind in {'out', 'ascending'}
 
 
-def classify_cuts(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+def classify_cuts_pass1(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
     """
-        Classify the cuts in this polygon.
+        Classify the cuts in this polygon, first pass.  No error checking of cuts in this pass.
 
         :param poly: List of Points in CCW order
         :param tool_angle: tool angle in degrees
@@ -103,7 +120,7 @@ def classify_cuts(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[Clas
 
     cuts = []
 
-    # These values should depend on tool angle
+    # TODO-These values should depend on tool angle
     angle_eps = 1.0     # degrees
     flat_eps = 15.0     # degrees
     for a, b, c in iter_rotate(poly, 3):
@@ -156,71 +173,166 @@ class CutError(Exception):
     pass
 
 
-def plot_classified_cuts(poly: PointList, tool_angle, tool_tip_height=0.0):
-    classified = classify_cuts(poly, tool_angle, tool_tip_height)
-    check_cut = not True
-    if check_cut:
-        # classified = classified[:16]      # for pinion
-        classified = classified[:17]        # for wheel
-        check_a = classified[-2].cut_line
-        check_b = classified[-7].cut_line
-        check_line = Line(check_a.p1, check_b.p2)
-        check_angle = check_a.direction.angle()-check_line.direction.angle()
-        plot([check_a.p2, check_line.p1, check_line.p2], 'pink')
-        print(check_a.direction.angle(), check_line.direction.angle())
-        plot(arc(check_a.direction.length()*0.7, check_a.direction.angle(), check_line.direction.angle(), check_a.p1), 'pink')
-        plt.text(*(check_line.p1+Vector(1.2, 0.0)).xy(), '%.1f deg' % check_angle,
-                 bbox=dict(facecolor='white', alpha=0.5))
+def classify_cuts_pass2(classified: List[ClassifiedCut], tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+    """
+        Refine the classified cuts:
+        * error checking
+        * reorient the cut.cut_line to tool alignment
+
+        :param classified: classified cuts from pass1
+        :param tool_angle: tool angle in degrees
+        :param tool_tip_height:
+        :returns: List of (cut, cut-kind, convex, allowed overshoot)
+    """
+    assert tool_angle == 0
+    half_tool_tip = tool_tip_height / 2
+
+    # Rotate classified cuts until we find a the first edge after an "in" edge
+    orig_len = len(classified)
+    last_in = -1
+    while classified[last_in].kind != "in":
+        last_in -= 1
+    if last_in != -1:
+        classified = classified[last_in+1:] + classified[:last_in+1]
+    assert len(classified) == orig_len
 
     for cut in classified:
-        normal = cut.cut_line.direction.unit().normal() * cut.z_offset
-        if cut.flat():
-            cuts = []
+        cuts = []
+        if cut.kind == 'undercut':
+            raise ValueError("Can't do undercuts yet")
+        elif cut.flat():
+            normal = cut.cut_line.direction.unit().normal() * cut.z_offset
+            du = cut.line.direction.unit() * tool_tip_height
             length = cut.line.direction.length()
             if length == 0:
                 continue
             elif cut.line.direction.length() < tool_tip_height:
                 # Cut shorter than saw kerf
                 if not cut.convex_p1 and not cut.convex_p2:
-                    print('ERROR: Cut is too narrow for saw width: %s / saw: %.4f' % (cut, tool_tip_height))
-                    print('   length: %.8f' % length)
-                    cuts.append((cut.line, 'undercut'))
+                    msg = 'ERROR: Cut is too narrow for tool.  Cut: %s [%.6f len]  Tool tip: %.4f' \
+                          % (cut, length, tool_tip_height)
+                    print(msg)
+                    raise CutError(msg)
                 if not cut.convex_p1:
                     # Align cut to p1
-                    cuts.append((Line(cut.line.p1, cut.line.direction.unit() * tool_tip_height), 'flat'))
+                    cuts.append((Line(cut.line.p1 + du, -1 * normal), 'flat'))
                 elif not cut.convex_p2:
-                    cuts.append((Line(cut.line.p2, -cut.line.direction.unit() * tool_tip_height), 'flat'))
+                    cuts.append((Line(cut.line.p2, -1 * normal), 'flat'))
                 else:
                     # Leave cut in middle
-                    cuts.append((cut.line, 'flat'))
+                    cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat'))
             else:
+                # Will need multiple cuts to fill entire line
                 cut_len = cut.line.direction.length()
                 cuts_required = ceil(cut_len/tool_tip_height)
                 cut_dir = cut.line.direction.unit()
                 for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
                     cut_start = cut.line.p1 + t * cut_dir
                     cut_end = cut_start + cut_dir * tool_tip_height
-                    cuts.append((Line(cut_start, cut_end), 'flat'))
-            for cut_line, kind in cuts:
-                du = cut_line.direction.unit() * tool_tip_height / 2
-                mid = cut_line.midpoint
-                mid1 = mid - du
-                mid2 = mid + du
-                plot([cut_line.p1 + normal/2, cut_line.p1,
-                      mid1, mid1-normal*2, mid1,
-                      mid, mid-normal, mid,
-                      mid2, mid2-normal*2, mid2,
-                      cut_line.p2, cut_line.p2 + normal/2],
-                     COLOR_MAP[kind])
+                    cuts.append((Line(cut_end, -1 * normal), 'flat'))
         else:
-            pm1 = cut.cut_line.p1 + normal
-            pm2 = cut.cut_line.p2 + normal
-            plot([pm2, pm1, cut.cut_line.p1, cut.cut_line.p2], COLOR_MAP[cut.kind])
+            cuts.append((cut.cut_line, cut.kind))
+
+        details = []
+        for adjusted_cut, kind in cuts:
+            cut_angle = adjusted_cut.direction.angle()
+            rotation = tool_angle - cut_angle
+            # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
+            t = Transform().rotate(-rotation)
+            y, z = t.transform_pt(adjusted_cut.origin)
+            if kind in {'in', 'descending'}:
+                z = z + half_tool_tip
+            else:
+                z = z - half_tool_tip
+            details.append(CutDetail(adjusted_cut, kind, cut_angle, y, z))
+        cut.cut_details.extend(details)
+
+    return classified
+
+
+def classify_cuts(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+    """
+        Classify the cuts in this polygon.
+        Calls first pass and then performs error checking and reorients the cut.cut_line to
+        tool alignment.
+
+        :param poly: List of Points in CCW order
+        :param tool_angle: tool angle in degrees
+        :param tool_tip_height:
+        :returns: List of (cut, cut-kind, convex, allowed overshoot)
+
+        Overshoot is allowed if the cut is along a convex part of the polygon.
+
+        Classify cuts by angle relative to center of gear::
+
+           <--- iterating CCW around top of gear
+                          out
+                   ending  |    u
+                 c         |       n
+                s          |         d
+                a          |          e
+           flat ---------- + ---------r-
+                d          |
+                e          |         c
+                 s         |       u
+                  cending  |    t
+                           in
+
+    """
+    classified = classify_cuts_pass1(poly, tool_angle, tool_tip_height)
+    refined = classify_cuts_pass2(classified, tool_angle, tool_tip_height)
+    return refined
+
+
+def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
+    classified = classify_cuts(gear.poly, tool_angle, tool_tip_height)
+    check_cut = True
+    if check_cut:
+        found = 0
+        while classified[found].kind != 'descending':
+            found += 1
+        while classified[found].kind != 'out':
+            found += 1
+        classified = classified[:found+2]
+        check_a = classified[-2].cut_line
+        while classified[found].kind != 'descending':
+            found -= 1
+        min_found: Optional[Line] = None
+        min_angle = 180.0
+        while classified[found].kind != 'ascending':
+            check_b = classified[found].cut_line
+            check_line = Line(check_a.p1, check_b.p2)
+            check_angle = check_a.direction.angle()-check_line.direction.angle()
+            if not min_angle or check_angle < min_angle:
+                min_found = check_line
+                min_angle = check_angle
+            found -= 1
+        plot([check_a.p2, min_found.p1, min_found.p2], 'pink')
+        print(check_a.direction.angle(), min_found.direction.angle())
+        min_arc = arc(check_a.direction.length()*0.7, check_a.direction.angle(), min_found.direction.angle(), check_a.p1)
+        plot(min_arc, 'pink')
+        mid_arc = min_arc[len(min_arc)//2]
+        plt.text(mid_arc[0]-0.3, mid_arc[1], '%.1f deg' % min_angle,
+                 bbox=dict(facecolor='white', alpha=0.5))
+        plt.title('Check angle for %s' % gear.description())
+
+    for outer_cut in classified:
+        for detail_cut in outer_cut.cut_details:
+            dcd = detail_cut.line.direction
+            dcn = dcd.normal().unit()
+            if outer_cut.inward():
+                dcn = -1 * dcn
+            p1 = detail_cut.line.origin
+            p2 = p1+dcn*tool_tip_height
+            pm = p1.mid(p2)
+            plot([p1+dcd, p1, pm, pm+dcd, pm, p2, p2+dcd*0.5], COLOR_MAP[detail_cut.kind])
+    # for outer_cut in classified:
+    #     plot([outer_cut.line.p1, outer_cut.line.p2], 'grey')
     plt.axis('equal')
     plt.show()
     print_fake_gcode = False
     if print_fake_gcode:
-        for r, y, z in cut_params_from_polygon(poly, tool_angle, tool_tip_height):
+        for r, y, z in cut_params_from_polygon(gear.poly, tool_angle, tool_tip_height):
             print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
 
@@ -412,7 +524,8 @@ def test_cuts():
         (1, -1),
     ]
     poly = [Point(*xy) for xy in points]
-    plot_classified_cuts(poly, 0)
+    gear = GearInstance(1, 1, 'Test', 'thingie', poly, Point(0, 0))
+    plot_classified_cuts(gear, 0)
 
 
 def pplot(rt, color='black', plotter=None):
@@ -478,7 +591,7 @@ def test_inv(num_teeth=None):
         offset_angle = 0
         cr = pitch_radius*200
         return inv(angle=t + offset_angle, radius=pitch_radius, offset_angle=offset_angle,
-                                      offset_radius=addendum, offset_norm=tip_half_tooth, clip=cr)
+                   offset_radius=addendum, offset_norm=tip_half_tooth, clip=cr)
 
     def solve_this_radius(t):
         x, y = f_undercut_edge(t)
@@ -517,7 +630,7 @@ def test_inv(num_teeth=None):
     plt.show()
 
     # tip_half_tooth = half_tooth - addendum * tan(radians(pressure_angle))
-    #print('tth: ', tip_half_tooth)
+    # print('tth: ', tip_half_tooth)
     tl, th = 0, 1
     tl, th = pi/2-0.1, pi/2+0.1
     tl, th = pi/2-0.1, pi/2+0.1
@@ -567,16 +680,16 @@ def main():
     # [test_inv(n) for n in range(3, 34)]; return
     # test_inv(); return
     # test_cuts(); return
-    all_gears(); return
-    do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
+    # all_gears(); return
+    # do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
 
     cp = CycloidalPair(137, 33)
-    plot_classified_cuts(cp.wheel().poly, tool_angle=0.0, tool_tip_height=1/32*25.4)
-    plot_classified_cuts(cp.pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4)
+    plot_classified_cuts(cp.wheel(), tool_angle=0.0, tool_tip_height=1/32*25.4)
+    plot_classified_cuts(cp.pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4)
     return
-    plot_classified_cuts(CycloidalPair(40, 17).pinion().poly, tool_angle=0.0, tool_tip_height=1/32*25.4); return
-    #plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
-    #do_pinions(zoom_radius=5, cycloidal=not False); return
+    plot_classified_cuts(CycloidalPair(40, 17).pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4); return
+    # plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
+    # do_pinions(zoom_radius=5, cycloidal=not False); return
     do_gears(zoom_radius=5, pinion_teeth=7, cycloidal=True, animate=True)
     do_gears(zoom_radius=7, pinion_teeth=18, animate=True, cycloidal=False); return
     for pt in [5, 6, 7, 8, 9, 10, 11]:

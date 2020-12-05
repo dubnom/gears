@@ -44,6 +44,9 @@ class CycloidalPair:
         self.tip_radius = self.pitch_radius + self.addendum
         # print('pr=%8.6f af=%8.6f' % (self.pitch_radius, self.addendum_factor))
 
+    def __str__(self):
+        return 'CycloidalPair: wheel=%d pinion=%d module=%g' % (self.wheel_teeth, self.pinion_teeth, self.module)
+
     def calc_cycloid(self, theta) -> Point:
         # https://en.wikipedia.org/wiki/Epicycloid
         rr = self.generating_radius + self.wheel_pitch_radius

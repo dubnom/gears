@@ -78,6 +78,9 @@ class GearInstance:
     def description(self):
         return '%s %s%d teeth' % (self.shape, (self.kind + ' ' if self.kind else ''), self.teeth)
 
+    def __str__(self):
+        return 'GearInstance: %s %s points @ %s' % (self.description(), len(self.poly), self.center.round(2))
+
     def plot(self, color='blue', rotation=0.0, plotter=None):
         """
             Plot the gear poly and associated construction lines/circles

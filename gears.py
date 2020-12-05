@@ -243,6 +243,7 @@ M30
         y = self.tool.radius + y_tool - h_dedendum
         shaft_clearance = y - outside_radius - shaft_radius
         if shaft_clearance < 0:
+            print('sc:%.4f  y:%.4f  or:%.4f  sr: %.4f' % (shaft_clearance, y, outside_radius, shaft_radius))
             raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
         gcode = [self.gcode_vars(locals())]
@@ -321,6 +322,7 @@ M30
             y = self.tool.radius + y_tool - h_dedendum
             shaft_clearance = y - outside_radius - shaft_radius
             if shaft_clearance < 0:
+                print('sc:%.4f  y:%.4f  or:%.4f  sr: %.4f' % (shaft_clearance, y, outside_radius, shaft_radius))
                 raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
         gcode = [self.gcode_vars(locals())]

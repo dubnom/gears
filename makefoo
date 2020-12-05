@@ -1,3 +1,15 @@
 # SHOW_INTERACTIVE=True
-python3 ./gears.py -t 137 -k 2 --pinion_teeth=33 --cycloidal=pinion --algo=new --make=33 -T saw0293.cfg orrery/foo.nc
-python3 ./render.py orrery/foo.nc -azp -t 6
+python3 ./gears.py -t 137 -k 2 --pinion_teeth=33 -m .89647 --cycloidal=wheel --algo=new -T saw0293.cfg orrery/foo_wheel.nc
+python3 ./gears.py -t 137 -k 2 --pinion_teeth=33 -m .89647 --cycloidal=pinion --algo=new -T saw0293.cfg orrery/foo_pinion.nc
+# python3 ./render.py orrery/foo_wheel.nc -azp -t 6
+# python3 ./render.py orrery/foo_pinion.nc -azp -t 6
+
+# Example output
+# Cycloidal: type=wheel wheel=137 pinion=33
+# CycloidalPair: wheel=137 pinion=33 module=0.89647 GearInstance: Cycloidal wheel 137 teeth 1781 points @ (0, 0) 1781
+# Generate: algo=cycloidal -> alignment
+# sc:-10.5099  y:70.1998  or:62.3047  sr: 18.4050
+# Cutter shaft hits gear blank by 10.5099 mm
+# Cycloidal: type=pinion wheel=137 pinion=33
+# CycloidalPair: wheel=137 pinion=33 module=0.89647 GearInstance: Cycloidal pinion 33 teeth 429 points @ (76.2, 0) 429
+# Generate: algo=cycloidal -> alignment

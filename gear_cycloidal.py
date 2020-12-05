@@ -162,11 +162,11 @@ class CycloidalPair:
 
     def wheel(self):
         """Return a gear instance that represents the wheel of the pair"""
-        return GearInstance(self.module, self.wheel_teeth, self.gen_poly(), Point(0, 0))
+        return GearInstance(self.module, self.wheel_teeth, 'Cycloidal', 'wheel', self.gen_poly(), Point(0, 0))
 
     def pinion(self):
         """Return a gear instance that represents the pinion of the pair"""
-        return GearInstance(self.module, self.pinion_teeth, self.gen_pinion_poly(),
+        return GearInstance(self.module, self.pinion_teeth, 'Cycloidal', 'pinion', self.gen_pinion_poly(),
                             Point(self.wheel_pitch_radius+self.pinion_pitch_radius, 0))
 
     def plot(self, color='blue', rotation=0.0, center=Point(0, 0), pinion: Union[str, bool] = True):

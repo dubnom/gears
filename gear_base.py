@@ -63,15 +63,20 @@ def plot(xy, color='black', plotter=None):
 
 class GearInstance:
     """Holder for finished gear (could be just about any polygon, really)"""
-    def __init__(self, module, teeth, poly: PointList, center: Point):
+    def __init__(self, module, teeth, shape, kind, poly: PointList, center: Point):
         self.module = module
         self.teeth = teeth
+        self.shape = shape
+        self.kind = kind
         self.poly = poly    # center of poly is 0, 0
         check_point_list(poly)
         self.center = center
         # self.circular_pitch = self.module * pi
         self.pitch_diameter = self.module * self.teeth
         self.pitch_radius = self.pitch_diameter / 2
+
+    def description(self):
+        return '%s %s%d teeth' % (self.shape, (self.kind + ' ' if self.kind else ''), self.teeth)
 
     def plot(self, color='blue', rotation=0.0, plotter=None):
         """

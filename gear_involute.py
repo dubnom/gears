@@ -368,7 +368,7 @@ class GearInvolute(object):
     def instance(self, x_pos=0):
         """Return a gear instance that represents this gear"""
         # x_pos = wheel_pitch_radius + pinion_pitch_radius
-        return GearInstance(self.module, self.teeth, self.gen_poly(), Point(x_pos, 0))
+        return GearInstance(self.module, self.teeth, 'Involute', '', self.gen_poly(), Point(x_pos, 0))
 
 
 class InvolutePair:

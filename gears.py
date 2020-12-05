@@ -26,7 +26,7 @@ import gear_plot
 from anim.geom import Point
 from gear_base import GearInstance, plot
 from gear_cycloidal import CycloidalPair
-from gear_plot import cut_params_from_polygon
+from gear_plot import cut_params_from_gear
 
 
 def rotate(a, x, y):
@@ -264,8 +264,6 @@ M30
         if blank_thickness <= 0:
             raise ValueError('Gear: Blank thickness must be greater than 0.')
 
-        poly = self.cycloidal_gear.poly
-
         if gear_plot.SHOW_INTERACTIVE:
             self.cycloidal_gear.center = Point(0, 0)
             self.cycloidal_gear.plot('red')
@@ -333,7 +331,7 @@ M30
                   outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
-        for r, y, z in cut_params_from_polygon(poly, self.tool.angle, self.tool.tip_height):
+        for r, y, z in cut_params_from_gear(self.cycloidal_gear, self.tool.angle, self.tool.tip_height):
             y += self.tool.radius
             gcc = cut.cut(-r, y, z)
             # print(gcc)
@@ -395,6 +393,7 @@ M30
         y = self.tool.radius + y_tool - h_dedendum
         shaft_clearance = y - outside_radius - shaft_radius
         if shaft_clearance < 0:
+            print('sc:%.4f  y:%.4f  or:%.4f  sr: %.4f' % (shaft_clearance, y, outside_radius, shaft_radius))
             raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
         gcode = [self.gcode_vars(locals())]

@@ -332,21 +332,21 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
     plt.show()
     print_fake_gcode = False
     if print_fake_gcode:
-        for r, y, z in cut_params_from_polygon(gear.poly, tool_angle, tool_tip_height):
+        for r, y, z in cut_params_from_gear(gear, tool_angle, tool_tip_height):
             print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
 
-def cut_params_from_polygon(poly: PointList, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
+def cut_params_from_gear(gear: GearInstance, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
     """
         Generate list of (rotation, y-position, z-position) from polygon
-        :param poly:                Polygon to cut
+        :param gear:                GearInstance to cut
         :param tool_angle:          In radians
         :param tool_tip_height:     Tool tip height
         :return: List of (r, y, z)
     """
     assert tool_angle == 0
     half_tool_tip = tool_tip_height / 2
-    classified = classify_cuts(poly, tool_angle, tool_tip_height)
+    classified = classify_cuts(gear.poly, tool_angle, tool_tip_height)
 
     # Rotate classified cuts until we find a the first edge after an "in" edge
     orig_len = len(classified)
@@ -358,55 +358,19 @@ def cut_params_from_polygon(poly: PointList, tool_angle, tool_tip_height=0.0) ->
     assert len(classified) == orig_len
 
     cut_params = []
-    for cut in classified:
-        cuts = []
-        if cut.kind == 'undercut':
-            raise ValueError("Can't do undercuts yet")
-        elif cut.flat():
-            normal = cut.cut_line.direction.unit().normal() * cut.z_offset
-            du = cut.line.direction.unit() * tool_tip_height
-            length = cut.line.direction.length()
-            if length == 0:
-                continue
-            elif cut.line.direction.length() < tool_tip_height:
-                # Cut shorter than saw kerf
-                if not cut.convex_p1 and not cut.convex_p2:
-                    print('ERROR: Cut is too narrow for saw width: %s / saw: %.4f' % (cut, tool_tip_height))
-                    print('   length: %.8f' % length)
-                    raise ValueError('ERROR: Cut is too narrow for saw width: %s / saw: %.4f' % (cut, tool_tip_height))
-                if not cut.convex_p1:
-                    # Align cut to p1
-                    cuts.append((Line(cut.line.p1 + du, -1 * normal), 'flat'))
-                elif not cut.convex_p2:
-                    cuts.append((Line(cut.line.p2, -1 * normal), 'flat'))
-                else:
-                    # Leave cut in middle
-                    cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat'))
-            else:
-                # Will need multiple cuts to fill entire line
-                cut_len = cut.line.direction.length()
-                cuts_required = ceil(cut_len/tool_tip_height)
-                cut_dir = cut.line.direction.unit()
-                for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
-                    cut_start = cut.line.p1 + t * cut_dir
-                    cut_end = cut_start + cut_dir * tool_tip_height
-                    cuts.append((Line(cut_end, -1 * normal), 'flat'))
 
-        else:
-            cuts.append((cut.cut_line, cut.kind))
-
-        for c, kind in cuts:
-            cut_angle = c.direction.angle()
+    for outer_cut in classified:
+        for detail_cut in outer_cut.cut_details:
+            cut_angle = detail_cut.line.direction.angle()
             rotation = tool_angle - cut_angle
             # print('ca=%9.6f rot=%9.6f' % (cut_angle, rotation))
             t = Transform().rotate(-rotation)
-            y, z = t.transform_pt(c.origin)
-            if kind in {'in', 'descending'}:
+            y, z = t.transform_pt(detail_cut.line.origin)
+            if outer_cut.inward():
                 z = z + half_tool_tip
             else:
                 z = z - half_tool_tip
             cut_params.append((rotation, y, z))
-
     return cut_params
 
 

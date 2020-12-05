@@ -93,6 +93,7 @@ class GearInstance:
         rotation *= 360 / self.teeth
         plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
         plot(path_translate(path_rotate(self.poly, rotation, True), self.center), color, plotter=plotter)
+        plot(path_translate(path_rotate([Point(0, 0), self.poly[5*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
 
     def set_zoom(self, zoom_radius=0.0, plotter=None):
         plotter = plotter or plt

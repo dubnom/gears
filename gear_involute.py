@@ -90,6 +90,7 @@ class GearInvolute(object):
         self.pitch_radius = self.module * self.teeth / 2
         self.base_radius = self.pitch_radius * cos(self.pressure_angle)
         self.tip_radius = self.pitch_radius + self.module   # add addendum
+        self.dedendum_radius = self.pitch_radius - self.module * self.relief_factor
         print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
 
     def gen_poly(self) -> PointList:
@@ -371,7 +372,9 @@ class GearInvolute(object):
     def instance(self, x_pos=0):
         """Return a gear instance that represents this gear"""
         # x_pos = wheel_pitch_radius + pinion_pitch_radius
-        return GearInstance(self.module, self.teeth, 'Involute', '', self.gen_poly(), Point(x_pos, 0))
+        return GearInstance(self.module, self.teeth, 'Involute', '', self.gen_poly(), Point(x_pos, 0),
+                            tip_radius=self.tip_radius, base_radius=self.base_radius,
+                            inside_radius=self.dedendum_radius)
 
 
 class InvolutePair:
@@ -389,3 +392,7 @@ class InvolutePair:
         p = self.gear_pinion.instance()
         p.center = Point(self.gear_wheel.pitch_radius + self.gear_pinion.pitch_radius, 0)
         return p
+
+    def plot(self, color='blue', rotation=0.0, plotter=None):
+        self.wheel().plot(color, rotation, plotter)
+        self.pinion().plot(color, rotation, plotter)

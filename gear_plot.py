@@ -307,8 +307,9 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
                 min_found = check_line
                 min_angle = check_angle
             found -= 1
-        check_a = Line(check_a.origin, check_a.direction.unit()*3*gear.module)
-        min_found = Line(min_found.origin, min_found.direction.unit()*3*gear.module)
+        check_len = max(check_a.direction.length(), min_found.direction.length()) * 1.25
+        check_a = Line(check_a.origin, check_a.direction.unit()*check_len)
+        min_found = Line(min_found.origin, min_found.direction.unit()*check_len)
         plot([check_a.p2, min_found.p1, min_found.p2], 'pink')
         print(check_a.direction.angle(), min_found.direction.angle())
         min_arc = arc(check_a.direction.length()*0.7, check_a.direction.angle(), min_found.direction.angle(), check_a.p1)
@@ -675,9 +676,11 @@ def main():
 
     pair = InvolutePair(137, 33, module=2)
     pair = InvolutePair(31, 27, module=2)
-    pair = CycloidalPair(137, 33)
+    pair = CycloidalPair(137, 33, module=0.89647)
     plot_classified_cuts(pair.wheel(), tool_angle=0.0, tool_tip_height=1/32*25.4)
     plot_classified_cuts(pair.pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4)
+    pair.plot()
+    pair.wheel().plot_show()
     return
     plot_classified_cuts(CycloidalPair(40, 17).pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4); return
     # plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return

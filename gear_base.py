@@ -63,7 +63,8 @@ def plot(xy, color='black', plotter=None):
 
 class GearInstance:
     """Holder for finished gear (could be just about any polygon, really)"""
-    def __init__(self, module, teeth, shape, kind, poly: PointList, center: Point):
+    def __init__(self, module, teeth, shape, kind, poly: PointList, center: Point,
+                 tip_radius=0., base_radius=0., inside_radius=0.):
         self.module = module
         self.teeth = teeth
         self.shape = shape
@@ -74,6 +75,9 @@ class GearInstance:
         # self.circular_pitch = self.module * pi
         self.pitch_diameter = self.module * self.teeth
         self.pitch_radius = self.pitch_diameter / 2
+        self.tip_radius = tip_radius
+        self.base_radius = base_radius
+        self.inside_radius = inside_radius
 
     def description(self):
         return '%s %s%d teeth' % (self.shape, (self.kind + ' ' if self.kind else ''), self.teeth)
@@ -92,7 +96,15 @@ class GearInstance:
         """
         rotation *= 360 / self.teeth
         plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
-        plot(path_translate(path_rotate(self.poly, rotation, True), self.center), color, plotter=plotter)
+        if self.base_radius:
+            plot(circle(self.base_radius, self.center), 'wheat', plotter=plotter)
+        if self.tip_radius:
+            plot(circle(self.tip_radius, self.center), 'yellow', plotter=plotter)
+        if self.inside_radius:
+            plot(circle(self.inside_radius, self.center), 'yellow', plotter=plotter)
+        path = path_translate(path_rotate(self.poly, rotation, True), self.center)
+        path.append(path[0])        # Make sure it is closed
+        plot(path, color, plotter=plotter)
         plot(path_translate(path_rotate([Point(0, 0), self.poly[5*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
 
     def set_zoom(self, zoom_radius=0.0, plotter=None):

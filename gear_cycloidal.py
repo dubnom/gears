@@ -33,15 +33,20 @@ class CycloidalPair:
         self.generating_radius = generating_radius or self.pinion_pitch_radius / 2
 
         self.pitch = self.module * pi
-        aft, theta = self.calc_addendum_factor()
-        self.addendum_factor_theoretical = aft
+        a_f_t, theta = self.calc_addendum_factor()
+        self.addendum_factor_theoretical = a_f_t
         self.addendum_factor = 0.95 * self.addendum_factor_theoretical
         self.wheel_tooth_theta = theta
-        self.addendum = self.addendum_factor * self.module
-        self.dedendum = self.addendum_factor_theoretical * 1.05 * self.module
-        self.wheel_base_radius = self.wheel_pitch_radius - self.dedendum
-        self.pinion_base_radius = self.pinion_pitch_radius - (self.addendum_factor + 0.4) * self.module
-        self.tip_radius = self.pitch_radius + self.addendum
+        self.wheel_addendum = self.addendum_factor * self.module
+        fa, fr = self.pinion_factors()
+        self.pinion_addendum_factor = fa
+        self.pinion_addendum_radius = fr
+        self.wheel_dedendum = self.pinion_addendum_factor * self.module
+        self.pinion_dedendum = self.addendum_factor_theoretical * 1.05 * self.module
+        self.wheel_base_radius = self.wheel_pitch_radius - self.wheel_dedendum * 1.05
+        self.pinion_base_radius = self.pinion_pitch_radius - self.wheel_addendum * 1.4
+        self.wheel_tip_radius = self.pitch_radius + self.wheel_addendum
+        self.pinion_tip_radius = self.pinion_pitch_radius + self.pinion_addendum_factor * self.module
         # print('pr=%8.6f af=%8.6f' % (self.pitch_radius, self.addendum_factor))
 
     def __str__(self):
@@ -118,6 +123,20 @@ class CycloidalPair:
 
         return points
 
+    def pinion_factors(self) -> Tuple[float, float]:
+        """
+            Lookup the pinion addendum and radius factors based in number of teeth.
+            :returns: f_addendum, f_radius
+
+            Data from: https://www.csparks.com/watchmaking/CycloidalGears/index.jxl
+        """
+        if self.pinion_teeth < 8:
+            return 0.855, 1.050
+        elif self.pinion_teeth < 10:
+            return 0.670, 0.700
+        else:
+            return 0.625, 0.625
+
     def gen_pinion_poly(self, rotation=0.0) -> PointList:
         if self.pinion_teeth % 2 == 0:
             rotation += 0.5
@@ -165,12 +184,14 @@ class CycloidalPair:
 
     def wheel(self):
         """Return a gear instance that represents the wheel of the pair"""
-        return GearInstance(self.module, self.wheel_teeth, 'Cycloidal', 'wheel', self.gen_poly(), Point(0, 0))
+        return GearInstance(self.module, self.wheel_teeth, 'Cycloidal', 'wheel', self.gen_poly(), Point(0, 0),
+                            tip_radius=self.wheel_tip_radius, base_radius=self.wheel_base_radius)
 
     def pinion(self):
         """Return a gear instance that represents the pinion of the pair"""
         return GearInstance(self.module, self.pinion_teeth, 'Cycloidal', 'pinion', self.gen_pinion_poly(),
-                            Point(self.wheel_pitch_radius+self.pinion_pitch_radius, 0))
+                            Point(self.wheel_pitch_radius+self.pinion_pitch_radius, 0),
+                            tip_radius=self.pinion_tip_radius, base_radius=self.pinion_base_radius)
 
     def plot(self, color='blue', rotation=0.0, center=Point(0, 0), pinion: Union[str, bool] = True):
         addendum = self.module * self.addendum_factor_theoretical
@@ -178,18 +199,10 @@ class CycloidalPair:
         pitch_radius = self.pitch_radius
 
         if pinion != 'only':
-            plot(circle(pitch_radius, c=center), color='green')
-            plot(circle(pitch_radius + addendum, c=center), color='yellow')
-            plot(circle(pitch_radius - dedendum, c=center), color='cyan')
-            # plot(circle(pitch_radius - addendum, c=center), color='cyan')
-            plot(self.gen_poly(rotation=rotation), color=color)
+            self.wheel().plot(color, rotation=rotation)
 
         if pinion:
-            pinion_pitch = self.pinion_pitch_radius
-            p_center = Point(pitch_radius+pinion_pitch, 0)
-            plot(circle(pinion_pitch, c=p_center), color='green')
-            plot(circle(pinion_pitch + addendum, c=p_center), color='yellow')
-            plot(circle(self.pinion_base_radius, c=p_center), color='cyan')
-            plot(self.gen_pinion_poly(rotation=-rotation), color=color)
+            p = self.pinion()
+            p.plot(color, rotation=rotation)
 
-        plt.title(r'$\sum_{idiot}^{\infty}sin(m^a_n)$')
+        plt.title('%s' % self)

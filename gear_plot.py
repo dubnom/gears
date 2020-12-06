@@ -190,7 +190,7 @@ def classify_cuts_pass2(classified: List[ClassifiedCut], tool_angle, tool_tip_he
     # Rotate classified cuts until we find a the first edge after an "in" edge
     orig_len = len(classified)
     last_in = -1
-    while classified[last_in].kind != "in":
+    while not classified[last_in-1].inward():
         last_in -= 1
     if last_in != -1:
         classified = classified[last_in+1:] + classified[:last_in+1]
@@ -289,12 +289,12 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
     check_cut = True
     if check_cut:
         found = 0
-        while classified[found].kind != 'descending':
+        while not classified[found].inward():
             found += 1
-        while classified[found].kind != 'out':
+        while not classified[found].outward():
             found += 1
-        classified = classified[:found+2]
-        check_a = classified[-2].cut_line
+        classified = classified[:found+5]
+        check_a = classified[found].cut_line
         while classified[found].kind != 'descending':
             found -= 1
         min_found: Optional[Line] = None
@@ -307,6 +307,8 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
                 min_found = check_line
                 min_angle = check_angle
             found -= 1
+        check_a = Line(check_a.origin, check_a.direction.unit()*3*gear.module)
+        min_found = Line(min_found.origin, min_found.direction.unit()*3*gear.module)
         plot([check_a.p2, min_found.p1, min_found.p2], 'pink')
         print(check_a.direction.angle(), min_found.direction.angle())
         min_arc = arc(check_a.direction.length()*0.7, check_a.direction.angle(), min_found.direction.angle(), check_a.p1)
@@ -314,6 +316,13 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
         mid_arc = min_arc[len(min_arc)//2]
         plt.text(mid_arc[0]-0.3, mid_arc[1], '%.1f deg' % min_angle,
                  bbox=dict(facecolor='white', alpha=0.5))
+        arc_start = Vector(*classified[0].line.p1.xy()).angle()
+        arc_end = Vector(*classified[-1].line.p2.xy()).angle()
+        arc_extra = (arc_end - arc_start) * 0.5
+        plot(arc(gear.pitch_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'green')
+        # plot(circle(gear.pitch_radius+gear.module, Point(0, 0)), 'yellow')
+        # plot(circle(gear.pitch_radius-gear.module*1.25, Point(0, 0)), 'yellow')
+        # plot(circle(gear.pitch_radius*cos(radians(20)), Point(0, 0)), 'brown')
         plt.title('Check angle for %s' % gear.description())
 
     for outer_cut in classified:
@@ -557,6 +566,15 @@ def test_inv(num_teeth=None):
         return inv(angle=t + offset_angle, radius=pitch_radius, offset_angle=offset_angle,
                    offset_radius=addendum, offset_norm=tip_half_tooth, clip=cr)
 
+    def solve_this_points(t) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        x, y = f_undercut_edge(t)
+        x2, y2 = f_tooth_edge(atan2(y, x))
+        return (x, y), (x2, y2)
+
+    def solve_this_radii(t) -> Tuple[float, float]:
+        (x, y), (x2, y2) = solve_this_points(t)
+        return hypot(x, y), hypot(x2, y2)
+
     def solve_this_radius(t):
         x, y = f_undercut_edge(t)
         x2, y2 = f_tooth_edge(atan2(y, x))
@@ -578,19 +596,26 @@ def test_inv(num_teeth=None):
     solution = solve_this(solve_this_radius, -2, 0)
     better_solution: scipy.optimize.OptimizeResult
     better_solution = scipy.optimize.minimize_scalar(
-        solve_this_distance, bounds=(solution-0.3, solution+0.3), tol=1e-8)
+        solve_this_distance, bounds=(solution-0.3, 0), tol=1e-8)
     print('Solved [%3d]: %9.4f %9.4f %9.4f %9.4f' % (
         num_teeth, solution, better_solution.x,
         solve_this_distance(solution), solve_this_distance(better_solution.x)))
-    if num_teeth != 7:
+    if num_teeth != 11:
         return
     print(better_solution)
 
     plot([(solution, -1), (solution, 1)])
     curve = [(t, solve_this_distance(t)) for t in t_range(50, solution-1, solution+1)]
+    plot(curve, 'lightgreen')
+    curve = [(t, solve_this_distance(t)) for t in t_range(5000, solution-0.1, solution+0.1)]
     plot(curve, 'green')
     curve = [(t, solve_this_radius(t)) for t in t_range(50, solution-1, solution+1)]
     plot(curve, 'blue')
+    curve = [(t, solve_this_radii(t)[0]) for t in t_range(50, solution-1, solution+1)]
+    plot(curve, 'yellow')
+    curve = [(t, solve_this_radii(t)[1]) for t in t_range(50, solution-1, solution+1)]
+    plot(curve, 'orange')
+    plt.title('Solution for distance and radius (teeth=%d)' % num_teeth)
     plt.show()
 
     # tip_half_tooth = half_tooth - addendum * tan(radians(pressure_angle))
@@ -604,7 +629,7 @@ def test_inv(num_teeth=None):
     plot(circle(tr), 'yellow')
     plot(circle(dr), 'yellow')
     undercut_point = Point(*f_undercut_edge(solution))
-    print('Undercut at ', undercut_point)
+    print('Undercut at %s, distance=%.4f' % (undercut_point, solve_this_distance(solution)))
     plot(circle(0.1, undercut_point), 'pink')
 
     def cross(r, c, color='black'):
@@ -637,6 +662,7 @@ def test_inv(num_teeth=None):
     # gi.plot('red', gear_space=True)
     # plot(pp(-1, 1, lambda t: (pitch_radius - t * tan(radians(pressure_angle)), t)), 'red')
     plt.axis('equal')
+    plt.title('Involutes & Throchoids for teeth=%d' % num_teeth)
     plt.show()
 
 
@@ -644,12 +670,14 @@ def main():
     # [test_inv(n) for n in range(3, 34)]; return
     # test_inv(); return
     # test_cuts(); return
-    all_gears(); return
+    # all_gears(); return
     # do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
 
-    cp = CycloidalPair(137, 33)
-    plot_classified_cuts(cp.wheel(), tool_angle=0.0, tool_tip_height=1/32*25.4)
-    plot_classified_cuts(cp.pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4)
+    pair = InvolutePair(137, 33, module=2)
+    pair = InvolutePair(31, 27, module=2)
+    pair = CycloidalPair(137, 33)
+    plot_classified_cuts(pair.wheel(), tool_angle=0.0, tool_tip_height=1/32*25.4)
+    plot_classified_cuts(pair.pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4)
     return
     plot_classified_cuts(CycloidalPair(40, 17).pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4); return
     # plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return

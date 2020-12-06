@@ -65,6 +65,7 @@ class Involute(object):
 class GearInvolute(object):
     def __init__(self, teeth=30, center=Point(0, 0), rot=0.0,
                  module=1.0, relief_factor=1.25,
+                 steps=4,
                  pressure_angle=20.0, pressure_line=True):
         """
             Plot an involute gear
@@ -72,6 +73,8 @@ class GearInvolute(object):
             :param center:  Center of gear
             :param rot: 	Rotation in #teeth
             :param module:	Module of gear
+            :param relief_factor: Relief factor
+            :param steps:   Number of steps in the involute side
             :param pressure_angle: Pressure angle
             :param pressure_line: True to plot pressure lines
         """
@@ -81,6 +84,7 @@ class GearInvolute(object):
         self.pitch = self.module * pi
         self.rot = rot * self.pitch  # Now rotation is in pitch distance
         self.relief_factor = relief_factor
+        self.steps = steps
         self.pressure_angle = radians(pressure_angle)
         self.pressure_line = pressure_line
         self.pitch_radius = self.module * self.teeth / 2
@@ -113,7 +117,7 @@ class GearInvolute(object):
             mid = n * self.pitch + self.rot
 
             start_angle = (mid - tooth_offset) / pr
-            pts = inv.path(offset=start_angle, center=self.center, up=-1)
+            pts = inv.path(offset=start_angle, center=self.center, up=-1, steps=self.steps)
             points.extend(reversed(pts))
             if not inv.clipped:
                 points.append((dr * cos(start_angle) + cx, dr * sin(start_angle) + cy))
@@ -121,9 +125,8 @@ class GearInvolute(object):
             start_angle = (mid + tooth_offset) / pr
             if not inv.clipped:
                 points.append((dr * cos(start_angle) + cx, dr * sin(start_angle) + cy))
-            pts = inv.path(offset=start_angle, center=self.center, up=1)
+            pts = inv.path(offset=start_angle, center=self.center, up=1, steps=self.steps)
             points.extend(pts)
-        points.append(points[0])
         points = [Point(x, y) for x, y in points]
         check_point_list(points)
         return points

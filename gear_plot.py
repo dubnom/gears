@@ -509,7 +509,7 @@ def pplot(rt, color='black', plotter=None):
     plotter.plot(*zip(*xy), color)
 
 
-def test_inv(num_teeth=None):
+def test_inv(num_teeth=None, do_plot=True):
     def inv(radius=0.0, angle=0.0, offset_angle=0.0, offset_radius=0.0, offset_norm=0.0, clip=None):
         # x = r * cos(a) + r*(a-oa) * sin(a)
         # x = (r-or) * cos(a) + r*(a-oa-on) * sin(a)
@@ -594,30 +594,38 @@ def test_inv(num_teeth=None):
             print('Not-solved')
         return found.root
 
-    solution = solve_this(solve_this_radius, -2, 0)
-    better_solution: scipy.optimize.OptimizeResult
-    better_solution = scipy.optimize.minimize_scalar(
-        solve_this_distance, bounds=(solution-0.3, 0), tol=1e-8)
-    print('Solved [%3d]: %9.4f %9.4f %9.4f %9.4f' % (
-        num_teeth, solution, better_solution.x,
-        solve_this_distance(solution), solve_this_distance(better_solution.x)))
-    if num_teeth != 11:
-        return
-    print(better_solution)
+    better_solution = None
+    solution = None
+    try:
+        solution = solve_this(solve_this_radius, -2, 0)
+        better_solution: Optional[scipy.optimize.OptimizeResult]
+        better_solution = scipy.optimize.minimize_scalar(
+            solve_this_distance, bounds=(solution-0.3, 0), tol=1e-8)
+        print('Solved [%3d]: %9.4f %9.4f %9.4f %9.4f' % (
+            num_teeth, solution, better_solution.x,
+            solve_this_distance(solution), solve_this_distance(better_solution.x)))
+    except ValueError as err:
+        print('Failed [%3d]: %s' % (num_teeth, err))
 
-    plot([(solution, -1), (solution, 1)])
-    curve = [(t, solve_this_distance(t)) for t in t_range(50, solution-1, solution+1)]
-    plot(curve, 'lightgreen')
-    curve = [(t, solve_this_distance(t)) for t in t_range(5000, solution-0.1, solution+0.1)]
-    plot(curve, 'green')
-    curve = [(t, solve_this_radius(t)) for t in t_range(50, solution-1, solution+1)]
-    plot(curve, 'blue')
-    curve = [(t, solve_this_radii(t)[0]) for t in t_range(50, solution-1, solution+1)]
-    plot(curve, 'yellow')
-    curve = [(t, solve_this_radii(t)[1]) for t in t_range(50, solution-1, solution+1)]
-    plot(curve, 'orange')
-    plt.title('Solution for distance and radius (teeth=%d)' % num_teeth)
-    plt.show()
+    if not do_plot:
+        return
+
+    if better_solution:
+        print(better_solution)
+
+        plot([(solution, -1), (solution, 1)])
+        curve = [(t, solve_this_distance(t)) for t in t_range(50, solution-1, solution+1)]
+        plot(curve, 'lightgreen')
+        curve = [(t, solve_this_distance(t)) for t in t_range(5000, solution-0.1, solution+0.1)]
+        plot(curve, 'green')
+        curve = [(t, solve_this_radius(t)) for t in t_range(50, solution-1, solution+1)]
+        plot(curve, 'blue')
+        curve = [(t, solve_this_radii(t)[0]) for t in t_range(50, solution-1, solution+1)]
+        plot(curve, 'yellow')
+        curve = [(t, solve_this_radii(t)[1]) for t in t_range(50, solution-1, solution+1)]
+        plot(curve, 'orange')
+        plt.title('Solution for distance and radius (teeth=%d)' % num_teeth)
+        plt.show()
 
     # tip_half_tooth = half_tooth - addendum * tan(radians(pressure_angle))
     # print('tth: ', tip_half_tooth)
@@ -629,15 +637,16 @@ def test_inv(num_teeth=None):
     plot(circle(base_radius), 'orange')
     plot(circle(tr), 'yellow')
     plot(circle(dr), 'yellow')
-    undercut_point = Point(*f_undercut_edge(solution))
-    print('Undercut at %s, distance=%.4f' % (undercut_point, solve_this_distance(solution)))
-    plot(circle(0.1, undercut_point), 'pink')
+    if solution:
+        undercut_point = Point(*f_undercut_edge(solution))
+        print('Undercut at %s, distance=%.4f' % (undercut_point, solve_this_distance(solution)))
+        plot(circle(0.1, undercut_point), 'pink')
 
     def cross(r, c, color='black'):
         u = Vector(r, r)
         d = Vector(r, -r)
         plot([c-u, c+u, c, c-d, c+d], color)
-    cross(0.05, undercut_point, 'pink')
+        cross(0.05, undercut_point, 'pink')
     # print('ht/pr:', half_tooth / pitch_radius, ' hta rad:', half_tooth_angle)
     for tc in [0]:
         th, tl = tc-1, tc+1
@@ -667,16 +676,26 @@ def test_inv(num_teeth=None):
     plt.show()
 
 
+def find_nt():
+    module = 1
+    for nt in range(5, 45):
+        pr = module * nt / 2
+        dr = pr - 1.25 * module
+        br = cos(radians(20)) * pr
+        print('%-3d %8.4f %8.4f %8.4f %s' % (nt, pr, dr, br, br < dr))
+
+
 def main():
+    # find_nt(); return
     # [test_inv(n) for n in range(3, 34)]; return
-    # test_inv(); return
+    # test_inv(137); test_inv(42); test_inv(142); return
     # test_cuts(); return
     # all_gears(); return
     # do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
 
     pair = InvolutePair(137, 33, module=2)
-    pair = InvolutePair(31, 27, module=2)
-    pair = CycloidalPair(137, 33, module=0.89647)
+    # pair = InvolutePair(31, 27, module=2)
+    # pair = CycloidalPair(137, 33, module=0.89647)
     plot_classified_cuts(pair.wheel(), tool_angle=0.0, tool_tip_height=1/32*25.4)
     plot_classified_cuts(pair.pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4)
     pair.plot()

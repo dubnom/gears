@@ -24,9 +24,8 @@ import configargparse
 
 import gear_plot
 from anim.geom import Point
-from gear_base import GearInstance, plot
+from gear_base import GearInstance, plot, cut_params_from_gear
 from gear_cycloidal import CycloidalPair
-from gear_plot import cut_params_from_gear
 
 
 def rotate(a, x, y):

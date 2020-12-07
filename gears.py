@@ -26,6 +26,7 @@ import gear_plot
 from anim.geom import Point
 from gear_base import GearInstance, plot
 from gear_cycloidal import CycloidalPair
+from gear_involute import GearInvolute
 
 
 def rotate(a, x, y):
@@ -159,120 +160,29 @@ M30
             gcode.append('( %17s: %-70s )' % (var, value))
         return '\n'.join(gcode)
 
-    def gcode_guts(self, gg: gear_plot.GearInvolute, cut: 'Cut', teeth_to_make) -> str:
-        """Generate the gcode guts"""
-        gcode = []
-        cuts = gg.cuts_for_mill(degrees(self.tool.angle), self.tool.tip_height)
-        # Generate a tooth profile for ever tooth requested
-        for tooth in range(teeth_to_make):
-            tooth_angle_offset = 360 * tooth / gg.teeth
-
-            gcode.append('')
-            gcode.append("( Tooth: %d )" % tooth)
-
-            for idx, (rotation, y, z) in enumerate(cuts):
-                rotation += tooth_angle_offset
-                y += self.tool.radius
-                # print('G? A%.5f Y%.5f Z%.5f' % (rotation, y, z))
-                gcc = cut.cut(-rotation, y, z)
-                # print(gcc)
-                gcode.append(gcc)
-
-        return '\n'.join(gcode)
-
-    def generate_new(self, teeth, blank_thickness, teeth_to_make=0):
-        """Generate the gcode for cutting a gear."""
-
-        if teeth <= 0:
-            raise ValueError('Gear: Number of teeth must be greater than 0.')
-        if blank_thickness <= 0:
-            raise ValueError('Gear: Blank thickness must be greater than 0.')
-
-        gg = gear_plot.GearInvolute(teeth,
-                            module=self.module, relief_factor=self.relief_factor,
-                            pressure_angle=degrees(self.pressure_angle))
-        if gear_plot.SHOW_INTERACTIVE:
-            gg.plot('red', tool_angle=self.tool.angle)
-            gg.plot_show(2)
-
-        # Calculate the variables used to generate the gear teeth
-        h_addendum = self.module
-        h_dedendum = self.module * self.relief_factor
-        h_total = h_addendum + h_dedendum
-        circular_pitch = self.module * pi
-        pitch_diameter = self.module * teeth
-        pitch_radius = pitch_diameter / 2.
-        outside_diameter = pitch_diameter + 2 * h_addendum
-        outside_radius = outside_diameter / 2.
-
-        half_tooth = circular_pitch / 4.
-        half_tool_tip = self.tool.tip_height / 2.
-        tip_offset_y = h_dedendum
-        tip_offset_z = half_tool_tip + tan(self.tool.angle / 2) * h_dedendum
-        tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
-
-        z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
-        root_incr = z_offset / (self.root_steps + 1)
-
-        x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(
-            self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
-        mill = self.tool.mill
-        angle_direction = 1 if self.right_rotary else -1
-        x_start, x_end = -angle_direction * x_offset, angle_direction * x_offset
-
-        # Determine the maximum amount of height (or depth) in the Z axis before the tip
-        # of the cutter won't intersect with the gear blank.
-        # z_max = sqrt(outside_radius**2 - (outside_radius - h_total)**2) + self.tool.tip_height
-        z_max = outside_radius
-        z_incr = z_max / (self.steps * 2)
-
-        # A partial number of teeth can be created if "teeth_to_make" is set,
-        # otherwise all of the gears teeth are cut.
-        if teeth_to_make == 0 or teeth_to_make > teeth:
-            teeth_to_make = teeth
-
-        # Make sure the cutter is big enough
-        if h_total > self.tool.depth:
-            raise ValueError("Cutter depth is too shallow for tooth height")
-
-        # Make sure the cutter shaft doesn't hit the gear blank.
-        shaft_radius = self.tool.radius - self.tool.depth
-        y_point, z_point = pitch_radius, z_max
-        y_tool, z_tool = rotate(-tool_angle_offset, y_point, z_point)
-        y = self.tool.radius + y_tool - h_dedendum
-        shaft_clearance = y - outside_radius - shaft_radius
-        if shaft_clearance < 0:
-            print('sc:%.4f  y:%.4f  or:%.4f  sr: %.4f' % (shaft_clearance, y, outside_radius, shaft_radius))
-            raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
-
-        gcode = [self.gcode_vars(locals())]
-
-        # Move to safe initial position
-        cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,
-                  -angle_direction * (outside_radius + self.tool.radius + self.cutter_clearance),
-                  outside_radius, clear_max_angle=self.clear_max_angle)
-        gcode.append(cut.start())
-
-        gcode.append(self.gcode_guts(gg, cut, teeth_to_make))
-
-        return '\n'.join(gcode)
-
-    def generate_cycloidal(self, teeth, blank_thickness, teeth_to_make=0):
-        """Generate the gcode for cutting a cycloidal gear."""
-        # assert teeth == self.cycloidal_gear.teeth
+    def generate_via_polygon(self, teeth, blank_thickness, teeth_to_make=0):
+        """Generate the gcode for a gear using the polygon."""
 
         if blank_thickness <= 0:
             raise ValueError('Gear: Blank thickness must be greater than 0.')
 
+        if self.cycloidal_gear:
+            the_gear = self.cycloidal_gear
+            print('Involute: ', the_gear)
+        else:
+            the_gear = GearInvolute(teeth=teeth, module=self.module,
+                                    relief_factor=self.relief_factor, steps=self.steps,
+                                    pressure_angle=degrees(self.pressure_angle)).instance()
+
         if gear_plot.SHOW_INTERACTIVE:
-            self.cycloidal_gear.center = Point(0, 0)
-            self.cycloidal_gear.plot('red')
-            self.cycloidal_gear.plot_show(2)
+            the_gear.center = Point(0, 0)
+            the_gear.plot('red')
+            the_gear.plot_show(2)
 
         needed_for_gcode_vars = True
         if needed_for_gcode_vars:
             # TODO-consolidate this code somewhere (or extract it from cycloidal, too)
-            teeth = self.cycloidal_gear.teeth
+            teeth = the_gear.teeth
 
             # Calculate the variables used to generate the gear teeth
             h_addendum = self.module
@@ -332,8 +242,8 @@ M30
                   outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
-        cut_params = self.cycloidal_gear.cut_params(degrees(self.tool.angle), self.tool.tip_height)
-        params_per_tooth = len(cut_params) // self.cycloidal_gear.teeth
+        cut_params = the_gear.cut_params(degrees(self.tool.angle), self.tool.tip_height)
+        params_per_tooth = len(cut_params) // the_gear.teeth
         for cut_num, (r, y, z) in enumerate(cut_params):
             if cut_num % params_per_tooth == 0:
                 gcode.append('')
@@ -577,11 +487,11 @@ M30
 
     def generate(self, teeth, blank_thickness, teeth_to_make=0) -> str:
         if self.algo == 'new':
-            print('Generate: algo=%s -> new' % self.algo)
-            return self.generate_new(teeth, blank_thickness, teeth_to_make)
+            print('Generate: algo=%s -> polygon/involute' % self.algo)
+            return self.generate_via_polygon(teeth, blank_thickness, teeth_to_make)
         elif self.algo == 'cycloidal':
-            print('Generate: algo=%s -> cycloidal' % self.algo)
-            return self.generate_cycloidal(teeth, blank_thickness, teeth_to_make)
+            print('Generate: algo=%s -> polygon/cycloidal' % self.algo)
+            return self.generate_via_polygon(teeth, blank_thickness, teeth_to_make)
         elif self.algo == 'align':
             print('Generate: algo=%s -> alignment' % self.algo)
             return self.generate_alignment_cuts(teeth, blank_thickness, teeth_to_make)
@@ -737,8 +647,6 @@ def main():
             # Setup for cycloidal
             gear.cycloidal(args.cycloidal, args.teeth, args.pinion_teeth)
             print(gear.cycloidal_pair, gear.cycloidal_gear, len(gear.cycloidal_gear.poly))
-            #print(gear.generate_cycloidal(args.teeth, args.thick, args.make))
-            #exit(1)
 
         print(gear.header(), file=out)
         print(gear.generate(args.teeth, args.thick, args.make), file=out)

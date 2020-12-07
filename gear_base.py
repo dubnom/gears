@@ -61,68 +61,6 @@ def plot(xy, color='black', plotter=None):
     plotter.plot(*zip(*xy), color)
 
 
-class GearInstance:
-    """Holder for finished gear (could be just about any polygon, really)"""
-    def __init__(self, module, teeth, shape, kind, poly: PointList, center: Point,
-                 tip_radius=0., base_radius=0., inside_radius=0.):
-        self.module = module
-        self.teeth = teeth
-        self.shape = shape
-        self.kind = kind
-        self.poly = poly    # center of poly is 0, 0
-        check_point_list(poly)
-        self.center = center
-        # self.circular_pitch = self.module * pi
-        self.pitch_diameter = self.module * self.teeth
-        self.pitch_radius = self.pitch_diameter / 2
-        self.tip_radius = tip_radius
-        self.base_radius = base_radius
-        self.inside_radius = inside_radius
-
-    def description(self):
-        return '%s %s%d teeth' % (self.shape, (self.kind + ' ' if self.kind else ''), self.teeth)
-
-    def __str__(self):
-        return 'GearInstance: %s %s points @ %s' % (self.description(), len(self.poly), self.center.round(2))
-
-    def plot(self, color='blue', rotation=0.0, plotter=None):
-        """
-            Plot the gear poly and associated construction lines/circles
-
-            :param color:       color for gear outline
-            :param rotation:    in units of teeth
-            :param plotter:     matplotlib Axes or None for top-level plot
-            :return:
-        """
-        rotation *= 360 / self.teeth
-        plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
-        if self.base_radius:
-            plot(circle(self.base_radius, self.center), 'wheat', plotter=plotter)
-        if self.tip_radius:
-            plot(circle(self.tip_radius, self.center), 'yellow', plotter=plotter)
-        if self.inside_radius:
-            plot(circle(self.inside_radius, self.center), 'yellow', plotter=plotter)
-        path = path_translate(path_rotate(self.poly, rotation, True), self.center)
-        path.append(path[0])        # Make sure it is closed
-        plot(path, color, plotter=plotter)
-        plot(path_translate(path_rotate([Point(0, 0), self.poly[5*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
-
-    def set_zoom(self, zoom_radius=0.0, plotter=None):
-        plotter = plotter or plt
-        plotter.axis('equal')
-        plotter.grid()
-        # Set zoom_radius to zoom in around where gears meet
-        if zoom_radius:
-            from matplotlib.axes import Axes
-            ax = plotter if isinstance(plotter, Axes) else plt.gca()
-            ax.set_xlim(self.pitch_radius - zoom_radius, self.pitch_radius + zoom_radius)
-            ax.set_ylim(-zoom_radius, zoom_radius)
-
-    def plot_show(self, zoom_radius=0.0, plotter=None):
-        self.set_zoom(zoom_radius=zoom_radius, plotter=plotter)
-        plt.show()
-
-
 COLOR_MAP = {
     'undercut': 'red',
     'ascending': '#0000FF',
@@ -192,6 +130,68 @@ class ClassifiedCut:
     def outward(self):
         """True if kind is 'out' or 'ascending'"""
         return self.kind in {'out', 'ascending'}
+
+
+class GearInstance:
+    """Holder for finished gear (could be just about any polygon, really)"""
+    def __init__(self, module, teeth, shape, kind, poly: PointList, center: Point,
+                 tip_radius=0., base_radius=0., inside_radius=0.):
+        self.module = module
+        self.teeth = teeth
+        self.shape = shape
+        self.kind = kind
+        self.poly = poly    # center of poly is 0, 0
+        check_point_list(poly)
+        self.center = center
+        # self.circular_pitch = self.module * pi
+        self.pitch_diameter = self.module * self.teeth
+        self.pitch_radius = self.pitch_diameter / 2
+        self.tip_radius = tip_radius
+        self.base_radius = base_radius
+        self.inside_radius = inside_radius
+
+    def description(self):
+        return '%s %s%d teeth' % (self.shape, (self.kind + ' ' if self.kind else ''), self.teeth)
+
+    def __str__(self):
+        return 'GearInstance: %s %s points @ %s' % (self.description(), len(self.poly), self.center.round(2))
+
+    def plot(self, color='blue', rotation=0.0, plotter=None):
+        """
+            Plot the gear poly and associated construction lines/circles
+
+            :param color:       color for gear outline
+            :param rotation:    in units of teeth
+            :param plotter:     matplotlib Axes or None for top-level plot
+            :return:
+        """
+        rotation *= 360 / self.teeth
+        plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
+        if self.base_radius:
+            plot(circle(self.base_radius, self.center), 'wheat', plotter=plotter)
+        if self.tip_radius:
+            plot(circle(self.tip_radius, self.center), 'yellow', plotter=plotter)
+        if self.inside_radius:
+            plot(circle(self.inside_radius, self.center), 'yellow', plotter=plotter)
+        path = path_translate(path_rotate(self.poly, rotation, True), self.center)
+        path.append(path[0])        # Make sure it is closed
+        plot(path, color, plotter=plotter)
+        plot(path_translate(path_rotate([Point(0, 0), self.poly[5*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
+
+    def set_zoom(self, zoom_radius=0.0, plotter=None):
+        plotter = plotter or plt
+        plotter.axis('equal')
+        plotter.grid()
+        # Set zoom_radius to zoom in around where gears meet
+        if zoom_radius:
+            from matplotlib.axes import Axes
+            ax = plotter if isinstance(plotter, Axes) else plt.gca()
+            ax.set_xlim(self.pitch_radius - zoom_radius, self.pitch_radius + zoom_radius)
+            ax.set_ylim(-zoom_radius, zoom_radius)
+
+    def plot_show(self, zoom_radius=0.0, plotter=None):
+        self.set_zoom(zoom_radius=zoom_radius, plotter=plotter)
+        plt.show()
 
 
 def classify_cuts_pass1(gear: GearInstance, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:

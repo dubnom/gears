@@ -211,12 +211,12 @@ for line_number, line in enumerate(infile):
                                         pressure_angle=degrees(v['pressure_angle']))
             gg_poly = gg.gen_poly()
             gg_base_circle = circle(gg.base_radius)
-            debug_cycloidal = True
-            if debug_cycloidal:
-                cp = CycloidalPair(137, 33, module=0.89647)
-                # cp = CycloidalPair(wheel_teeth=35, pinion_teeth=7, module=v['module'])
-                # gg_poly = cp.pinion().poly
-                gg_poly = cp.wheel().poly
+            if cycloidal_target := v.get('cycloidal_target'):
+                cp = CycloidalPair(v['wheel_teeth'], v['pinion_teeth'], v['module'])
+                if cycloidal_target == 'wheel':
+                    gg_poly = cp.wheel().poly
+                else:
+                    gg_poly = cp.pinion().poly
 
             if sa and zoom:
                 # cx = v['outside_radius']

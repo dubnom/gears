@@ -201,7 +201,7 @@ class GearInstance:
 
             :param tool_angle: tool angle in degrees
             :param tool_tip_height:
-            :returns: List of (cut, cut-kind, convex, allowed overshoot)
+            :returns: List of ClassifiedCut
 
             Overshoot is allowed if the cut is along a convex part of the polygon.
 
@@ -235,9 +235,13 @@ class GearInstance:
         flat_eps = 15.0     # degrees
         for a, b, c in iter_rotate(poly, 3):
             cut = Line(a, b)
-            # radial_angle = Vector(*a.mid(b).xy()).angle()
-            # Take the angle from the tip of the line
-            radial_vector = Vector(*a.xy())
+            # TODO-decide whether to take angle from tip or center of cut
+            angle_from_midpoint = True
+            if angle_from_midpoint:
+                radial_vector = Vector(*a.mid(b).xy())
+            else:
+                # TODO-not quite the tip, since it's not clear if a or b more inward yet
+                radial_vector = Vector(*a.xy())
             radial_angle = radial_vector.angle()
             radial_distance = radial_vector.length()
             line_angle = cut.direction.angle()
@@ -253,7 +257,7 @@ class GearInstance:
                 kind = 'in'
             elif abs(delta-90) < flat_eps and (tool_angle == 0 or radial_distance < self.pitch_radius):
                 kind = 'flat'
-            elif 0 < delta < 90:
+            elif 0 < delta <= 90:
                 kind = 'ascending'
             elif 90 < delta < 180:
                 kind = 'descending'
@@ -342,7 +346,14 @@ class GearInstance:
                         cut_end = cut_start + cut_dir * tool_tip_height
                         cuts.append((Line(cut_end, -1 * normal), 'flat'))
             else:
-                cuts.append((cut.cut_line, cut.kind))
+                if cut.overshoot:
+                    # TODO-this needs to be calculated based on nearby edges
+                    allowed_overshoot = 0.2 * self.module
+                    overshoot = cut.cut_line.direction.unit() * allowed_overshoot
+                    cut_line = Line(cut.cut_line.origin - overshoot, cut.cut_line.direction)
+                else:
+                    cut_line = cut.cut_line
+                cuts.append((cut_line, cut.kind))
 
             details = []
             for adjusted_cut, kind in cuts:
@@ -412,7 +423,7 @@ class GearInstance:
         # Rotate classified cuts until we find the first edge after an "in" edge
         orig_len = len(classified)
         last_in = -1
-        while classified[last_in].kind != "in":
+        while not classified[last_in].inward():
             last_in -= 1
         if last_in != -1:
             classified = classified[last_in+1:] + classified[:last_in+1]

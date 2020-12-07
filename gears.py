@@ -146,7 +146,7 @@ G30
 M30
 %"""
 
-    def gcode_vars(self, locals_to_dump):
+    def gcode_vars(self, locals_to_dump, vars_to_dump: Optional[dict] = None):
         """Include all of the generating parameters in the G Code header"""
 
         var_t = ['z_max', 'module', 'teeth', 'blank_thickness', 'tool', 'relief_factor',
@@ -157,6 +157,8 @@ M30
         gcode = []
         for var in var_t:
             value = locals_to_dump[var] if var in locals_to_dump else getattr(self, var)
+            gcode.append('( %17s: %-70s )' % (var, value))
+        for var, value in (vars_to_dump or {}).items():
             gcode.append('( %17s: %-70s )' % (var, value))
         return '\n'.join(gcode)
 
@@ -234,7 +236,13 @@ M30
                 print('sc:%.4f  y:%.4f  or:%.4f  sr: %.4f' % (shaft_clearance, y, outside_radius, shaft_radius))
                 raise ValueError("Cutter shaft hits gear blank by %g mm" % -shaft_clearance)
 
-        gcode = [self.gcode_vars(locals())]
+        extra_vars = dict(
+            gear_kind=the_gear.kind,
+            cycloidal_target=self.cycloidal_target or '',
+            wheel_teeth=self.wheel_teeth,
+            pinion_teeth=self.pinion_teeth,
+        )
+        gcode = [self.gcode_vars(locals(), extra_vars)]
 
         # Move to safe initial position
         cut = Cut(mill, x_start, x_end, -angle_direction * self.cutter_clearance,

@@ -73,9 +73,14 @@ if not (picture or animate or svg or stats):
     p.print_help()
     exit(-1)
 
+def log_cut(*args):
+    do_log = False
+    if do_log:
+        print(*args)
+
 
 # Regular expressions used to parse file from gears.py
-parse_tooth = re.compile(r'^\( Tooth: ([-0-9]+)\)$')
+parse_tooth = re.compile(r'^\( Tooth: ([-0-9]+) *\)$')
 parse_general = re.compile(r'^\( *([a-z_A-Z]+): ([-0-9\.]+) *\)$')
 parse_rotary = re.compile(r'^\( *right_rotary: (True|False) *\)$')
 parse_tool = re.compile(r'^\( *tool: \(Angle: ([0-9\.]+), Depth: ([0-9\.]+), Radius: ([0-9\.]+), TipHeight: ([0-9\.]+), Flutes: ([0-9]+)\) *\)$')
@@ -98,6 +103,7 @@ tooth = 0
 step_number = 0
 cuttings = []
 v = {}
+teeth_drawn = set()
 
 for line_number, line in enumerate(infile):
     l = line.strip()
@@ -207,8 +213,10 @@ for line_number, line in enumerate(infile):
             gg_base_circle = circle(gg.base_radius)
             debug_cycloidal = True
             if debug_cycloidal:
-                cp = CycloidalPair(wheel_teeth=35, pinion_teeth=7, module=v['module'])
-                gg_poly = cp.pinion().poly
+                cp = CycloidalPair(137, 33, module=0.89647)
+                # cp = CycloidalPair(wheel_teeth=35, pinion_teeth=7, module=v['module'])
+                # gg_poly = cp.pinion().poly
+                gg_poly = cp.wheel().poly
 
             if sa and zoom:
                 # cx = v['outside_radius']
@@ -248,12 +256,15 @@ for line_number, line in enumerate(infile):
                     if amountCut > 0.:
                         cuttings.append(amountCut)
                         if move_cut == 0:
-                            print("Error:", line_number+1, l)
+                            log_cut("Error:", line_number+1, l)
                     elif move_cut == 1:
-                        print("Delete:", line_number+1, l)
+                        log_cut("Delete:", line_number+1, l)
 
                     # Write an animation frame
                     if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
+                        if tooth not in teeth_drawn:
+                            print('Render: tooth=%d' % tooth)
+                            teeth_drawn.add(tooth)
                         show_rotated = True
                         with sa.next_step() as dc:
                             def poly(pp: Polygon, fill=None, outline='black'):

@@ -333,10 +333,14 @@ M30
                   outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
-        for r, y, z in cut_params_from_gear(self.cycloidal_gear, degrees(self.tool.angle), self.tool.tip_height):
+        cut_params = cut_params_from_gear(self.cycloidal_gear, degrees(self.tool.angle), self.tool.tip_height)
+        params_per_tooth = len(cut_params) // self.cycloidal_gear.teeth
+        for cut_num, (r, y, z) in enumerate(cut_params):
+            if cut_num % params_per_tooth == 0:
+                gcode.append('')
+                gcode.append("( Tooth: %d )" % (cut_num / params_per_tooth))
             y += self.tool.radius
             gcc = cut.cut(-r, y, z)
-            # print(gcc)
             gcode.append(gcc)
 
         return '\n'.join(gcode)

@@ -257,10 +257,12 @@ class GearInstance:
                 kind = 'in'
             elif abs(delta-90) < flat_eps and (tool_angle == 0 or radial_distance < self.pitch_radius):
                 kind = 'flat'
-            elif 0 < delta <= 90:
-                kind = 'ascending'
-            elif 90 < delta < 180:
+            elif 90-flat_eps <= delta < 180:
+                # Bias flat cuts with pointed tools to be descending to avoid tool shaft hitting gear blank
+                # TODO-flat_eps is not the right bias amount.  It should depend on the tool geometry
                 kind = 'descending'
+            elif 0 < delta <= 90-flat_eps:
+                kind = 'ascending'
             else:
                 kind = 'undercut'
             convex_p1 = cuts[-1].convex_p2 if cuts else False

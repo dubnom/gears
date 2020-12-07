@@ -175,6 +175,14 @@ for line_number, line in enumerate(infile):
             half_tip = tool_tip_height / 2.
             y = half_tip + tan(radians(tool_angle / 2.)) * tool_depth
             shaft = tool_radius - tool_depth
+            cutter_shaft = Polygon([
+                (shaft, v['outside_radius']),
+                (shaft, y),
+                (shaft, -y),
+                (-shaft, -y),
+                (-shaft, y),
+                (-shaft, v['outside_radius']),
+                ])
             cutter = Polygon([
                 (shaft, v['outside_radius']),
                 (shaft, y),
@@ -237,14 +245,19 @@ for line_number, line in enumerate(infile):
             elif axis == 'X':
                 if cutter_y:
                     cur_cutter = translate(cutter, cutter_y, cutter_z)
+                    cur_shaft: Polygon = translate(cutter_shaft, cutter_y, cutter_z)
                     area_start = gear_blank.area
                     if not gear_blank.is_valid:
                         gear_blank = gear_blank.buffer(0)
+                    # TODO-even better would be to define a shaft-no-go-zone and use that
+                    #     -probably just original gear blank plus a little bit would be good
+                    if cur_shaft.intersection(gear_blank).exterior:
+                        print('ERROR: Shaft intersects gear blank', line_number+1, l)
                     gear_blank = gear_blank.difference(cur_cutter)
 
                     # Deal with an acute cutter trimming off a shard
                     if type(gear_blank) == MultiPolygon:
-                        print("Sharding:", line_number+1, l)
+                        log_cut("Sharding:", line_number+1, l)
                         big_poly, area = None, 0.
                         for polygon in gear_blank:
                             if polygon.area > area:
@@ -275,12 +288,15 @@ for line_number, line in enumerate(infile):
                                 poly(rotated_gear_blank, 'blue')
                                 rotated_cutter = rotate(cur_cutter, cur_angle, origin=(0, 0))
                                 poly(rotated_cutter, 'red')
+                                rotated_shaft = rotate(cur_shaft, cur_angle, origin=(0, 0))
+                                poly(rotated_shaft, 'yellow')
                                 cur_extra = translate(extra_cutter, cutter_y, cutter_z)
                                 rotated_extra = rotate(cur_extra, cur_angle, origin=(0, 0))
                                 poly(rotated_extra, None, '#FF8080')
                             else:
                                 poly(gear_blank, 'blue')
                                 poly(cur_cutter, 'red')
+                                poly(cur_shaft, 'yellow')
                             poly(pitch_circle, None, 'cyan')
                             poly(clearance_circle, None, 'yellow')
                             poly(gg_base_circle, None, 'brown')
@@ -349,12 +365,16 @@ if picture:
         clip = Polygon([
             (-v['module'] * 2, v['outside_radius']+v['h_addendum']),
             (v['module'] * 2, v['outside_radius']+v['h_addendum']),
-            (v['module'] * 2, v['outside_radius'] - v['h_total'] -v['h_addendum']),
+            (v['module'] * 2, v['outside_radius'] - v['h_total'] - v['h_addendum']),
             (-v['module'] * 2, v['outside_radius'] - v['h_total'] - v['h_addendum'])])
         plt.plot(*pitch_circle.intersection(clip).exterior.xy, color='g')
         plt.plot(*clearance_circle.intersection(clip).exterior.xy, color='c')
         plt.plot(*dedendum_circle.intersection(clip).exterior.xy, color='m')
-        plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
+        final_blank = gear_blank.intersection(clip)
+        if not final_blank.exterior:
+            print('ERROR: Gear blank does not intersect with zoom window')
+        else:
+            plt.plot(*final_blank.exterior.xy, color='b')
     else:
         plt.plot(*pitch_circle.exterior.xy, color='g')
         plt.plot(*clearance_circle.exterior.xy, color='c')

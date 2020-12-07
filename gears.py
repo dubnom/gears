@@ -24,7 +24,7 @@ import configargparse
 
 import gear_plot
 from anim.geom import Point
-from gear_base import GearInstance, plot, cut_params_from_gear
+from gear_base import GearInstance, plot
 from gear_cycloidal import CycloidalPair
 
 
@@ -332,7 +332,7 @@ M30
                   outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
-        cut_params = cut_params_from_gear(self.cycloidal_gear, degrees(self.tool.angle), self.tool.tip_height)
+        cut_params = self.cycloidal_gear.cut_params(degrees(self.tool.angle), self.tool.tip_height)
         params_per_tooth = len(cut_params) // self.cycloidal_gear.teeth
         for cut_num, (r, y, z) in enumerate(cut_params):
             if cut_num % params_per_tooth == 0:

@@ -5,8 +5,7 @@ import scipy.optimize
 from math import cos, sin, tan, tau, pi, radians, hypot, atan2
 
 from anim.geom import Line, Vector, Point
-from gear_base import plot, t_range, circle, arc, GearInstance, COLOR_MAP, classify_cuts, \
-    cut_params_from_gear
+from gear_base import plot, t_range, circle, arc, GearInstance, CUT_KIND_COLOR_MAP
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvolutePair, Involute
 
@@ -17,7 +16,7 @@ SHOW_INTERACTIVE = os.environ.get('SHOW_INTERACTIVE', 'false').lower() in {'1', 
 
 
 def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
-    classified = classify_cuts(gear, tool_angle, tool_tip_height)
+    classified = gear.classify_cuts(tool_angle, tool_tip_height)
     check_cut = True
     if check_cut:
         found = 0
@@ -67,14 +66,14 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
             p1 = detail_cut.line.origin
             p2 = p1+dcn*tool_tip_height
             pm = p1.mid(p2)
-            plot([p1+dcd, p1, pm, pm+dcd, pm, p2, p2+dcd*0.5], COLOR_MAP[detail_cut.kind])
+            plot([p1+dcd, p1, pm, pm+dcd, pm, p2, p2+dcd*0.5], CUT_KIND_COLOR_MAP[detail_cut.kind])
     # for outer_cut in classified:
     #     plot([outer_cut.line.p1, outer_cut.line.p2], 'grey')
     plt.axis('equal')
     plt.show()
     print_fake_gcode = False
     if print_fake_gcode:
-        for r, y, z in cut_params_from_gear(gear, tool_angle, tool_tip_height):
+        for r, y, z in gear.cut_params(tool_angle, tool_tip_height):
             print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
 

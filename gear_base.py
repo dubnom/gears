@@ -10,10 +10,22 @@ __all__ = [
     'PointList', 'PointUnionList', 'check_point_list',
     't_range',
     'path_rotate', 'path_translate', 'circle', 'arc', 'plot',
-    'GearInstance',
+    'GearInstance', 'CUT_KIND_COLOR_MAP', 'CutError',
 ]
 PointList = List[BasePoint]
 PointUnionList = List[Union[BasePoint, float, Tuple[float, float]]]
+CUT_KIND_COLOR_MAP = {
+    'undercut': 'red',
+    'ascending': '#0000FF',
+    'descending': '#00FF00',
+    'out': '#9999FF',
+    'in': '#99FF99',
+    'flat': 'orange'
+}
+
+
+class CutError(Exception):
+    pass
 
 
 def check_point_list(lst):
@@ -59,16 +71,6 @@ def circle(r, c=Point(0, 0)) -> XYList:
 def plot(xy, color='black', plotter=None):
     plotter = plotter or plt
     plotter.plot(*zip(*xy), color)
-
-
-COLOR_MAP = {
-    'undercut': 'red',
-    'ascending': '#0000FF',
-    'descending': '#00FF00',
-    'out': '#9999FF',
-    'in': '#99FF99',
-    'flat': 'orange'
-}
 
 
 class CutDetail:
@@ -193,243 +195,231 @@ class GearInstance:
         self.set_zoom(zoom_radius=zoom_radius, plotter=plotter)
         plt.show()
 
+    def classify_cuts_pass1(self, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+        """
+            Classify the cuts in this polygon, first pass.  No error checking of cuts in this pass.
 
-def classify_cuts_pass1(gear: GearInstance, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
-    """
-        Classify the cuts in this polygon, first pass.  No error checking of cuts in this pass.
+            :param tool_angle: tool angle in degrees
+            :param tool_tip_height:
+            :returns: List of (cut, cut-kind, convex, allowed overshoot)
 
-        :param gear: GearInstance
-        :param tool_angle: tool angle in degrees
-        :param tool_tip_height:
-        :returns: List of (cut, cut-kind, convex, allowed overshoot)
+            Overshoot is allowed if the cut is along a convex part of the polygon.
 
-        Overshoot is allowed if the cut is along a convex part of the polygon.
+            Classify cuts by angle relative to center of gear::
 
-        Classify cuts by angle relative to center of gear::
+               <--- iterating CCW around top of gear
+                              out
+                       ending  |    u
+                     c         |       n
+                    s          |         d
+                    a          |          e
+               flat ---------- + ---------r-
+                    d          |
+                    e          |         c
+                     s         |       u
+                      cending  |    t
+                               in
 
-           <--- iterating CCW around top of gear
-                          out
-                   ending  |    u
-                 c         |       n
-                s          |         d
-                a          |          e
-           flat ---------- + ---------r-
-                d          |
-                e          |         c
-                 s         |       u
-                  cending  |    t
-                           in
+        """
+        # Is polygon in CCW order?
+        poly = self.poly
+        if polygon_area(poly) < 0:
+            poly = list(reversed(poly))
+        per_tooth = len(poly) // self.teeth
+        poly = poly[-per_tooth:] + poly[:-per_tooth]
+        half_tool_tip = tool_tip_height / 2
 
-    """
-    # Is polygon in CCW order?
-    poly = gear.poly
-    if polygon_area(poly) < 0:
-        poly = list(reversed(poly))
-    per_tooth = len(poly) // gear.teeth
-    poly = poly[-per_tooth:] + poly[:-per_tooth]
-    half_tool_tip = tool_tip_height / 2
-
-    cuts = []
-
-    vertical_eps = 1.0  # degrees
-    flat_eps = 15.0     # degrees
-    for a, b, c in iter_rotate(poly, 3):
-        cut = Line(a, b)
-        # radial_angle = Vector(*a.mid(b).xy()).angle()
-        # Take the angle from the tip of the line
-        radial_vector = Vector(*a.xy())
-        radial_angle = radial_vector.angle()
-        radial_distance = radial_vector.length()
-        line_angle = cut.direction.angle()
-        delta = line_angle - radial_angle
-        if delta > 180:
-            delta -= 360
-        if delta < -180:
-            delta += 360
-        # print('a:%-8s b:%-8s ra:%5.1f la:%5.1f d:%5.1f' % (a, b, radial_angle, line_angle, delta))
-        if abs(delta) < vertical_eps:
-            kind = 'out'
-        elif 180 - abs(delta) < vertical_eps:
-            kind = 'in'
-        elif abs(delta-90) < flat_eps and (tool_angle == 0 or radial_distance < gear.pitch_radius):
-            kind = 'flat'
-        elif 0 < delta < 90:
-            kind = 'ascending'
-        elif 90 < delta < 180:
-            kind = 'descending'
-        else:
-            kind = 'undercut'
-        convex_p1 = cuts[-1].convex_p2 if cuts else False
-        convex_p2 = cut.direction.cross(c-b) >= 0
-        # TODO-overshoot should look for intersections with other segments
-        if kind in {'ascending', 'out'}:
-            # On ascending or out cuts, we care about the previous intersection's convexity, not the trailing
-            overshoot = 1.0 if convex_p1 else 0.0
-            z_offset = half_tool_tip
-        else:
-            overshoot = 1.0 if convex_p2 else 0.0
-            z_offset = -half_tool_tip
-
-        cuts.append(ClassifiedCut(
-            line=cut, kind=kind, convex_p1=convex_p1, convex_p2=convex_p2,
-            overshoot=overshoot, z_offset=z_offset))
-
-    cuts[0].convex_p1 = cuts[-1].convex_p2
-
-    debug_print = False
-    if debug_print:
-        for cut in cuts[:20]:
-            print(cut)
-    return cuts
-
-
-class CutError(Exception):
-    pass
-
-
-def classify_cuts_pass2(gear: GearInstance, classified: List[ClassifiedCut], tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
-    """
-        Refine the classified cuts:
-        * error checking
-        * reorient the cut.cut_line to tool alignment
-
-        :param gear: gear instance
-        :param classified: classified cuts from pass1
-        :param tool_angle: tool angle in degrees
-        :param tool_tip_height:
-        :returns: List of (cut, cut-kind, convex, allowed overshoot)
-    """
-    half_tool_tip = tool_tip_height / 2
-
-    # Rotate classified cuts until we find a the first edge after an "in" edge
-    orig_len = len(classified)
-    last_in = -1
-    while not classified[last_in-1].inward():
-        last_in -= 1
-    if last_in != -1:
-        classified = classified[last_in+1:] + classified[:last_in+1]
-    assert len(classified) == orig_len
-
-    for cut in classified:
         cuts = []
-        if cut.kind == 'undercut':
-            raise ValueError("Can't do undercuts yet")
-        elif cut.flat():
-            if tool_angle != 0 and Vector(*cut.cut_line.origin.xy()).length() < gear.pitch_radius:
-                # TODO-attempt to do bottom clearing with pointy-cutter
-                continue
-            normal = cut.cut_line.direction.unit().normal() * cut.z_offset
-            du = cut.line.direction.unit() * tool_tip_height
-            length = cut.line.direction.length()
-            if length == 0:
-                continue
-            elif cut.line.direction.length() < tool_tip_height:
-                # Cut shorter than saw kerf
-                if not cut.convex_p1 and not cut.convex_p2:
-                    msg = 'ERROR: Cut is too narrow for tool.  Cut: %s [%.6f len]  Tool tip: %.4f' \
-                          % (cut, length, tool_tip_height)
-                    print(msg)
-                    raise CutError(msg)
-                if not cut.convex_p1:
-                    # Align cut to p1
-                    cuts.append((Line(cut.line.p1 + du, -1 * normal), 'flat'))
-                elif not cut.convex_p2:
-                    cuts.append((Line(cut.line.p2, -1 * normal), 'flat'))
+
+        vertical_eps = 1.0  # degrees
+        flat_eps = 15.0     # degrees
+        for a, b, c in iter_rotate(poly, 3):
+            cut = Line(a, b)
+            # radial_angle = Vector(*a.mid(b).xy()).angle()
+            # Take the angle from the tip of the line
+            radial_vector = Vector(*a.xy())
+            radial_angle = radial_vector.angle()
+            radial_distance = radial_vector.length()
+            line_angle = cut.direction.angle()
+            delta = line_angle - radial_angle
+            if delta > 180:
+                delta -= 360
+            if delta < -180:
+                delta += 360
+            # print('a:%-8s b:%-8s ra:%5.1f la:%5.1f d:%5.1f' % (a, b, radial_angle, line_angle, delta))
+            if abs(delta) < vertical_eps:
+                kind = 'out'
+            elif 180 - abs(delta) < vertical_eps:
+                kind = 'in'
+            elif abs(delta-90) < flat_eps and (tool_angle == 0 or radial_distance < self.pitch_radius):
+                kind = 'flat'
+            elif 0 < delta < 90:
+                kind = 'ascending'
+            elif 90 < delta < 180:
+                kind = 'descending'
+            else:
+                kind = 'undercut'
+            convex_p1 = cuts[-1].convex_p2 if cuts else False
+            convex_p2 = cut.direction.cross(c-b) >= 0
+            # TODO-overshoot should look for intersections with other segments
+            if kind in {'ascending', 'out'}:
+                # On ascending or out cuts, we care about the previous intersection's convexity, not the trailing
+                overshoot = 1.0 if convex_p1 else 0.0
+                z_offset = half_tool_tip
+            else:
+                overshoot = 1.0 if convex_p2 else 0.0
+                z_offset = -half_tool_tip
+
+            cuts.append(ClassifiedCut(
+                line=cut, kind=kind, convex_p1=convex_p1, convex_p2=convex_p2,
+                overshoot=overshoot, z_offset=z_offset))
+
+        cuts[0].convex_p1 = cuts[-1].convex_p2
+
+        debug_print = False
+        if debug_print:
+            for cut in cuts[:20]:
+                print(cut)
+        return cuts
+
+    def classify_cuts_pass2(self, classified: List[ClassifiedCut], tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+        """
+            Refine the classified cuts:
+            * error checking
+            * reorient the cut.cut_line to tool alignment
+
+            :param classified: classified cuts from pass1
+            :param tool_angle: tool angle in degrees
+            :param tool_tip_height:
+            :returns: List of (cut, cut-kind, convex, allowed overshoot)
+        """
+        half_tool_tip = tool_tip_height / 2
+
+        # Rotate classified cuts until we find a the first edge after an "in" edge
+        orig_len = len(classified)
+        last_in = -1
+        while not classified[last_in-1].inward():
+            last_in -= 1
+        if last_in != -1:
+            classified = classified[last_in+1:] + classified[:last_in+1]
+        assert len(classified) == orig_len
+
+        for cut in classified:
+            cuts = []
+            if cut.kind == 'undercut':
+                raise ValueError("Can't do undercuts yet")
+            elif cut.flat():
+                if tool_angle != 0 and Vector(*cut.cut_line.origin.xy()).length() < self.pitch_radius:
+                    # TODO-attempt to do bottom clearing with pointy-cutter
+                    continue
+                normal = cut.cut_line.direction.unit().normal() * cut.z_offset
+                du = cut.line.direction.unit() * tool_tip_height
+                length = cut.line.direction.length()
+                if length == 0:
+                    continue
+                elif cut.line.direction.length() < tool_tip_height:
+                    # Cut shorter than saw kerf
+                    if not cut.convex_p1 and not cut.convex_p2:
+                        msg = 'ERROR: Cut is too narrow for tool.  Cut: %s [%.6f len]  Tool tip: %.4f' \
+                              % (cut, length, tool_tip_height)
+                        print(msg)
+                        raise CutError(msg)
+                    if not cut.convex_p1:
+                        # Align cut to p1
+                        cuts.append((Line(cut.line.p1 + du, -1 * normal), 'flat'))
+                    elif not cut.convex_p2:
+                        cuts.append((Line(cut.line.p2, -1 * normal), 'flat'))
+                    else:
+                        # Leave cut in middle
+                        cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat'))
                 else:
-                    # Leave cut in middle
-                    cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat'))
+                    # Will need multiple cuts to fill entire line
+                    cut_len = cut.line.direction.length()
+                    cuts_required = ceil(cut_len/tool_tip_height)
+                    cut_dir = cut.line.direction.unit()
+                    for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
+                        cut_start = cut.line.p1 + t * cut_dir
+                        cut_end = cut_start + cut_dir * tool_tip_height
+                        cuts.append((Line(cut_end, -1 * normal), 'flat'))
             else:
-                # Will need multiple cuts to fill entire line
-                cut_len = cut.line.direction.length()
-                cuts_required = ceil(cut_len/tool_tip_height)
-                cut_dir = cut.line.direction.unit()
-                for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
-                    cut_start = cut.line.p1 + t * cut_dir
-                    cut_end = cut_start + cut_dir * tool_tip_height
-                    cuts.append((Line(cut_end, -1 * normal), 'flat'))
-        else:
-            cuts.append((cut.cut_line, cut.kind))
+                cuts.append((cut.cut_line, cut.kind))
 
-        details = []
-        for adjusted_cut, kind in cuts:
-            cut_angle = adjusted_cut.direction.angle()
-            if cut.inward():
-                rotation = -tool_angle/2 - cut_angle
-            else:
-                rotation = tool_angle/2 - cut_angle
+            details = []
+            for adjusted_cut, kind in cuts:
+                cut_angle = adjusted_cut.direction.angle()
+                if cut.inward():
+                    rotation = -tool_angle/2 - cut_angle
+                else:
+                    rotation = tool_angle/2 - cut_angle
 
-            t = Transform().rotate(-rotation)
-            cut_origin = adjusted_cut.origin
-            # TODO-This should check for intersections with other edges
-            # TODO-replace hacky heuristic to shorten vertical cuts
-            if tool_angle and cut.kind in {'in', 'out'}:
-                cut_origin += adjusted_cut.direction.unit()*gear.module*1.5
-            y, z = t.transform_pt(cut_origin)
-            if cut.inward():
-                z = z + half_tool_tip
-            else:
-                z = z - half_tool_tip
-            details.append(CutDetail(adjusted_cut, kind, rotation, y, z))
-        cut.cut_details.extend(details)
+                t = Transform().rotate(-rotation)
+                cut_origin = adjusted_cut.origin
+                # TODO-This should check for intersections with other edges
+                # TODO-replace hacky heuristic to shorten vertical cuts
+                if tool_angle and cut.kind in {'in', 'out'}:
+                    cut_origin += adjusted_cut.direction.unit() * self.module * 1.5
+                y, z = t.transform_pt(cut_origin)
+                if cut.inward():
+                    z = z + half_tool_tip
+                else:
+                    z = z - half_tool_tip
+                details.append(CutDetail(adjusted_cut, kind, rotation, y, z))
+            cut.cut_details.extend(details)
 
-    return classified
+        return classified
 
+    def classify_cuts(self, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+        """
+            Classify the cuts in this polygon.
+            Calls first pass and then performs error checking and reorients the cut.cut_line to
+            tool alignment.
 
-def classify_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
-    """
-        Classify the cuts in this polygon.
-        Calls first pass and then performs error checking and reorients the cut.cut_line to
-        tool alignment.
+            :param tool_angle: tool angle in degrees
+            :param tool_tip_height:
+            :returns: List of (cut, cut-kind, convex, allowed overshoot)
 
-        :param gear: GearInstance
-        :param tool_angle: tool angle in degrees
-        :param tool_tip_height:
-        :returns: List of (cut, cut-kind, convex, allowed overshoot)
+            Overshoot is allowed if the cut is along a convex part of the polygon.
 
-        Overshoot is allowed if the cut is along a convex part of the polygon.
+            Classify cuts by angle relative to center of gear::
 
-        Classify cuts by angle relative to center of gear::
+               <--- iterating CCW around top of gear
+                              out
+                       ending  |    u
+                     c         |       n
+                    s          |         d
+                    a          |          e
+               flat ---------- + ---------r-
+                    d          |
+                    e          |         c
+                     s         |       u
+                      cending  |    t
+                               in
 
-           <--- iterating CCW around top of gear
-                          out
-                   ending  |    u
-                 c         |       n
-                s          |         d
-                a          |          e
-           flat ---------- + ---------r-
-                d          |
-                e          |         c
-                 s         |       u
-                  cending  |    t
-                           in
+        """
+        classified = self.classify_cuts_pass1(tool_angle, tool_tip_height)
+        refined = self.classify_cuts_pass2(classified, tool_angle, tool_tip_height)
+        return refined
 
-    """
-    classified = classify_cuts_pass1(gear, tool_angle, tool_tip_height)
-    refined = classify_cuts_pass2(gear, classified, tool_angle, tool_tip_height)
-    return refined
+    def cut_params(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
+        """
+            Generate list of (rotation, y-position, z-position) from polygon
+            :param tool_angle:          In radians
+            :param tool_tip_height:     Tool tip height
+            :return: List of (r, y, z)
+        """
+        classified = self.classify_cuts(tool_angle, tool_tip_height)
 
+        # Rotate classified cuts until we find the first edge after an "in" edge
+        orig_len = len(classified)
+        last_in = -1
+        while classified[last_in].kind != "in":
+            last_in -= 1
+        if last_in != -1:
+            classified = classified[last_in+1:] + classified[:last_in+1]
+        assert len(classified) == orig_len
 
-def cut_params_from_gear(gear: GearInstance, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
-    """
-        Generate list of (rotation, y-position, z-position) from polygon
-        :param gear:                GearInstance to cut
-        :param tool_angle:          In radians
-        :param tool_tip_height:     Tool tip height
-        :return: List of (r, y, z)
-    """
-    classified = classify_cuts(gear, tool_angle, tool_tip_height)
-
-    # Rotate classified cuts until we find the first edge after an "in" edge
-    orig_len = len(classified)
-    last_in = -1
-    while classified[last_in].kind != "in":
-        last_in -= 1
-    if last_in != -1:
-        classified = classified[last_in+1:] + classified[:last_in+1]
-    assert len(classified) == orig_len
-
-    cut_params = []
-    for outer_cut in classified:
-        for detail_cut in outer_cut.cut_details:
-            cut_params.append((detail_cut.angle, detail_cut.y, detail_cut.z))
-    return cut_params
+        cut_params = []
+        for outer_cut in classified:
+            for detail_cut in outer_cut.cut_details:
+                cut_params.append((detail_cut.angle, detail_cut.y, detail_cut.z))
+        return cut_params

@@ -333,7 +333,7 @@ M30
                   outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
-        for r, y, z in cut_params_from_gear(self.cycloidal_gear, self.tool.angle, self.tool.tip_height):
+        for r, y, z in cut_params_from_gear(self.cycloidal_gear, degrees(self.tool.angle), self.tool.tip_height):
             y += self.tool.radius
             gcc = cut.cut(-r, y, z)
             # print(gcc)
@@ -577,7 +577,7 @@ M30
             print('Generate: algo=%s -> new' % self.algo)
             return self.generate_new(teeth, blank_thickness, teeth_to_make)
         elif self.algo == 'cycloidal':
-            print('Generate: algo=%s -> alignment' % self.algo)
+            print('Generate: algo=%s -> cycloidal' % self.algo)
             return self.generate_cycloidal(teeth, blank_thickness, teeth_to_make)
         elif self.algo == 'align':
             print('Generate: algo=%s -> alignment' % self.algo)

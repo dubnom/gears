@@ -385,15 +385,15 @@ class GearInstance:
                             cut_end = cut_start + cut_dir * tool_tip_height
                             cuts.append((Line(cut_end, -1 * normal), 'flat-multi'))
             else:
+                cut_line = cut.cut_line
+                if cut.kind == 'flat-tip':
+                    # flat-tip acts like descending, so need to reverse the line
+                    cut_line = Line(cut.cut_line.p2, cut.cut_line.p1)
                 if cut.overshoot:
                     # TODO-this needs to be calculated based on nearby edges
                     allowed_overshoot = 0.2 * self.module
-                    overshoot = cut.cut_line.direction.unit() * allowed_overshoot
-                    cut_line = Line(cut.cut_line.origin - overshoot, cut.cut_line.direction + overshoot)
-                else:
-                    cut_line = cut.cut_line
-                if cut.kind == 'flat-tip':
-                    cut_line = Line(cut_line.p2, cut_line.p1)
+                    overshoot = cut_line.direction.unit() * allowed_overshoot
+                    cut_line = Line(cut_line.origin - overshoot, cut_line.direction + overshoot)
                 cuts.append((cut_line, cut.kind))
 
             details = []

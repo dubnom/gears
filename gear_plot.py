@@ -52,12 +52,16 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
         arc_end = Vector(*classified[-1].line.p2.xy()).angle()
         arc_extra = (arc_end - arc_start) * 0.5
         plot(arc(gear.pitch_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'green')
+        plot(arc(gear.tip_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'yellow')
+        plot(arc(gear.inside_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'yellow')
+        plot(arc(gear.base_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'brown')
         # plot(circle(gear.pitch_radius+gear.module, Point(0, 0)), 'yellow')
         # plot(circle(gear.pitch_radius-gear.module*1.25, Point(0, 0)), 'yellow')
         # plot(circle(gear.pitch_radius*cos(radians(20)), Point(0, 0)), 'brown')
         plt.title('Check angle for %s' % gear.description())
 
     for outer_cut in classified:
+        # print(outer_cut.kind, outer_cut.cut_line.p1.round(2), outer_cut.cut_line.p2.round(2))
         for detail_cut in outer_cut.cut_details:
             dcd = detail_cut.line.direction
             dcn = dcd.normal().unit()
@@ -66,14 +70,17 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
             p1 = detail_cut.line.origin
             p2 = p1+dcn*tool_tip_height
             pm = p1.mid(p2)
-            plot([p1+dcd, p1, pm, pm+dcd, pm, p2, p2+dcd*0.5], CUT_KIND_COLOR_MAP[detail_cut.kind])
+            # print('  ', detail_cut.kind, detail_cut.line.p1.round(2), detail_cut.line.p2.round(2))
+            kind = detail_cut.kind.split('-')[0]
+            plot([p1+dcd, p1, pm, pm+dcd, pm, p2, p2+dcd*0.5], CUT_KIND_COLOR_MAP[kind])
     # for outer_cut in classified:
     #     plot([outer_cut.line.p1, outer_cut.line.p2], 'grey')
     plt.axis('equal')
     plt.show()
     print_fake_gcode = False
     if print_fake_gcode:
-        for r, y, z in gear.cut_params(tool_angle, tool_tip_height):
+        for r, y, z, k in gear.cut_params(tool_angle, tool_tip_height):
+            print('( kind: %s )' % k)
             print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
 

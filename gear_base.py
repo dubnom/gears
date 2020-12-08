@@ -20,8 +20,11 @@ CUT_KIND_COLOR_MAP = {
     'descending': '#00FF00',
     'out': '#9999FF',
     'in': '#99FF99',
-    'flat': 'orange'
+    'flat': 'orange',
+    'flat-tip': 'orange',
+    'flat-root': 'orange',
 }
+CUT_KINDS = set(CUT_KIND_COLOR_MAP.keys())
 
 
 class CutError(Exception):
@@ -96,13 +99,14 @@ class ClassifiedCut:
                  convex_p1: bool, convex_p2: bool, overshoot: float, z_offset: float):
         """
             :param line:        Line segment in CCW direction
-            :param kind:        in/out/ascending/descending/flat/undercut
+            :param kind:        in/out/ascending/descending/flat-tip/flat-root/undercut
             :param convex_p1:      True if shape is convex at line.p1
             :param convex_p2:      True if shape is convex at line.p2
             :param overshoot:   Allowed overshoot
             :param z_offset:    Z offset for tool
         """
         self.line = line
+        assert kind in CUT_KINDS
         self.kind = kind
         self.convex_p1 = convex_p1
         self.convex_p2 = convex_p2
@@ -123,8 +127,8 @@ class ClassifiedCut:
         return Vector(*self.cut_line.origin.xy()).length()
 
     def flat(self):
-        """True if kind is 'flat'"""
-        return self.kind == 'flat'
+        """True if kind is 'flat-tip' or 'flat-root'"""
+        return self.kind in {'flat-tip', 'flat-root'}
 
     def inward(self):
         """True if kind is 'in' or 'descending'"""
@@ -256,13 +260,14 @@ class GearInstance:
                 kind = 'out'
             elif 180 - abs(delta) < vertical_eps:
                 kind = 'in'
-            elif abs(delta-90) < flat_eps and (tool_angle == 0 or radial_distance < self.pitch_radius):
-                kind = 'flat'
-            elif 90-flat_eps <= delta < 180:
-                # Bias flat cuts with pointed tools to be descending to avoid tool shaft hitting gear blank
-                # TODO-flat_eps is not the right bias amount.  It should depend on the tool geometry
+            elif abs(delta-90) < flat_eps:
+                if radial_distance < self.pitch_radius:
+                    kind = 'flat-root'
+                else:
+                    kind = 'flat-tip'
+            elif 90 <= delta < 180:
                 kind = 'descending'
-            elif 0 < delta <= 90-flat_eps:
+            elif 0 < delta <= 90:
                 kind = 'ascending'
             else:
                 kind = 'undercut'
@@ -322,9 +327,10 @@ class GearInstance:
 
         for cut_index, cut in enumerate(classified):
             cuts = []
+            is_flat = (cut.kind == 'flat-root') or (cut.kind == 'flat-tip' and tool_angle == 0)
             if cut.kind == 'undercut':
                 raise ValueError("Can't do undercuts yet")
-            elif cut.flat():
+            elif is_flat:
                 if tool_angle != 0 and Vector(*cut.cut_line.origin.xy()).length() < self.pitch_radius:
                     # TODO-attempt to do bottom clearing with pointy-cutter
                     pass
@@ -346,12 +352,12 @@ class GearInstance:
                         raise CutError(msg)
                     if not cut.convex_p1:
                         # Align cut to p1
-                        cuts.append((Line(cut.line.p1 + du, -1 * normal), 'flat'))
+                        cuts.append((Line(cut.line.p1 + du, -1 * normal), 'flat-p1'))
                     elif not cut.convex_p2:
-                        cuts.append((Line(cut.line.p2, -1 * normal), 'flat'))
+                        cuts.append((Line(cut.line.p2, -1 * normal), 'flat-p2'))
                     else:
                         # Leave cut in middle
-                        cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat'))
+                        cuts.append((Line(cut.line.midpoint + du/2, -1 * normal), 'flat-mid'))
                 else:
                     # Will need multiple cuts to fill entire line
                     cut_len = cut.line.direction.length()
@@ -371,27 +377,30 @@ class GearInstance:
                             tool_dir = Vector(cos(radians(u)), sin(radians(u)))
                             cut_end = cut_end - tool_dir * flat_tool_extension
                             # tool_dir = Vector(cos(radians(base_angle)), sin(radians(base_angle)))
-                            cuts.append((Line(cut_end, tool_dir * self.module * 2), 'flat'))
+                            cuts.append((Line(cut_end, tool_dir * self.module * 2), 'flat-multi-a'))
                     else:
                         # Simple flat cuts work like this:
                         for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
                             cut_start = cut.line.p1 + t * cut_dir
                             cut_end = cut_start + cut_dir * tool_tip_height
-                            cuts.append((Line(cut_end, -1 * normal), 'flat'))
+                            cuts.append((Line(cut_end, -1 * normal), 'flat-multi'))
             else:
                 if cut.overshoot:
                     # TODO-this needs to be calculated based on nearby edges
                     allowed_overshoot = 0.2 * self.module
                     overshoot = cut.cut_line.direction.unit() * allowed_overshoot
-                    cut_line = Line(cut.cut_line.origin - overshoot, cut.cut_line.direction)
+                    cut_line = Line(cut.cut_line.origin - overshoot, cut.cut_line.direction + overshoot)
                 else:
                     cut_line = cut.cut_line
+                if cut.kind == 'flat-tip':
+                    cut_line = Line(cut_line.p2, cut_line.p1)
                 cuts.append((cut_line, cut.kind))
 
             details = []
+            inward = cut.inward() or (cut.kind == 'flat-tip' and tool_angle)
             for adjusted_cut, kind in cuts:
                 cut_angle = adjusted_cut.direction.angle()
-                if cut.inward():
+                if inward:
                     rotation = -tool_angle/2 - cut_angle
                 else:
                     rotation = tool_angle/2 - cut_angle
@@ -405,7 +414,7 @@ class GearInstance:
                     # vertical_cut_reduction = 1.5
                     cut_origin += adjusted_cut.direction.unit() * self.module * vertical_cut_reduction
                 y, z = t.transform_pt(cut_origin)
-                if cut.inward():
+                if inward:
                     z = z + half_tool_tip
                 else:
                     z = z - half_tool_tip
@@ -446,12 +455,12 @@ class GearInstance:
         refined = self.classify_cuts_pass2(classified, tool_angle, tool_tip_height)
         return refined
 
-    def cut_params(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]:
+    def cut_params(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float, str]]:
         """
             Generate list of (rotation, y-position, z-position) from polygon
             :param tool_angle:          In radians
             :param tool_tip_height:     Tool tip height
-            :return: List of (r, y, z)
+            :return: List of (r, y, z, cut-kind)
         """
         classified = self.classify_cuts(tool_angle, tool_tip_height)
 
@@ -467,5 +476,5 @@ class GearInstance:
         cut_params = []
         for outer_cut in classified:
             for detail_cut in outer_cut.cut_details:
-                cut_params.append((detail_cut.angle, detail_cut.y, detail_cut.z))
+                cut_params.append((detail_cut.angle, detail_cut.y, detail_cut.z, detail_cut.kind))
         return cut_params

@@ -253,13 +253,23 @@ M30
 
         cut_params = the_gear.cut_params(degrees(self.tool.angle), self.tool.tip_height)
         params_per_tooth = len(cut_params) // the_gear.teeth
-        for cut_num, (r, y, z) in enumerate(cut_params):
+        cuts_outer = []
+        cuts_inner = []
+        for cut_num, (r, y, z, k) in enumerate(cut_params):
             if cut_num % params_per_tooth == 0:
-                gcode.append('')
-                gcode.append("( Tooth: %d )" % (cut_num / params_per_tooth))
+                tooth_num = cut_num / params_per_tooth
+                cuts_inner.append('')
+                cuts_inner.append('( Tooth: %d )' % (cut_num / params_per_tooth))
+                cuts_outer.append('')
+                cuts_outer.append('( Tooth: %d )' % (cut_num / params_per_tooth))
             y += self.tool.radius
             gcc = cut.cut(-r, y, z)
-            gcode.append(gcc)
+            if k == 'flat-tip':
+                cuts_outer.append(gcc)
+            else:
+                cuts_inner.append(gcc)
+        gcode.extend(cuts_outer)
+        gcode.extend(cuts_inner)
 
         return '\n'.join(gcode)
 

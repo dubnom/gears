@@ -1,0 +1,13 @@
+* Bottom clearing for new algo with pointy cutters
+* Add cut strategy capability to reorder/modify cuts
+* Improved sequencing of cuts to minimize movement of mill (sort by rotation?)
+* Avoid outputting angles that cause 360 degree rotation
+  - what was the exact issue?   (something like G0 A350 // G0 A-10?)
+* Add cutters that have flat & rounded tips (like gear cutters)
+* Make gear cutter work
+* Cleanup gcode_vars
+  - make gears and tools know how to output / load from gcode_vars
+* Use gcode loop instead of outputting gcode for every tooth
+* Make render generate zoomed and non-zoomed results at the same time
+* Move /tmp/anim_opt.gif into local directory
+* Generate movie files instead of GIFs

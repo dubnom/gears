@@ -53,9 +53,13 @@ p.add('--stats', '-s', action='store_true', help='Generate statistics')
 p.add('--zoom', '-z', action='store_true', help='Zoom into one/two teeth in picture')
 p.add('--inches', '-i', action='store_true', help='Show statistics in imperial units')
 p.add('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
+p.add('--first', '-f', default=0, type=int, help='First tooth to draw')
 args = p.parse_args()
 
-teeth_to_draw = args.teeth[0]
+if args.teeth[0] != -1:
+    teeth_to_draw = set(range(args.first, args.first + args.teeth[0]))
+else:
+    teeth_to_draw = 'all'
 animationFile = args.A
 pictureFile = args.P
 svg_file = args.G
@@ -83,7 +87,7 @@ def log_cut(*args):
 parse_tooth = re.compile(r'^\( Tooth: ([-0-9]+) *\)$')
 parse_general = re.compile(r'^\( *([a-z_A-Z]+): ([-0-9\.]+) *\)$')
 parse_rotary = re.compile(r'^\( *right_rotary: (True|False) *\)$')
-parse_tool = re.compile(r'^\( *tool: \(Angle: ([0-9\.]+), Depth: ([0-9\.]+), Radius: ([0-9\.]+), TipHeight: ([0-9\.]+), Flutes: ([0-9]+)\) *\)$')
+parse_tool = re.compile(r'^\( *tool: \(%s\) *\)$' % ', '.join(r'%s: ([0-9\.]+)' % f for f in ['Angle', 'Depth', 'Radius', 'TipHeight', 'Extension', 'Flutes']))
 parse_feed = re.compile(r'^F([-0-9\.]+)')
 parse_speed = re.compile(r'^S([-0-9\.]+)')
 parse_movecut = re.compile(r'^G([01]+)')
@@ -140,7 +144,8 @@ for line_number, line in enumerate(infile):
         tool_radius = float(mTool.group(3))
         # tool_radius += 0.1
         tool_tip_height = float(mTool.group(4))
-        tool_flutes = int(mTool.group(5))
+        tool_shaft_extension = float(mTool.group(5))
+        tool_flutes = int(mTool.group(6))
 
     # Feed rate
     elif mFeed:
@@ -175,11 +180,13 @@ for line_number, line in enumerate(infile):
             half_tip = tool_tip_height / 2.
             y = half_tip + tan(radians(tool_angle / 2.)) * tool_depth
             shaft = tool_radius - tool_depth
+            print('Tool: shaft_diameter=%9.4fmm 2*y=%9.4fmm' % (shaft*2, y))
+            print('Tool: shaft_diameter=%9.4f 64ths 2*y=%9.4f 64ths' % (shaft*2/25.4*64, y/25.4*64))
             cutter_shaft = Polygon([
                 (shaft, v['outside_radius']),
                 (shaft, y),
-                (shaft, -y),
-                (-shaft, -y),
+                (shaft, -y-tool_shaft_extension),
+                (-shaft, -y-tool_shaft_extension),
                 (-shaft, y),
                 (-shaft, v['outside_radius']),
                 ])
@@ -226,14 +233,19 @@ for line_number, line in enumerate(infile):
                 else:
                     gg_poly = cp.pinion().poly
 
-            if sa and zoom:
-                # cx = v['outside_radius']
-                cx = v['pitch_diameter'] / 2
-                cy = 0
-                # zr = max(v['h_total'] * 3, v['z_max'])
-                zr = v['h_total'] * 0.9
-                zr = v['h_total'] * 2
+            if sa:
+                if zoom:
+                    # cx = v['outside_radius']
+                    cx = v['pitch_diameter'] / 2
+                    cy = 0
+                    # zr = max(v['h_total'] * 3, v['z_max'])
+                    zr = v['h_total'] * 0.9
+                    # zr = v['h_total'] * 2
+                else:
+                    cx, cy = 0, 0
+                    zr = zy = v['pitch_diameter']
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
+
 
         # Move and cut based on each axis
         for axis, amt in mgCode:
@@ -251,7 +263,10 @@ for line_number, line in enumerate(infile):
                         gear_blank = gear_blank.buffer(0)
                     # TODO-even better would be to define a shaft-no-go-zone and use that
                     #     -probably just original gear blank plus a little bit would be good
-                    if cur_shaft.intersection(gear_blank).exterior:
+                    intersection = cur_shaft.intersection(gear_blank)
+                    if not hasattr(intersection, 'exterior'):
+                        print('ERROR: Shaft intersection has no exterior', line_number+1, l)
+                    elif cur_shaft.intersection(gear_blank).exterior:
                         print('ERROR: Shaft intersects gear blank', line_number+1, l)
                     gear_blank = gear_blank.difference(cur_cutter)
 
@@ -274,7 +289,7 @@ for line_number, line in enumerate(infile):
                         log_cut("Delete:", line_number+1, l)
 
                     # Write an animation frame
-                    if animate and (teeth_to_draw == -1 or tooth < teeth_to_draw):
+                    if animate and (teeth_to_draw == 'all' or tooth in teeth_to_draw):
                         if tooth not in teeth_drawn:
                             print('Render: tooth=%d' % tooth)
                             teeth_drawn.add(tooth)

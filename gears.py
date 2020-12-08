@@ -34,20 +34,20 @@ def rotate(a, x, y):
     return x * cos(a) - y * sin(a), x * sin(a) + y * cos(a)
 
 
-class Tool():
+class Tool:
     r"""
         The Tool class holds the specifications of the cutting tool.
           /\
          /  \
          |   |
-         |   ---------
-         |   ---------
+        |+   ---------
+        |+   ---------
          |   |
          \  /
           \/
     """
 
-    def __init__(self, angle=40., depth=3., radius=10., tip_height=0.,
+    def __init__(self, angle=40., depth=3., radius=10., tip_height=0., shaft_extension=6.35,
                  number=1, rpm=2000, feed=200, flutes=4, mist=False, flood=False,
                  mill='both'):
         if angle < 0.:
@@ -65,6 +65,7 @@ class Tool():
         self.depth = depth
         self.radius = radius
         self.tip_height = tip_height
+        self.shaft_extension = shaft_extension
         self.number = number
         self.rpm = rpm
         self.feed = feed
@@ -74,11 +75,11 @@ class Tool():
         self.mill = mill
 
     def __str__(self):
-        return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {}, Flutes: {})".format(
-            degrees(self.angle), self.depth, self.radius, self.tip_height, self.flutes)
+        return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {}, Extension: {}, Flutes: {})".format(
+            degrees(self.angle), self.depth, self.radius, self.tip_height, self.shaft_extension, self.flutes)
 
 
-class Gear():
+class Gear:
     """The Gear class is used to generate G Code of involute gears."""
 
     def __init__(self, tool, module=1., pressure_angle=20., relief_factor=1.25, steps=5, root_steps=1,
@@ -597,6 +598,7 @@ def main():
     p.add('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
     p.add('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
     p.add('--diameter', '-I', type=float, default=15., help='Tool: cutting diameter at tip in mm')
+    p.add('--shaft_extension', type=float, default=6.35, help='Tool: shaft extension beyond bottom of cutter in mm')
     p.add('--number', '-N', type=int, default=1, help='Tool: tool number')
     p.add('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
     p.add('--feed', '-F', type=float, default=200., help='Tool: feed rate')
@@ -631,7 +633,7 @@ def main():
     out = args.out
 
     try:
-        tool = Tool(angle=args.angle, depth=args.depth, tip_height=args.height,
+        tool = Tool(angle=args.angle, depth=args.depth, tip_height=args.height, shaft_extension=args.shaft_extension,
                     radius=args.diameter / 2., number=args.number, rpm=args.rpm,
                     feed=args.feed, flutes=args.flutes, mist=args.mist,
                     flood=args.flood, mill=args.mill)

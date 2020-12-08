@@ -1,4 +1,4 @@
-from math import sin, cos, tau, radians, ceil
+from math import sin, cos, tau, radians, ceil, tan
 from typing import List, Union, Tuple
 
 from matplotlib import pyplot as plt
@@ -109,6 +109,7 @@ class ClassifiedCut:
         self.overshoot = overshoot
         self.z_offset = z_offset
         # cut_line is reversed if this is an inward cut
+        # cut_line.origin is always the deepest point of cut
         self.cut_line = Line(line.p2, line.p1) if self.inward() else self.line
         self.cut_details: List[CutDetail] = []
 
@@ -267,7 +268,7 @@ class GearInstance:
                 kind = 'undercut'
             convex_p1 = cuts[-1].convex_p2 if cuts else False
             convex_p2 = cut.direction.cross(c-b) >= 0
-            # TODO-overshoot should look for intersections with other segments
+            # TODO-overshoot should look for intersections with other segments, based on tool shape
             if kind in {'ascending', 'out'}:
                 # On ascending or out cuts, we care about the previous intersection's convexity, not the trailing
                 overshoot = 1.0 if convex_p1 else 0.0
@@ -300,6 +301,15 @@ class GearInstance:
             :returns: List of (cut, cut-kind, convex, allowed overshoot)
         """
         half_tool_tip = tool_tip_height / 2
+        if tool_angle:
+            # For pointy tools clearing the flats at the bottom of the tooth,
+            # go deeper with the cutter by _extension which gives a width of _tip
+            # TODO-0.3 seems to work, but should really be configurable
+            flat_tool_extension = 0.3 * self.module
+            flat_tool_tip = flat_tool_extension * tan(radians(tool_angle/2)) * 2
+        else:
+            flat_tool_extension = 0
+            flat_tool_tip = tool_tip_height
 
         # Rotate classified cuts until we find a the first edge after an "in" edge
         orig_len = len(classified)
@@ -310,24 +320,28 @@ class GearInstance:
             classified = classified[last_in+1:] + classified[:last_in+1]
         assert len(classified) == orig_len
 
-        for cut in classified:
+        for cut_index, cut in enumerate(classified):
             cuts = []
             if cut.kind == 'undercut':
                 raise ValueError("Can't do undercuts yet")
             elif cut.flat():
                 if tool_angle != 0 and Vector(*cut.cut_line.origin.xy()).length() < self.pitch_radius:
                     # TODO-attempt to do bottom clearing with pointy-cutter
-                    continue
-                normal = cut.cut_line.direction.unit().normal() * cut.z_offset
-                du = cut.line.direction.unit() * tool_tip_height
+                    pass
+                    # continue
+                if tool_angle == 0:
+                    normal = cut.cut_line.direction.unit().normal() * cut.z_offset
+                else:
+                    normal = cut.cut_line.direction.unit().normal() * -1
+                du = cut.line.direction.unit() * flat_tool_tip
                 length = cut.line.direction.length()
                 if length == 0:
                     continue
-                elif cut.line.direction.length() < tool_tip_height:
+                elif cut.line.direction.length() < flat_tool_tip:
                     # Cut shorter than saw kerf
                     if not cut.convex_p1 and not cut.convex_p2:
                         msg = 'ERROR: Cut is too narrow for tool.  Cut: %s [%.6f len]  Tool tip: %.4f' \
-                              % (cut, length, tool_tip_height)
+                              % (cut, length, flat_tool_tip)
                         print(msg)
                         raise CutError(msg)
                     if not cut.convex_p1:
@@ -341,12 +355,29 @@ class GearInstance:
                 else:
                     # Will need multiple cuts to fill entire line
                     cut_len = cut.line.direction.length()
-                    cuts_required = ceil(cut_len/tool_tip_height)
+                    cuts_required = ceil(cut_len/flat_tool_tip)
                     cut_dir = cut.line.direction.unit()
-                    for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
-                        cut_start = cut.line.p1 + t * cut_dir
-                        cut_end = cut_start + cut_dir * tool_tip_height
-                        cuts.append((Line(cut_end, -1 * normal), 'flat'))
+                    if tool_angle:
+                        start_angle = classified[cut_index-1].cut_line.direction.angle()+tool_angle
+                        end_angle = classified[(cut_index+1) % len(classified)].cut_line.direction.angle()
+                        # TODO-This works, but is there something smarter?
+                        delta_angle = (start_angle-end_angle) % 360
+                        start_angle = start_angle % 360
+                        end_angle = start_angle - delta_angle
+                        for t, u in zip(t_range(cuts_required - 1, 0, cut_len),  # - flat_tool_tip),
+                                        t_range(cuts_required - 1, start_angle, end_angle)):
+                            cut_start = cut.line.p1 + t * cut_dir
+                            cut_end = cut_start + cut_dir * flat_tool_tip
+                            tool_dir = Vector(cos(radians(u)), sin(radians(u)))
+                            cut_end = cut_end - tool_dir * flat_tool_extension
+                            # tool_dir = Vector(cos(radians(base_angle)), sin(radians(base_angle)))
+                            cuts.append((Line(cut_end, tool_dir * self.module * 2), 'flat'))
+                    else:
+                        # Simple flat cuts work like this:
+                        for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
+                            cut_start = cut.line.p1 + t * cut_dir
+                            cut_end = cut_start + cut_dir * tool_tip_height
+                            cuts.append((Line(cut_end, -1 * normal), 'flat'))
             else:
                 if cut.overshoot:
                     # TODO-this needs to be calculated based on nearby edges
@@ -370,7 +401,9 @@ class GearInstance:
                 # TODO-This should check for intersections with other edges
                 # TODO-replace hacky heuristic to shorten vertical cuts
                 if tool_angle and cut.kind in {'in', 'out'}:
-                    cut_origin += adjusted_cut.direction.unit() * self.module * 1.5
+                    vertical_cut_reduction = 0
+                    # vertical_cut_reduction = 1.5
+                    cut_origin += adjusted_cut.direction.unit() * self.module * vertical_cut_reduction
                 y, z = t.transform_pt(cut_origin)
                 if cut.inward():
                     z = z + half_tool_tip

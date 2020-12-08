@@ -1,6 +1,9 @@
-python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 -T saw32nd.cfg orrery/mercury_x_32_new.nc
-python3 ./render.py orrery/mercury_x_32_new.nc -azp -t 6
-python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 -T cutter45.cfg orrery/mercury_x_45_new.nc
-python3 ./render.py orrery/mercury_x_45_new.nc -azp -t 6
+# python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 -T saw32nd.cfg orrery/mercury_x_32_new.nc
+# python3 ./render.py orrery/mercury_x_32_new.nc -azp -t 6
+# python3 ./gears.py --algo=new -m .89647 -s 7 -t 13 -k 2 -T cutter40.cfg orrery/mercury_x_40_new.nc
+# python3 ./render.py orrery/mercury_x_40_new.nc -azp -t 4
+# python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 -T cutter45.cfg orrery/mercury_x_45_new.nc
+# python3 ./render.py orrery/mercury_x_45_new.nc -azp -t 6
 python3 ./gears.py --algo=new -m .89647 -s 7 -t 137 -k 2 -T cutter45.cfg orrery/mercury_y_45_new.nc
 python3 ./render.py orrery/mercury_y_45_new.nc -azp -t 6
+# python3 ./render.py orrery/mercury_y_45_new.nc -ap -f 62 -t 17

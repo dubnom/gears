@@ -364,7 +364,7 @@ class GearInstance:
                         delta_angle = (start_angle-end_angle) % 360
                         start_angle = start_angle % 360
                         end_angle = start_angle - delta_angle
-                        for t, u in zip(t_range(cuts_required - 1, 0, cut_len),  # - flat_tool_tip),
+                        for t, u in zip(t_range(cuts_required - 1, 0, cut_len - flat_tool_tip),
                                         t_range(cuts_required - 1, start_angle, end_angle)):
                             cut_start = cut.line.p1 + t * cut_dir
                             cut_end = cut_start + cut_dir * flat_tool_tip

@@ -107,7 +107,7 @@ tooth = 0
 step_number = 0
 cuttings = []
 v = {}
-teeth_drawn = set()
+tooth_last = -1
 
 for line_number, line in enumerate(infile):
     l = line.strip()
@@ -252,6 +252,8 @@ for line_number, line in enumerate(infile):
             step_number += 1
             amt = float(amt)
             if axis == 'A':
+                if abs(cur_angle - amt) > 20:
+                    print('WARNING: Large Angle move: %.4f -> %.4f @ %d %s' % (cur_angle, amt, line_number+1, l))
                 gear_blank = rotate(gear_blank, cur_angle - amt, origin=(0, 0))
                 cur_angle = amt
             elif axis == 'X':
@@ -290,9 +292,9 @@ for line_number, line in enumerate(infile):
 
                     # Write an animation frame
                     if animate and (teeth_to_draw == 'all' or tooth in teeth_to_draw):
-                        if tooth not in teeth_drawn:
+                        if tooth != tooth_last:
                             print('Render: tooth=%d' % tooth)
-                            teeth_drawn.add(tooth)
+                            tooth_last = tooth
                         show_rotated = True
                         with sa.next_step() as dc:
                             def poly(pp: Polygon, fill=None, outline='black'):

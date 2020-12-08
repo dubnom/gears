@@ -255,18 +255,32 @@ M30
         params_per_tooth = len(cut_params) // the_gear.teeth
         cuts_outer = []
         cuts_inner = []
+        tooth_angle = None
         for cut_num, (r, y, z, k) in enumerate(cut_params):
+            r = -r
             if cut_num % params_per_tooth == 0:
+                tooth_angle = None
                 tooth_num = cut_num / params_per_tooth
                 cuts_inner.append('')
                 cuts_inner.append('( Tooth: %d )' % (cut_num / params_per_tooth))
                 cuts_outer.append('')
                 cuts_outer.append('( Tooth: %d )' % (cut_num / params_per_tooth))
             y += self.tool.radius
-            gcc = cut.cut(-r, y, z)
             if k == 'flat-tip':
+                gcc = cut.cut(r, y, z)
                 cuts_outer.append(gcc)
             else:
+                if tooth_angle is None:
+                    tooth_angle = r % 360      # Starting angle for this tooth
+                    adjusted_angle = tooth_angle
+                    # cuts_inner.append('( Inner: InputAngle=%.4f ToothAngle=%.4f Adjusted=%.4f )' % (r, tooth_angle, adjusted_angle))
+                else:
+                    delta_mod = (tooth_angle - r % 360) % 360
+                    if delta_mod > 180:
+                        delta_mod -= 360
+                    adjusted_angle = tooth_angle - delta_mod
+                    # cuts_inner.append('( Inner: InputAngle=%.4f ToothAngle=%.4f Adjusted=%.4f Delta=%.4f)' % (r, tooth_angle, adjusted_angle, delta_mod))
+                gcc = cut.cut(adjusted_angle, y, z)
                 cuts_inner.append(gcc)
         gcode.extend(cuts_outer)
         gcode.extend(cuts_inner)

@@ -408,7 +408,7 @@ if picture:
         plt.plot(*dedendum_circle.exterior.xy, color='m')
         plt.plot(*gear_blank.exterior.xy, color='b')
         plt.plot(*zip(*gg_poly), color='#DDDDDD')
-        plt.plot(*zip(*gg.gen_tooth()), 'green')
+        plt.plot(*zip(*gg.gen_rack_tooth()), 'green')
         gg.plot_show(2)
 
 # Create an svg file of only the gear

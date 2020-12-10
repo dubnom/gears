@@ -42,7 +42,7 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
         check_a = Line(check_a.origin, check_a.direction.unit()*check_len)
         min_found = Line(min_found.origin, min_found.direction.unit()*check_len)
         plot([check_a.p2, min_found.p1, min_found.p2], 'pink')
-        print(check_a.direction.angle(), min_found.direction.angle())
+        # print(check_a.direction.angle(), min_found.direction.angle())
         min_arc = arc(check_a.direction.length()*0.7, check_a.direction.angle(), min_found.direction.angle(), check_a.p1)
         plot(min_arc, 'pink')
         mid_arc = min_arc[len(min_arc)//2]

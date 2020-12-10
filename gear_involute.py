@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 from anim.geom import Point, Vector, Line
 from anim.transform import Transform
-from gear_base import PointList, check_point_list, plot, circle, GearInstance
+from gear_base import PointList, check_point_list, plot, circle, GearInstance, path_rotate
 from rack import Rack
 
 
@@ -91,16 +91,24 @@ class GearInvolute(object):
         self.base_radius = self.pitch_radius * cos(self.pressure_angle)
         self.tip_radius = self.pitch_radius + self.module   # add addendum
         self.dedendum_radius = self.pitch_radius - self.module * self.relief_factor
-        print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
+        # print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
 
-    def gen_poly(self) -> PointList:
+    def gen_gear_tooth(self) -> PointList:
+        """
+            Generate one tooth centered on the tip of the tooth.
+            Does not include the root flats since they will be created when adjoining
+            tooth is placed.
+                  ____
+                 /    \
+            \___/      \___/
+        """
         addendum = self.module
         dedendum = self.module * 1.25
         tooth = self.pitch / 2
         addendum_offset = addendum * tan(self.pressure_angle)
         dedendum_offset = dedendum * tan(self.pressure_angle)
-        print(self.pitch, tooth, addendum_offset)
-        print('pitch=', self.pitch, ' cp=', tau / self.teeth)
+        # print(self.pitch, tooth, addendum_offset)
+        # print('pitch=', self.pitch, ' cp=', tau / self.teeth)
         points = []
         br = self.base_radius
         pr = self.pitch_radius
@@ -114,20 +122,26 @@ class GearInvolute(object):
         # Multiply pp_off_angle by pr to move from angular to pitch space
         tooth_offset = tooth / 2 - pp_off_angle * pr
 
+        start_angle = -tooth_offset / pr
+        pts = inv.path(offset=start_angle, center=self.center, up=-1, steps=self.steps)
+        # TODO-fix all of this reversing
+        points.extend(reversed(pts))
+        if not inv.clipped:
+            # Add the direct line to the dedendum radius
+            # TODO-this should handle undercutting
+            points.append((dr * cos(start_angle) + cx, dr * sin(start_angle) + cy))
+        points.extend(Point(x, -y) for x, y in list(reversed(points)))
+        points = [Point(x, y) for x, y in reversed(points)]
+        return points
+
+    def gen_poly(self) -> PointList:
+        """Generate the full polygon for the gear using gen_gear_tooth"""
+        tooth_path = self.gen_gear_tooth()
+        check_point_list(tooth_path)
+        points = []
         for n in range(self.teeth):
-            mid = n * self.pitch + self.rot
-
-            start_angle = (mid - tooth_offset) / pr
-            pts = inv.path(offset=start_angle, center=self.center, up=-1, steps=self.steps)
-            points.extend(reversed(pts))
-            if not inv.clipped:
-                points.append((dr * cos(start_angle) + cx, dr * sin(start_angle) + cy))
-
-            start_angle = (mid + tooth_offset) / pr
-            if not inv.clipped:
-                points.append((dr * cos(start_angle) + cx, dr * sin(start_angle) + cy))
-            pts = inv.path(offset=start_angle, center=self.center, up=1, steps=self.steps)
-            points.extend(pts)
+            start_angle = 360 / self.teeth * n
+            points.extend(path_rotate(tooth_path, start_angle, True))
         points = [Point(x, y) for x, y in points]
         check_point_list(points)
         return points
@@ -278,7 +292,7 @@ class GearInvolute(object):
             low_params.append((rotation, y, z+half_tool_tip))
         return high_params + center_params + list(reversed(low_params)) + tip_params
 
-    def gen_tooth(self):
+    def gen_rack_tooth(self):
         rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)
         tooth_pts = [rack.tooth_base_high, rack.tooth_tip_high, rack.tooth_tip_low, rack.tooth_base_low]
         offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
@@ -330,7 +344,7 @@ class GearInvolute(object):
                 # plot([cut.p1.xy(), cut.p2.xy()], color)
                 origins.append(cut.origin)
             plot(origins, col)
-            plot(self.gen_tooth(), 'green')
+            plot(self.gen_rack_tooth(), 'green')
 
         if mill_space:
             cuts = self.cuts_for_mill(tool_angle)

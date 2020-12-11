@@ -17,66 +17,22 @@ Copyright 2020 - Michael Dubno - New York
 # FIX: Add support for DP
 
 import sys
-from math import sin, cos, tan, atan2, radians, degrees, sqrt, pi, tau
+from math import sin, cos, tan, radians, degrees, sqrt, pi, tau
 from typing import Optional
 
 import configargparse
 
 import gear_plot
 from anim.geom import Point
-from gear_base import GearInstance, plot
+from gear_base import GearInstance
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute
+from tool import Tool
 
 
 def rotate(a, x, y):
     """Return point x,y rotated by angle a (in radians)."""
     return x * cos(a) - y * sin(a), x * sin(a) + y * cos(a)
-
-
-class Tool:
-    r"""
-        The Tool class holds the specifications of the cutting tool.
-          /\
-         /  \
-         |   |
-        |+   ---------
-        |+   ---------
-         |   |
-         \  /
-          \/
-    """
-
-    def __init__(self, angle=40., depth=3., radius=10., tip_height=0., shaft_extension=6.35,
-                 number=1, rpm=2000, feed=200, flutes=4, mist=False, flood=False,
-                 mill='both'):
-        if angle < 0.:
-            raise ValueError('Tool: Angle must be greater than or equal to 0')
-        if depth <= 0.:
-            raise ValueError('Tool: Depth must be greater than 0')
-        if radius < depth:
-            raise ValueError('Tool: Radius must be greater than depth')
-        if tip_height < 0:
-            raise ValueError('Tool: tip_height must be greater than or equal to 0')
-        if mill not in ['both', 'climb', 'conventional']:
-            raise ValueError('Tool: mill must be "both", "climb", or "conventional')
-
-        self.angle = radians(angle)
-        self.depth = depth
-        self.radius = radius
-        self.tip_height = tip_height
-        self.shaft_extension = shaft_extension
-        self.number = number
-        self.rpm = rpm
-        self.feed = feed
-        self.flutes = flutes
-        self.mist = mist
-        self.flood = flood
-        self.mill = mill
-
-    def __str__(self):
-        return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {}, Extension: {}, Flutes: {})".format(
-            degrees(self.angle), self.depth, self.radius, self.tip_height, self.shaft_extension, self.flutes)
 
 
 class Gear:
@@ -617,19 +573,7 @@ def main():
     p.add('--algo', type=str, default='old', help='Which algorithm to use for gcode generation')
 
     # Tool arguments
-    p.add('--tool', '-T', is_config_file=True, help='Tool config file')
-    p.add('--angle', '-A', type=float, default=40., help='Tool: included angle in degrees')
-    p.add('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
-    p.add('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
-    p.add('--diameter', '-I', type=float, default=15., help='Tool: cutting diameter at tip in mm')
-    p.add('--shaft_extension', type=float, default=6.35, help='Tool: shaft extension beyond bottom of cutter in mm')
-    p.add('--number', '-N', type=int, default=1, help='Tool: tool number')
-    p.add('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
-    p.add('--feed', '-F', type=float, default=200., help='Tool: feed rate')
-    p.add('--flutes', '-U', type=int, default=4, help='Tool: flutes')
-    p.add('--mist', '-M', action='store_true', help='Tool: turn on mist coolant')
-    p.add('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
-    p.add('--mill', default='conventional', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
+    Tool.add_config_args(p)
 
     # Alignment test
     p.add('--align', type=bool, default=False, help='Generate alignment cuts')

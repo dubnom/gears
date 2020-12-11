@@ -53,7 +53,8 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
         arc_extra = (arc_end - arc_start) * 0.5
         plot(arc(gear.pitch_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'green')
         plot(arc(gear.tip_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'yellow')
-        plot(arc(gear.inside_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'yellow')
+        if gear.inside_radius:
+            plot(arc(gear.inside_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'yellow')
         plot(arc(gear.base_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'brown')
         # plot(circle(gear.pitch_radius+gear.module, Point(0, 0)), 'yellow')
         # plot(circle(gear.pitch_radius-gear.module*1.25, Point(0, 0)), 'yellow')
@@ -393,9 +394,9 @@ def main():
     # all_gears(); return
     # do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
 
-    pair = InvolutePair(137, 33, module=2)
+    # pair = InvolutePair(137, 33, module=2)
     # pair = InvolutePair(31, 27, module=2)
-    # pair = CycloidalPair(137, 33, module=0.89647)
+    pair = CycloidalPair(137, 33, module=0.89647)
     plot_classified_cuts(pair.wheel(), tool_angle=0.0, tool_tip_height=1/32*25.4)
     plot_classified_cuts(pair.pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4)
     pair.plot()

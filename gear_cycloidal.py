@@ -95,8 +95,7 @@ class CycloidalPair:
             print('   : ')
         return af, theta_guess / pr_gr
 
-    def gen_poly(self, rotation=0.0) -> PointList:
-        rotation *= self.wheel_tooth_degrees
+    def gen_wheel_tooth(self) -> PointList:
         half_tooth = self.wheel_tooth_degrees / 4
         cycloid_path_down = list(reversed(self.cycloid_path(theta_max=self.wheel_tooth_theta, steps=5)))
         cycloid_path_up = [Point(p.x, -p.y) for p in reversed(cycloid_path_down)]
@@ -113,6 +112,11 @@ class CycloidalPair:
         tooth_path.extend(tip_high)
         tooth_path.extend(tip_low[1:])      # First point is duplicate of tip_high last point
         tooth_path.append(scale_pt(tip_low[-1]))
+        return tooth_path
+
+    def gen_poly(self, rotation=0.0) -> PointList:
+        rotation *= self.wheel_tooth_degrees
+        tooth_path = self.gen_wheel_tooth()
 
         points = []
         # for n in [-1, 0, 1]:
@@ -137,10 +141,7 @@ class CycloidalPair:
         else:
             return 0.625, 0.625
 
-    def gen_pinion_poly(self, rotation=0.0) -> PointList:
-        if self.pinion_teeth % 2 == 0:
-            rotation += 0.5
-        rotation *= self.pinion_tooth_degrees
+    def gen_pinion_tooth(self) -> PointList:
         half_tooth = tau / self.pinion_teeth / 4
         if self.pinion_teeth < 10:
             half_tooth *= 1.05 / (pi/2)
@@ -170,6 +171,13 @@ class CycloidalPair:
         # Hack to chop off the tip, just for demo
         # tooth_path_polar = tooth_path_polar[:3] + tooth_path_polar[-3:]
         tooth_path = [Point(r*cos(t), r*sin(t)) for r, t in tooth_path_polar]
+        return tooth_path
+
+    def gen_pinion_poly(self, rotation=0.0) -> PointList:
+        if self.pinion_teeth % 2 == 0:
+            rotation += 0.5
+        rotation *= self.pinion_tooth_degrees
+        tooth_path = self.gen_pinion_tooth()
 
         points = []
         # for n in [-1, 0, 1]:

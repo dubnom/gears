@@ -1,5 +1,5 @@
 from math import sin, cos, tau, radians, ceil, tan
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Optional
 
 from matplotlib import pyplot as plt
 
@@ -141,21 +141,37 @@ class ClassifiedCut:
 
 class GearInstance:
     """Holder for finished gear (could be just about any polygon, really)"""
-    def __init__(self, module, teeth, shape, kind, poly: PointList, center: Point,
-                 tip_radius=0., base_radius=0., inside_radius=0.):
+    def __init__(self, module, teeth, shape, kind, tooth_path: PointList, center: Point,
+                 poly: Optional[PointList] = None, rotation_extra=0.,
+                 tip_radius=0., base_radius=0., root_radius=0.):
         self.module = module
         self.teeth = teeth
         self.shape = shape
         self.kind = kind
-        self.poly = poly    # center of poly is 0, 0
-        check_point_list(poly)
+        self.tooth_path = tooth_path
+        check_point_list(tooth_path)
+        self.poly = poly or self.gen_poly()
+        check_point_list(self.poly)
+        self.rotation_extra = rotation_extra
         self.center = center
         # self.circular_pitch = self.module * pi
         self.pitch_diameter = self.module * self.teeth
         self.pitch_radius = self.pitch_diameter / 2
         self.tip_radius = tip_radius
         self.base_radius = base_radius
-        self.inside_radius = inside_radius
+        self.root_radius = root_radius
+
+    def gen_poly(self, rotation=0.0) -> PointList:
+        """Generate the full polygon from the tooth path"""
+        degrees_per_tooth = 360 / self.teeth
+        rotation *= degrees_per_tooth
+
+        points = []
+        for n in range(self.teeth):
+            mid = n * degrees_per_tooth + rotation
+            points.extend(path_rotate(self.tooth_path, mid, True))
+        check_point_list(points)
+        return points
 
     def description(self):
         return '%s %s%d teeth' % (self.shape, (self.kind + ' ' if self.kind else ''), self.teeth)
@@ -172,14 +188,15 @@ class GearInstance:
             :param plotter:     matplotlib Axes or None for top-level plot
             :return:
         """
+        rotation += self.rotation_extra
         rotation *= 360 / self.teeth
         plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
         if self.base_radius:
             plot(circle(self.base_radius, self.center), 'wheat', plotter=plotter)
         if self.tip_radius:
             plot(circle(self.tip_radius, self.center), 'yellow', plotter=plotter)
-        if self.inside_radius:
-            plot(circle(self.inside_radius, self.center), 'yellow', plotter=plotter)
+        if self.root_radius:
+            plot(circle(self.root_radius, self.center), 'yellow', plotter=plotter)
         path = path_translate(path_rotate(self.poly, rotation, True), self.center)
         path.append(path[0])        # Make sure it is closed
         plot(path, color, plotter=plotter)

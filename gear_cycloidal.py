@@ -4,7 +4,7 @@ from typing import Tuple, cast, Union
 from matplotlib import pyplot as plt
 
 from anim.geom import Point, BasePoint
-from gear_base import PointList, t_range, path_rotate, GearInstance, plot, circle
+from gear_base import PointList, t_range, path_rotate, GearInstance
 
 
 class CycloidalPair:
@@ -95,8 +95,7 @@ class CycloidalPair:
             print('   : ')
         return af, theta_guess / pr_gr
 
-    def gen_poly(self, rotation=0.0) -> PointList:
-        rotation *= self.wheel_tooth_degrees
+    def gen_wheel_tooth(self) -> PointList:
         half_tooth = self.wheel_tooth_degrees / 4
         cycloid_path_down = list(reversed(self.cycloid_path(theta_max=self.wheel_tooth_theta, steps=5)))
         cycloid_path_up = [Point(p.x, -p.y) for p in reversed(cycloid_path_down)]
@@ -113,15 +112,7 @@ class CycloidalPair:
         tooth_path.extend(tip_high)
         tooth_path.extend(tip_low[1:])      # First point is duplicate of tip_high last point
         tooth_path.append(scale_pt(tip_low[-1]))
-
-        points = []
-        # for n in [-1, 0, 1]:
-        for n in range(self.wheel_teeth):
-            mid = n * self.wheel_tooth_degrees + rotation
-            points.extend(path_rotate(tooth_path, mid, True))
-        # points.append(points[0])
-
-        return points
+        return tooth_path
 
     def pinion_factors(self) -> Tuple[float, float]:
         """
@@ -137,10 +128,7 @@ class CycloidalPair:
         else:
             return 0.625, 0.625
 
-    def gen_pinion_poly(self, rotation=0.0) -> PointList:
-        if self.pinion_teeth % 2 == 0:
-            rotation += 0.5
-        rotation *= self.pinion_tooth_degrees
+    def gen_pinion_tooth(self) -> PointList:
         half_tooth = tau / self.pinion_teeth / 4
         if self.pinion_teeth < 10:
             half_tooth *= 1.05 / (pi/2)
@@ -170,34 +158,21 @@ class CycloidalPair:
         # Hack to chop off the tip, just for demo
         # tooth_path_polar = tooth_path_polar[:3] + tooth_path_polar[-3:]
         tooth_path = [Point(r*cos(t), r*sin(t)) for r, t in tooth_path_polar]
-
-        points = []
-        # for n in [-1, 0, 1]:
-        for n in range(self.pinion_teeth):
-            mid = n * self.pinion_tooth_degrees + rotation
-            rotated = path_rotate(tooth_path, mid, True)
-            points.extend(rotated)
-
-        # points.append(points[0])
-
-        return points
+        return tooth_path
 
     def wheel(self):
         """Return a gear instance that represents the wheel of the pair"""
-        return GearInstance(self.module, self.wheel_teeth, 'Cycloidal', 'wheel', self.gen_poly(), Point(0, 0),
+        return GearInstance(self.module, self.wheel_teeth, 'Cycloidal', 'wheel', self.gen_wheel_tooth(), Point(0, 0),
                             tip_radius=self.wheel_tip_radius, base_radius=self.wheel_base_radius)
 
     def pinion(self):
         """Return a gear instance that represents the pinion of the pair"""
-        return GearInstance(self.module, self.pinion_teeth, 'Cycloidal', 'pinion', self.gen_pinion_poly(),
+        return GearInstance(self.module, self.pinion_teeth, 'Cycloidal', 'pinion', self.gen_pinion_tooth(),
                             Point(self.wheel_pitch_radius+self.pinion_pitch_radius, 0),
+                            rotation_extra=0.5 if self.pinion_teeth % 2 == 0 else 0.0,
                             tip_radius=self.pinion_tip_radius, base_radius=self.pinion_base_radius)
 
-    def plot(self, color='blue', rotation=0.0, center=Point(0, 0), pinion: Union[str, bool] = True):
-        addendum = self.module * self.addendum_factor_theoretical
-        dedendum = self.pitch / 2
-        pitch_radius = self.pitch_radius
-
+    def plot(self, color='blue', rotation=0.0, pinion: Union[str, bool] = True):
         if pinion != 'only':
             self.wheel().plot(color, rotation=rotation)
 

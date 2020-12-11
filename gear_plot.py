@@ -142,27 +142,17 @@ def do_gears(rot=0., zoom_radius=0., cycloidal=True, wheel_teeth=40, pinion_teet
         wheel.plot_show(zoom_radius)
 
 
-def all_gears(cycloidal=True, animate=not False):
+def all_gears(cycloidal=True, animate=True, zoom=False):
     import gear_config
-    assert cycloidal
 
     gears = []
     for planet, (x, y, module) in gear_config.GEARS.items():
-        if x > y:
+        if cycloidal:
             pair = CycloidalPair(x, y, module=module)
-            gear_x = pair.wheel()
-            gear_y = pair.pinion()
-        elif x == y:
-            pair = CycloidalPair(x, y, module=module)
-            gear_x = pair.wheel()
-            gear_y = pair.wheel()
-            gear_y.center = pair.pinion().center
-            gear_y = pair.pinion()
         else:
-            pair = CycloidalPair(y, x, module=module)
-            gear_x = pair.pinion()
-            gear_y = pair.wheel()
-            gear_x.center, gear_y.center = gear_y.center, gear_x.center
+            pair = InvolutePair(x, y, module=module)
+        gear_x = pair.wheel()
+        gear_y = pair.pinion()
         gears.append((pair, gear_x, gear_y))
 
     if animate:
@@ -171,15 +161,17 @@ def all_gears(cycloidal=True, animate=not False):
 
         def update(ax):
             for pair, gear_x, gear_y in gears:
+                extra = 0
                 if cycloidal:
                     extra = 0.08 if pair.pinion_teeth < 10 else 0.05
-                else:
-                    extra = 0.5 if pinion.teeth % 2 == 0 else 0.0
                 gear_x.set_zoom(plotter=ax)
+                if zoom:
+                    ax.set_xlim(0, 80)
+                    ax.set_ylim(-40, 40)
                 rot = rotation[0]/7*gear_x.teeth
                 gear_x.plot('blue', rotation=rot, plotter=ax)
                 gear_y.plot('green', rotation=-rot + extra, plotter=ax)
-            rotation[0] += 0.2
+            rotation[0] += 0.002
         pv = PlotViewer(update_func=update)
         pv.mainloop()       # never returns
     else:
@@ -391,7 +383,7 @@ def main():
     # [test_inv(n) for n in range(3, 34)]; return
     # test_inv(137); test_inv(42); test_inv(142); return
     # test_cuts(); return
-    # all_gears(); return
+    all_gears(cycloidal=not False); return
     # do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
 
     # pair = InvolutePair(137, 33, module=2)

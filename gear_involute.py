@@ -393,6 +393,7 @@ class InvolutePair:
     def pinion(self):
         p = self.gear_pinion.instance()
         p.center = Point(self.gear_wheel.pitch_radius + self.gear_pinion.pitch_radius, 0)
+        p.rotation_extra = 0.5 if p.teeth % 2 == 0 else 0.0
         return p
 
     def plot(self, color='blue', rotation=0.0, plotter=None):

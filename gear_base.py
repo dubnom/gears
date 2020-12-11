@@ -142,7 +142,7 @@ class ClassifiedCut:
 class GearInstance:
     """Holder for finished gear (could be just about any polygon, really)"""
     def __init__(self, module, teeth, shape, kind, tooth_path: PointList, center: Point,
-                 poly: Optional[PointList] = None,
+                 poly: Optional[PointList] = None, rotation_extra=0.,
                  tip_radius=0., base_radius=0., root_radius=0.):
         self.module = module
         self.teeth = teeth
@@ -152,6 +152,7 @@ class GearInstance:
         check_point_list(tooth_path)
         self.poly = poly or self.gen_poly()
         check_point_list(self.poly)
+        self.rotation_extra = rotation_extra
         self.center = center
         # self.circular_pitch = self.module * pi
         self.pitch_diameter = self.module * self.teeth
@@ -187,6 +188,7 @@ class GearInstance:
             :param plotter:     matplotlib Axes or None for top-level plot
             :return:
         """
+        rotation += self.rotation_extra
         rotation *= 360 / self.teeth
         plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
         if self.base_radius:

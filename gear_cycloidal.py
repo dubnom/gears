@@ -169,6 +169,7 @@ class CycloidalPair:
         """Return a gear instance that represents the pinion of the pair"""
         return GearInstance(self.module, self.pinion_teeth, 'Cycloidal', 'pinion', self.gen_pinion_tooth(),
                             Point(self.wheel_pitch_radius+self.pinion_pitch_radius, 0),
+                            rotation_extra=0.5 if self.pinion_teeth % 2 == 0 else 0.0,
                             tip_radius=self.pinion_tip_radius, base_radius=self.pinion_base_radius)
 
     def plot(self, color='blue', rotation=0.0, pinion: Union[str, bool] = True):

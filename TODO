@@ -2,7 +2,8 @@ DONE: Bottom clearing for new algo with pointy cutters
 DONE: Separate tip clearing from gear cutting
 * Stand-alone tip-clearing with optimization (maybe keep mill in place and use rotation only?)
 * Add cut strategy capability to reorder/modify cuts
-* Change to tooth-based description instead of full polygon
+DONE: Change to tooth-based generation instead of full polygon
+* Change to tooth-based cut analysis instead of full polygon
 * Add backlash parameter
 PARTIAL: Improved sequencing of cuts to minimize movement of mill (sort by rotation?)
 PARTIAL: Avoid outputting angles that cause 360 degree rotation

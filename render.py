@@ -224,7 +224,7 @@ for line_number, line in enumerate(infile):
             gg = gear_plot.GearInvolute(v['teeth'],
                                         module=v['module'], relief_factor=v['relief_factor'],
                                         pressure_angle=degrees(v['pressure_angle']))
-            gg_poly = gg.gen_poly()
+            gg_poly = gg.instance().poly
             gg_base_circle = circle(gg.base_radius)
             if cycloidal_target := v.get('cycloidal_target'):
                 cp = CycloidalPair(v['wheel_teeth'], v['pinion_teeth'], v['module'])

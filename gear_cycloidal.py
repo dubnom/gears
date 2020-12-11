@@ -4,7 +4,7 @@ from typing import Tuple, cast, Union
 from matplotlib import pyplot as plt
 
 from anim.geom import Point, BasePoint
-from gear_base import PointList, t_range, path_rotate, GearInstance, plot, circle
+from gear_base import PointList, t_range, path_rotate, GearInstance
 
 
 class CycloidalPair:
@@ -114,19 +114,6 @@ class CycloidalPair:
         tooth_path.append(scale_pt(tip_low[-1]))
         return tooth_path
 
-    def gen_poly(self, rotation=0.0) -> PointList:
-        rotation *= self.wheel_tooth_degrees
-        tooth_path = self.gen_wheel_tooth()
-
-        points = []
-        # for n in [-1, 0, 1]:
-        for n in range(self.wheel_teeth):
-            mid = n * self.wheel_tooth_degrees + rotation
-            points.extend(path_rotate(tooth_path, mid, True))
-        # points.append(points[0])
-
-        return points
-
     def pinion_factors(self) -> Tuple[float, float]:
         """
             Lookup the pinion addendum and radius factors based in number of teeth.
@@ -173,39 +160,18 @@ class CycloidalPair:
         tooth_path = [Point(r*cos(t), r*sin(t)) for r, t in tooth_path_polar]
         return tooth_path
 
-    def gen_pinion_poly(self, rotation=0.0) -> PointList:
-        if self.pinion_teeth % 2 == 0:
-            rotation += 0.5
-        rotation *= self.pinion_tooth_degrees
-        tooth_path = self.gen_pinion_tooth()
-
-        points = []
-        # for n in [-1, 0, 1]:
-        for n in range(self.pinion_teeth):
-            mid = n * self.pinion_tooth_degrees + rotation
-            rotated = path_rotate(tooth_path, mid, True)
-            points.extend(rotated)
-
-        # points.append(points[0])
-
-        return points
-
     def wheel(self):
         """Return a gear instance that represents the wheel of the pair"""
-        return GearInstance(self.module, self.wheel_teeth, 'Cycloidal', 'wheel', self.gen_poly(), Point(0, 0),
+        return GearInstance(self.module, self.wheel_teeth, 'Cycloidal', 'wheel', self.gen_wheel_tooth(), Point(0, 0),
                             tip_radius=self.wheel_tip_radius, base_radius=self.wheel_base_radius)
 
     def pinion(self):
         """Return a gear instance that represents the pinion of the pair"""
-        return GearInstance(self.module, self.pinion_teeth, 'Cycloidal', 'pinion', self.gen_pinion_poly(),
+        return GearInstance(self.module, self.pinion_teeth, 'Cycloidal', 'pinion', self.gen_pinion_tooth(),
                             Point(self.wheel_pitch_radius+self.pinion_pitch_radius, 0),
                             tip_radius=self.pinion_tip_radius, base_radius=self.pinion_base_radius)
 
-    def plot(self, color='blue', rotation=0.0, center=Point(0, 0), pinion: Union[str, bool] = True):
-        addendum = self.module * self.addendum_factor_theoretical
-        dedendum = self.pitch / 2
-        pitch_radius = self.pitch_radius
-
+    def plot(self, color='blue', rotation=0.0, pinion: Union[str, bool] = True):
         if pinion != 'only':
             self.wheel().plot(color, rotation=rotation)
 

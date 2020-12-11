@@ -53,8 +53,8 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
         arc_extra = (arc_end - arc_start) * 0.5
         plot(arc(gear.pitch_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'green')
         plot(arc(gear.tip_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'yellow')
-        if gear.inside_radius:
-            plot(arc(gear.inside_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'yellow')
+        if gear.root_radius:
+            plot(arc(gear.root_radius, arc_start - arc_extra, arc_end + arc_extra, Point(0, 0)), 'yellow')
         plot(arc(gear.base_radius, arc_start-arc_extra, arc_end+arc_extra, Point(0, 0)), 'brown')
         # plot(circle(gear.pitch_radius+gear.module, Point(0, 0)), 'yellow')
         # plot(circle(gear.pitch_radius-gear.module*1.25, Point(0, 0)), 'yellow')
@@ -142,7 +142,7 @@ def do_gears(rot=0., zoom_radius=0., cycloidal=True, wheel_teeth=40, pinion_teet
         wheel.plot_show(zoom_radius)
 
 
-def all_gears(zoom_radius=0., cycloidal=True, animate=not False):
+def all_gears(cycloidal=True, animate=not False):
     import gear_config
     assert cycloidal
 

@@ -1,4 +1,5 @@
 import json
+import sys
 from math import radians, degrees, tan
 
 import configargparse
@@ -6,15 +7,28 @@ import configargparse
 
 class Tool:
     r"""
-        The Tool class holds the specifications of the cutting tool.
-          /\
-         /  \
-         |   |
-        |+   ---------
-        |+   ---------
-         |   |
-         \  /
-          \/
+        The Tool class holds the specifications of the cutting tool, shown here
+        on its side::
+
+               _
+              / \               d_e
+             /   \             c   f
+             |    |            |   |
+            |+    ---------   ab   g---------h
+            |                 |
+            |+    ---------   AB   G---------h
+             |    |            |   |
+             \   /             C   F
+              \_/               D_E
+
+        * angle is angle(dc,ef)
+        * depth is height(cd)
+        * radius is height(bd)
+        * tip_height is length(de)
+        * shaft_extension is length(ab)
+        * shaft_length is length(gh)  [argument to cutter_poly() and shaft_poly()]
+        * shaft radius is length(aA)/2 and is computed as radius-depth
+        * length(bc) must be zero in the current model
     """
 
     def __init__(self, angle=40., depth=3., radius=10., tip_height=0., shaft_extension=6.35,
@@ -44,9 +58,17 @@ class Tool:
         self.flood = flood
         self.mill = mill
 
+    @property
+    def angle_radians(self):
+        return self.angle
+
+    @property
+    def angle_degrees(self):
+        return degrees(self.angle)
+
     def __str__(self):
         return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {}, Extension: {}, Flutes: {})".format(
-            degrees(self.angle), self.depth, self.radius, self.tip_height, self.shaft_extension, self.flutes)
+            self.angle_degrees, self.depth, self.radius, self.tip_height, self.shaft_extension, self.flutes)
 
     @staticmethod
     def add_config_args(p: configargparse.ArgumentParser):
@@ -67,7 +89,7 @@ class Tool:
         p.add_argument('--mill', default='conventional', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
 
     @classmethod
-    def from_config_args(cls, args):
+    def from_config_args(cls, args: configargparse.Namespace):
         return Tool(angle=args.angle, depth=args.depth, tip_height=args.height, shaft_extension=args.shaft_extension,
                     radius=args.diameter / 2., number=args.number, rpm=args.rpm,
                     feed=args.feed, flutes=args.flutes, mist=args.mist,
@@ -82,7 +104,7 @@ class Tool:
 
     def to_json(self, indent=None):
         d = dict(**self.__dict__)
-        d['angle'] = degrees(d['angle'])
+        d['angle'] = self.angle_degrees
         return json.dumps(d, sort_keys=True, indent=indent)
 
     @classmethod
@@ -93,7 +115,7 @@ class Tool:
         """Return a polygon representing this tool"""
 
         half_tip = self.tip_height / 2.
-        tip_y = half_tip + tan(radians(self.angle / 2.)) * self.depth
+        tip_y = half_tip + tan(self.angle_radians / 2.) * self.depth
         shaft = self.radius - self.depth
 
         shaft_top = tip_y + shaft_length
@@ -118,7 +140,7 @@ class Tool:
         """Return a polygon representing this tool"""
 
         half_tip = self.tip_height / 2.
-        tip_y = half_tip + tan(radians(self.angle / 2.)) * self.depth
+        tip_y = half_tip + tan(self.angle_radians / 2.) * self.depth
         shaft = self.radius - self.depth
 
         shaft_top = tip_y + shaft_length
@@ -132,18 +154,20 @@ class Tool:
         ]
         return shaft
 
-    def plot(self, title=''):
+    def plot(self, title='', do_show=True):
         import matplotlib.pyplot as plt
         plt.plot(*zip(*self.cutter_poly(self.radius)))
         plt.plot(*zip(*self.shaft_poly(self.radius)))
         plt.axis('equal')
         if title:
             plt.title(title)
-        plt.show()
+        if do_show:
+            plt.show()
 
 
-def test():
-    for fn in ['saw32nd.cfg', 'cutter45.cfg', 'gear_cutter_06.cfg']:
+def test(args):
+    args = args or ['saw32nd.cfg', 'cutter45.cfg', 'gear_cutter_06.cfg']
+    for fn in args:
         t = Tool.from_config_file(fn)
         print(fn)
         print('   ', t)
@@ -156,4 +180,4 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    test(sys.argv[1:])

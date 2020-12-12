@@ -10,7 +10,9 @@ PARTIAL: Avoid outputting angles that cause 360 degree rotation
   - what was the exact issue?   (something like G0 A350 // G0 A-10?)
 * Add cutters that have flat & rounded tips (like gear cutters)
 * Add cutter far side to gear intersection tests during cut generation
-* Make gear cutter work
+DONE: Make simple (non-radiused) gear cutter work
+* Model gear cutter with radius at tip corners
+* Make gear cutter with radius work
 * Cleanup gcode_vars
   - make gears and tools know how to output / load from gcode_vars
 DONE: Put Tool class in stand-alone file

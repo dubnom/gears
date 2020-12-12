@@ -200,6 +200,7 @@ class GearInstance:
         path = path_translate(path_rotate(self.poly, rotation, True), self.center)
         path.append(path[0])        # Make sure it is closed
         plot(path, color, plotter=plotter)
+        # Add a pointer to make it possible to visually track rotation
         plot(path_translate(path_rotate([Point(0, 0), self.poly[5*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
 
     def set_zoom(self, zoom_radius=0.0, plotter=None):
@@ -322,9 +323,10 @@ class GearInstance:
             :param tool_tip_height:
             :returns: List of (cut, cut-kind, convex, allowed overshoot)
         """
+        tool_is_pointy = tool_tip_height == 0
         half_tool_tip = tool_tip_height / 2
-        if tool_angle:
-            # For pointy tools clearing the flats at the bottom of the tooth,
+        if tool_is_pointy:
+            # For pointy tools clearing the flats at the root of the tooth,
             # go deeper with the cutter by _extension which gives a width of _tip
             # TODO-0.3 seems to work, but should really be configurable
             flat_tool_extension = 0.3 * self.module
@@ -344,15 +346,15 @@ class GearInstance:
 
         for cut_index, cut in enumerate(classified):
             cuts = []
-            is_flat = (cut.kind == 'flat-root') or (cut.kind == 'flat-tip' and tool_angle == 0)
+            is_flat = (cut.kind == 'flat-root') or (cut.kind == 'flat-tip' and not tool_is_pointy)
             if cut.kind == 'undercut':
                 raise ValueError("Can't do undercuts yet")
             elif is_flat:
-                if tool_angle != 0 and Vector(*cut.cut_line.origin.xy()).length() < self.pitch_radius:
+                if tool_is_pointy and Vector(*cut.cut_line.origin.xy()).length() < self.pitch_radius:
                     # TODO-attempt to do bottom clearing with pointy-cutter
                     pass
                     # continue
-                if tool_angle == 0:
+                if tool_is_pointy:
                     normal = cut.cut_line.direction.unit().normal() * cut.z_offset
                 else:
                     normal = cut.cut_line.direction.unit().normal() * -1
@@ -380,7 +382,7 @@ class GearInstance:
                     cut_len = cut.line.direction.length()
                     cuts_required = ceil(cut_len/flat_tool_tip)
                     cut_dir = cut.line.direction.unit()
-                    if tool_angle:
+                    if tool_is_pointy:
                         start_angle = classified[cut_index-1].cut_line.direction.angle()+tool_angle
                         end_angle = classified[(cut_index+1) % len(classified)].cut_line.direction.angle()
                         # TODO-This works, but is there something smarter?
@@ -414,19 +416,27 @@ class GearInstance:
                 cuts.append((cut_line, cut.kind))
 
             details = []
-            inward = cut.inward() or (cut.kind == 'flat-tip' and tool_angle)
+            inward = cut.inward() or (cut.kind == 'flat-tip' and tool_is_pointy)
             for adjusted_cut, kind in cuts:
                 cut_angle = adjusted_cut.direction.angle()
-                if inward:
-                    rotation = -tool_angle/2 - cut_angle
+                if kind == 'flat-multi':
+                    # Do not use tool_angle for flat-multi as these cuts use the end of the tool
+                    rotation = -cut_angle
+                    if tool_angle and tool_tip_height and cut.kind == 'flat-root':
+                        # Skip root clearing for gear cutter type tools
+                        # TODO-this should determine if root gap is narrower than 2 * tool_tip_height
+                        continue
                 else:
-                    rotation = tool_angle/2 - cut_angle
+                    if inward:
+                        rotation = -tool_angle/2 - cut_angle
+                    else:
+                        rotation = tool_angle/2 - cut_angle
 
                 t = Transform().rotate(-rotation)
                 cut_origin = adjusted_cut.origin
                 # TODO-This should check for intersections with other edges
                 # TODO-replace hacky heuristic to shorten vertical cuts
-                if tool_angle and cut.kind in {'in', 'out'}:
+                if tool_is_pointy and cut.kind in {'in', 'out'}:
                     vertical_cut_reduction = 0
                     # vertical_cut_reduction = 1.5
                     cut_origin += adjusted_cut.direction.unit() * self.module * vertical_cut_reduction

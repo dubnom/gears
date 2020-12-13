@@ -70,6 +70,15 @@ class Tool:
         return "(Angle: {}, Depth: {}, Radius: {}, TipHeight: {}, Extension: {}, Flutes: {})".format(
             self.angle_degrees, self.depth, self.radius, self.tip_height, self.shaft_extension, self.flutes)
 
+    def __repr__(self):
+        fields = 'depth,radius,tip_height,shaft_extension,number,rpm,feed,flutes,mist,flood,mill'
+        field_vals = ', '.join('%s=%s' % (f, getattr(self, f)) for f in fields.split(','))
+        return 'Tool(angle=%s, %s)' % (self.angle_degrees, field_vals)
+
+    def __eq__(self, other):
+        return type(self) == type(other) and \
+               self.__dict__ == other.__dict__
+
     @staticmethod
     def add_config_args(p: configargparse.ArgumentParser):
         """Add arguments for tool description"""
@@ -88,28 +97,28 @@ class Tool:
         p.add_argument('--flood', '-L', action='store_true', help='Tool: turn on flood coolant')
         p.add_argument('--mill', default='conventional', choices=['both', 'climb', 'conventional'], help='Tool: cutting method')
 
-    @classmethod
-    def from_config_args(cls, args: configargparse.Namespace):
+    @staticmethod
+    def from_config_args(args: configargparse.Namespace):
         return Tool(angle=args.angle, depth=args.depth, tip_height=args.height, shaft_extension=args.shaft_extension,
                     radius=args.diameter / 2., number=args.number, rpm=args.rpm,
                     feed=args.feed, flutes=args.flutes, mist=args.mist,
                     flood=args.flood, mill=args.mill)
 
-    @classmethod
-    def from_config_file(cls, filename):
+    @staticmethod
+    def from_config_file(filename):
         """Load a tool from a config file"""
         parser = configargparse.ArgParser()
-        cls.add_config_args(parser)
-        return cls.from_config_args(parser.parse_args(['--tool=%s' % filename]))
+        Tool.add_config_args(parser)
+        return Tool.from_config_args(parser.parse_args(['--tool=%s' % filename]))
 
     def to_json(self, indent=None):
         d = dict(**self.__dict__)
         d['angle'] = self.angle_degrees
         return json.dumps(d, sort_keys=True, indent=indent)
 
-    @classmethod
-    def from_dict(cls, d: dict):
-        return cls(**d)
+    @staticmethod
+    def from_dict(d: dict):
+        return Tool(**d)
 
     def cutter_poly(self, shaft_length=40.0):
         """Return a polygon representing this tool"""

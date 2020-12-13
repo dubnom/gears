@@ -4,6 +4,9 @@ from math import radians, degrees, tan
 
 import configargparse
 
+from anim.geom import Point
+from gear_base import arc
+
 
 class Tool:
     r"""
@@ -25,13 +28,15 @@ class Tool:
         * depth is height(cd)
         * radius is height(bd)
         * tip_height is length(de)
+        * tip_radius is radius at corners cde & def.  Must be <= tip_height/2
         * shaft_extension is length(ab)
         * shaft_length is length(gh)  [argument to cutter_poly() and shaft_poly()]
         * shaft radius is length(aA)/2 and is computed as radius-depth
         * length(bc) must be zero in the current model
     """
 
-    def __init__(self, angle=40., depth=3., radius=10., tip_height=0., shaft_extension=6.35,
+    def __init__(self, angle=40., depth=3., radius=10., tip_height=0., tip_radius=0.,
+                 shaft_extension=6.35,
                  number=1, rpm=2000, feed=200, flutes=4, mist=False, flood=False,
                  mill='both'):
         if angle < 0.:
@@ -42,6 +47,8 @@ class Tool:
             raise ValueError('Tool: Radius must be greater than depth')
         if tip_height < 0:
             raise ValueError('Tool: tip_height must be greater than or equal to 0')
+        if tip_radius > tip_height / 2:
+            raise ValueError('Tool: tip_radius must be less than or equal to tip_height / 2')
         if mill not in ['both', 'climb', 'conventional']:
             raise ValueError('Tool: mill must be "both", "climb", or "conventional')
 
@@ -49,6 +56,7 @@ class Tool:
         self.depth = depth
         self.radius = radius
         self.tip_height = tip_height
+        self.tip_radius = tip_radius
         self.shaft_extension = shaft_extension
         self.number = number
         self.rpm = rpm
@@ -71,7 +79,7 @@ class Tool:
             self.angle_degrees, self.depth, self.radius, self.tip_height, self.shaft_extension, self.flutes)
 
     def __repr__(self):
-        fields = 'depth,radius,tip_height,shaft_extension,number,rpm,feed,flutes,mist,flood,mill'
+        fields = 'depth,radius,tip_height,tip_radius,shaft_extension,number,rpm,feed,flutes,mist,flood,mill'
         field_vals = ', '.join('%s=%s' % (f, getattr(self, f)) for f in fields.split(','))
         return 'Tool(angle=%s, %s)' % (self.angle_degrees, field_vals)
 
@@ -88,6 +96,7 @@ class Tool:
         p.add_argument('--depth', '-D', type=float, default=5., help='Tool: depth of cutting head in mm')
         p.add_argument('--height', '-H', type=float, default=0., help='Tool: distance between the top and bottom of cutter at tip in mm')
         p.add_argument('--diameter', '-I', type=float, default=15., help='Tool: cutting diameter at tip in mm')
+        p.add_argument('--tip_radius', type=float, default=0., help='Tool: bevel(?) radius at cutter tip in mm')
         p.add_argument('--shaft_extension', type=float, default=6.35, help='Tool: shaft extension beyond bottom of cutter in mm')
         p.add_argument('--number', '-N', type=int, default=1, help='Tool: tool number')
         p.add_argument('--rpm', '-R', type=float, default=2000., help='Tool: spindle speed')
@@ -99,7 +108,8 @@ class Tool:
 
     @staticmethod
     def from_config_args(args: configargparse.Namespace):
-        return Tool(angle=args.angle, depth=args.depth, tip_height=args.height, shaft_extension=args.shaft_extension,
+        return Tool(angle=args.angle, depth=args.depth, tip_height=args.height, tip_radius=args.tip_radius,
+                    shaft_extension=args.shaft_extension,
                     radius=args.diameter / 2., number=args.number, rpm=args.rpm,
                     feed=args.feed, flutes=args.flutes, mist=args.mist,
                     flood=args.flood, mill=args.mill)
@@ -129,10 +139,13 @@ class Tool:
 
         shaft_top = tip_y + shaft_length
         # TODO-leave shaft out of cutter?
+        t1 = arc(self.tip_radius, 90-self.angle_degrees/2, 0, c=Point(self.radius-self.tip_radius, half_tip-self.tip_radius))
+        t2 = [(x, -y) for x, y in reversed(t1)]
+        tip = t1 + [(self.radius, 0)] + t2
         cutter = [
             (shaft, shaft_top),
             (shaft, tip_y),
-            (self.radius, half_tip),
+            (self.radius, half_tip), ] + tip + [
             (self.radius, -half_tip),
             (shaft, -tip_y),
             (shaft, -tip_y - self.shaft_extension),
@@ -164,6 +177,7 @@ class Tool:
         return shaft
 
     def plot(self, title='', do_show=True):
+        # noinspection PyPackageRequirements
         import matplotlib.pyplot as plt
         plt.plot(*zip(*self.cutter_poly(self.radius)))
         plt.plot(*zip(*self.shaft_poly(self.radius)))
@@ -175,6 +189,7 @@ class Tool:
 
 
 def test(args):
+    args = args or ['gear_cutter_06.cfg']
     args = args or ['saw32nd.cfg', 'cutter45.cfg', 'gear_cutter_06.cfg']
     for fn in args:
         t = Tool.from_config_file(fn)

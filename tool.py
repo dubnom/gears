@@ -130,6 +130,11 @@ class Tool:
     def from_dict(d: dict):
         return Tool(**d)
 
+    @staticmethod
+    def from_json(js: str) -> 'Tool':
+        """Create from json string"""
+        return Tool.from_dict(json.loads(js))
+
     def cutter_poly(self, shaft_length=40.0):
         """Return a polygon representing this tool"""
 

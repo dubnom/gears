@@ -87,11 +87,13 @@ G30
 T{number} G43 H{number} M6
 S{rpm} M3{mist}{flood}
 G54
-F{feed}""".format(number=self.tool.number,
-                  feed=self.tool.feed,
-                  rpm=self.tool.rpm,
-                  mist=' M07' if self.tool.mist else '',
-                  flood=' M08' if self.tool.flood else '')
+F{feed}
+( ToolDetails: {tool_info} )""".format(number=self.tool.number,
+                                       feed=self.tool.feed,
+                                       rpm=self.tool.rpm,
+                                       mist=' M07' if self.tool.mist else '',
+                                       flood=' M08' if self.tool.flood else '',
+                                       tool_info=self.tool.to_json())
 
     def footer(self):
         """Return the gcode for the bottom of the file."""
@@ -599,10 +601,7 @@ def main():
     out = args.out
 
     try:
-        tool = Tool(angle=args.angle, depth=args.depth, tip_height=args.height, shaft_extension=args.shaft_extension,
-                    radius=args.diameter / 2., number=args.number, rpm=args.rpm,
-                    feed=args.feed, flutes=args.flutes, mist=args.mist,
-                    flood=args.flood, mill=args.mill)
+        tool = Tool.from_config_args(args)
 
         gear = Gear(tool, module=args.module, pressure_angle=args.pressure,
                     relief_factor=args.relief, steps=args.steps, root_steps=args.roots,

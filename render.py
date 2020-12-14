@@ -24,6 +24,7 @@ from anim.geom import BBox
 from anim.simple import SimpleAnimation
 from gear_cycloidal import CycloidalPair
 from rack import Rack
+from tool import Tool
 
 
 def circle(radius):
@@ -92,6 +93,7 @@ parse_feed = re.compile(r'^F([-0-9\.]+)')
 parse_speed = re.compile(r'^S([-0-9\.]+)')
 parse_movecut = re.compile(r'^G([01]+)')
 parse_gcode = r'([AXYZ])([-0-9\.]+)'
+parse_tool_details = re.compile(r'^\( *ToolDetails: ({.*}) *\)$')
 
 # Start up a camera if we're creating an animation
 if animate:
@@ -113,7 +115,9 @@ for line_number, line in enumerate(infile):
     l = line.strip()
     mTooth = parse_tooth.match(l)
     mGeneral = parse_general.match(l)
-    mTool = parse_tool.match(l)
+    # mTool = parse_tool.match(l)
+    mTool = None
+    mToolDetails = parse_tool_details.match(l)
     mRotary = parse_rotary.match(l)
     mFeed = parse_feed.match(l)
     mSpeed = parse_speed.match(l)
@@ -146,6 +150,18 @@ for line_number, line in enumerate(infile):
         tool_tip_height = float(mTool.group(4))
         tool_shaft_extension = float(mTool.group(5))
         tool_flutes = int(mTool.group(6))
+
+    # ToolDetails argument
+    elif mToolDetails:
+        tool = Tool.from_json(mToolDetails.group(1))
+        print('NewTool: %r' % tool)
+        tool_angle = tool.angle_degrees
+        tool_depth = tool.depth
+        tool_radius = tool.radius
+        # tool_radius += 0.1
+        tool_tip_height = tool.tip_height
+        tool_shaft_extension = tool.shaft_extension
+        tool_flutes = tool.flutes
 
     # Feed rate
     elif mFeed:
@@ -202,6 +218,8 @@ for line_number, line in enumerate(infile):
                 (-shaft, y),
                 (-shaft, v['outside_radius']),
                 ])
+            cutter_shaft = Polygon(tool.shaft_poly(v['outside_radius']))
+            cutter = Polygon(tool.cutter_poly(v['outside_radius']))
             extra = 0.2
             extra_cutter = Polygon([
                 (shaft, v['outside_radius']),

@@ -6,7 +6,8 @@ from matplotlib import pyplot as plt
 
 from anim.geom import Point, Vector, Line
 from anim.transform import Transform
-from gear_base import PointList, plot, circle, GearInstance
+from gear_base import plot, GearInstance
+from anim.utils import PointList, circle
 from rack import Rack
 
 

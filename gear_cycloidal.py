@@ -4,7 +4,8 @@ from typing import Tuple, cast, Union
 from matplotlib import pyplot as plt
 
 from anim.geom import Point, BasePoint
-from gear_base import PointList, t_range, path_rotate, GearInstance
+from gear_base import GearInstance
+from anim.utils import PointList, t_range, path_rotate
 
 
 class CycloidalPair:

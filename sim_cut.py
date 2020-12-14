@@ -3,6 +3,8 @@ Simulate cuts in a gear and display images
 """
 
 from PIL import Image
+
+import anim.utils
 from anim.simple import SimpleAnimation
 from anim.drawing import DrawingContext
 from anim.transform import Transform

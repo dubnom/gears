@@ -5,7 +5,7 @@ from math import radians, degrees, tan, cos, sin, pi
 import configargparse
 
 from anim.geom import Point, Vector
-from gear_base import arc
+from anim.utils import arc
 
 
 class Tool:

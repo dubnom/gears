@@ -1,7 +1,7 @@
 import math
 from typing import Callable, Optional
 
-from gear_base import t_range
+from anim.utils import t_range
 
 import matplotlib
 matplotlib.use("TkAgg")

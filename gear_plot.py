@@ -5,7 +5,8 @@ import scipy.optimize
 from math import cos, sin, tan, tau, pi, radians, hypot, atan2
 
 from anim.geom import Line, Vector, Point
-from gear_base import plot, t_range, circle, arc, GearInstance, CUT_KIND_COLOR_MAP
+from gear_base import plot, GearInstance, CUT_KIND_COLOR_MAP
+from anim.utils import t_range, arc, circle
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvolutePair, Involute
 

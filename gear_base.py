@@ -59,9 +59,9 @@ def path_translate(path: PointList, dxy: Union[Point, Vector], as_pt=False) -> P
         return [(p + dxy).xy() for p in path]
 
 
-def arc(r, sa, ea, c=Point(0, 0)) -> XYList:
+def arc(r, sa, ea, c=Point(0, 0), steps=-1) -> XYList:
     """Generate an arc of radius r about c as a list of x,y pairs"""
-    steps = int(abs(ea-sa)+1)
+    steps = int(abs(ea-sa)+1) if steps < 0 else steps
     return [(r * cos(t) + c.x, r * sin(t) + c.y) for t in t_range(steps, radians(sa), radians(ea))]
 
 

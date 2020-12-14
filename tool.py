@@ -1,10 +1,10 @@
 import json
 import sys
-from math import radians, degrees, tan
+from math import radians, degrees, tan, cos, sin, pi
 
 import configargparse
 
-from anim.geom import Point
+from anim.geom import Point, Vector
 from gear_base import arc
 
 
@@ -139,24 +139,25 @@ class Tool:
 
         shaft_top = tip_y + shaft_length
         # TODO-leave shaft out of cutter?
-        t1 = arc(self.tip_radius, 90-self.angle_degrees/2, 0, c=Point(self.radius-self.tip_radius, half_tip-self.tip_radius))
-        t2 = [(x, -y) for x, y in reversed(t1)]
-        tip = t1 + [(self.radius, 0)] + t2
-        cutter = [
+        if self.tip_radius:
+            # Where is center for tip radius?
+            cx = self.radius-self.tip_radius        # Back up by tip_radius
+            cy = half_tip-self.tip_radius*tan(pi/4-self.angle_radians/4)
+            center = Point(cx, cy)
+            sa = pi/2-self.angle_radians/2
+            ep = center + self.tip_radius * Vector(cos(sa), sin(sa))
+            t1 = arc(self.tip_radius, 90-self.angle_degrees/2, 0, c=Point(cx, cy), steps=3)
+            t2 = [(x, -y) for x, y in reversed(t1)]
+            tip = t1 + [(self.radius, 0)] + t2 + []
+        else:
+            tip = [(self.radius, half_tip), (self.radius, -half_tip)]
+        cutter_half = [
             (shaft, shaft_top),
-            (shaft, tip_y),
-            (self.radius, half_tip), ] + tip + [
-            (self.radius, -half_tip),
+            (shaft, tip_y), ] + tip + [
             (shaft, -tip_y),
-            (shaft, -tip_y - self.shaft_extension),
-            (-shaft, -tip_y - self.shaft_extension),
-            (-shaft, -tip_y),
-            (-self.radius, -half_tip),
-            (-self.radius, half_tip),
-            (-shaft, tip_y),
-            (-shaft, shaft_top),
+            (shaft, -tip_y - self.shaft_extension)
         ]
-        return cutter
+        return cutter_half + [(-x, y) for x, y in reversed(cutter_half)]
 
     def shaft_poly(self, shaft_length=40.0):
         """Return a polygon representing this tool"""

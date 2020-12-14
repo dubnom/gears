@@ -1,19 +1,16 @@
-from math import sin, cos, tau, radians, ceil, tan
-from typing import List, Union, Tuple, Optional
-
+from math import sin, cos, radians, ceil, tan
+from typing import List, Tuple, Optional
 from matplotlib import pyplot as plt
-
-from anim.geom import BasePoint, Point, Vector, XYList, Line, polygon_area, iter_rotate
+from anim.geom import Point, Vector, Line, polygon_area, iter_rotate
 from anim.transform import Transform
+from anim.utils import PointList, check_point_list, t_range, path_rotate, path_translate, circle
+from tool import Tool
 
 __all__ = [
-    'PointList', 'PointUnionList', 'check_point_list',
-    't_range',
-    'path_rotate', 'path_translate', 'circle', 'arc', 'plot',
+    'plot',
     'GearInstance', 'CUT_KIND_COLOR_MAP', 'CutError',
 ]
-PointList = List[BasePoint]
-PointUnionList = List[Union[BasePoint, float, Tuple[float, float]]]
+
 CUT_KIND_COLOR_MAP = {
     'undercut': 'red',
     'ascending': '#0000FF',
@@ -29,58 +26,6 @@ CUT_KINDS = set(CUT_KIND_COLOR_MAP.keys())
 
 class CutError(Exception):
     pass
-
-
-def check_point_list(lst):
-    """Validate that lst is List[BasePoint]"""
-    for elem in lst:
-        if not isinstance(elem, BasePoint):
-            raise ValueError('%s of lst is not a BasePoint' % repr(elem))
-
-
-def min_rotation(target_degrees, source_degrees):
-    """
-        Return the smallest rotation required to move
-        from source angle to target angle::
-
-            min_rotation(20, 10) => 10
-            min_rotation(-340, 10) => 10
-            min_rotation(20, 370) => 10
-    """
-    return (target_degrees - source_degrees + 180) % 360 - 180
-
-
-def t_range(steps, t_low=0.0, t_high=1.0, closed=True):
-    """Range from t_low to t_high in steps.  If closed, include t_high"""
-    t_len = t_high - t_low
-    return (step / steps * t_len + t_low for step in range(0, steps + int(closed)))
-
-
-def path_rotate(path: PointList, angle, as_pt=False) -> PointUnionList:
-    """Rotate all points by angle (in degrees) about 0,0"""
-    t = Transform().rotate(angle)
-    return [t.transform_pt(pt, as_pt) for pt in path]
-
-
-def path_translate(path: PointList, dxy: Union[Point, Vector], as_pt=False) -> PointUnionList:
-    """Rotate all points by angle (in degrees) about 0,0"""
-    dxy = Vector(*dxy.xy())
-    if as_pt:
-        return [p + dxy for p in path]
-    else:
-        return [(p + dxy).xy() for p in path]
-
-
-def arc(r, sa, ea, c=Point(0, 0), steps=-1) -> XYList:
-    """Generate an arc of radius r about c as a list of x,y pairs"""
-    steps = int(abs(ea-sa)+1) if steps < 0 else steps
-    return [(r * cos(t) + c.x, r * sin(t) + c.y) for t in t_range(steps, radians(sa), radians(ea))]
-
-
-def circle(r, c=Point(0, 0)) -> XYList:
-    """Generate a circle of radius r about c as a list of x,y pairs"""
-    steps = 360
-    return [(r * cos(t) + c.x, r * sin(t) + c.y) for t in t_range(steps, 0, tau)]
 
 
 def plot(xy, color='black', plotter=None):
@@ -230,12 +175,11 @@ class GearInstance:
         self.set_zoom(zoom_radius=zoom_radius, plotter=plotter)
         plt.show()
 
-    def classify_cuts_pass1(self, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+    def classify_cuts_pass1(self, tool: Tool) -> List[ClassifiedCut]:
         """
             Classify the cuts in this polygon, first pass.  No error checking of cuts in this pass.
 
-            :param tool_angle: tool angle in degrees
-            :param tool_tip_height:
+            :param tool: the tool to use
             :returns: List of ClassifiedCut
 
             Overshoot is allowed if the cut is along a convex part of the polygon.
@@ -262,7 +206,7 @@ class GearInstance:
             poly = list(reversed(poly))
         per_tooth = len(poly) // self.teeth
         poly = poly[-per_tooth:] + poly[:-per_tooth]
-        half_tool_tip = tool_tip_height / 2
+        half_tool_tip = tool.tip_height / 2
 
         cuts = []
 
@@ -324,28 +268,27 @@ class GearInstance:
                 print(cut)
         return cuts
 
-    def classify_cuts_pass2(self, classified: List[ClassifiedCut], tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+    def classify_cuts_pass2(self, classified: List[ClassifiedCut], tool: Tool) -> List[ClassifiedCut]:
         """
             Refine the classified cuts:
             * error checking
             * reorient the cut.cut_line to tool alignment
 
             :param classified: classified cuts from pass1
-            :param tool_angle: tool angle in degrees
-            :param tool_tip_height:
+            :param tool: the tool to use
             :returns: List of (cut, cut-kind, convex, allowed overshoot)
         """
-        tool_is_pointy = tool_tip_height == 0
-        half_tool_tip = tool_tip_height / 2
+        tool_is_pointy = tool.tip_height == 0
+        half_tool_tip = tool.tip_height / 2
         if tool_is_pointy:
             # For pointy tools clearing the flats at the root of the tooth,
             # go deeper with the cutter by _extension which gives a width of _tip
             # TODO-0.3 seems to work, but should really be configurable
             flat_tool_extension = 0.3 * self.module
-            flat_tool_tip = flat_tool_extension * tan(radians(tool_angle/2)) * 2
+            flat_tool_tip = flat_tool_extension * tan(tool.angle_radians/2) * 2
         else:
             flat_tool_extension = 0
-            flat_tool_tip = tool_tip_height
+            flat_tool_tip = tool.tip_height
 
         # Rotate classified cuts until we find a the first edge after an "in" edge
         orig_len = len(classified)
@@ -362,10 +305,6 @@ class GearInstance:
             if cut.kind == 'undercut':
                 raise ValueError("Can't do undercuts yet")
             elif is_flat:
-                if tool_is_pointy and Vector(*cut.cut_line.origin.xy()).length() < self.pitch_radius:
-                    # TODO-attempt to do bottom clearing with pointy-cutter
-                    pass
-                    # continue
                 if tool_is_pointy:
                     normal = cut.cut_line.direction.unit().normal() * cut.z_offset
                 else:
@@ -395,7 +334,7 @@ class GearInstance:
                     cuts_required = ceil(cut_len/flat_tool_tip)
                     cut_dir = cut.line.direction.unit()
                     if tool_is_pointy:
-                        start_angle = classified[cut_index-1].cut_line.direction.angle()+tool_angle
+                        start_angle = classified[cut_index-1].cut_line.direction.angle()+tool.angle_degrees
                         end_angle = classified[(cut_index+1) % len(classified)].cut_line.direction.angle()
                         # TODO-This works, but is there something smarter?
                         delta_angle = (start_angle-end_angle) % 360
@@ -411,9 +350,9 @@ class GearInstance:
                             cuts.append((Line(cut_end, tool_dir * self.module * 2), 'flat-multi-a'))
                     else:
                         # Simple flat cuts work like this:
-                        for t in t_range(cuts_required-1, 0, cut_len-tool_tip_height):
+                        for t in t_range(cuts_required - 1, 0, cut_len - tool.tip_height):
                             cut_start = cut.line.p1 + t * cut_dir
-                            cut_end = cut_start + cut_dir * tool_tip_height
+                            cut_end = cut_start + cut_dir * tool.tip_height
                             cuts.append((Line(cut_end, -1 * normal), 'flat-multi'))
             else:
                 cut_line = cut.cut_line
@@ -434,15 +373,15 @@ class GearInstance:
                 if kind == 'flat-multi':
                     # Do not use tool_angle for flat-multi as these cuts use the end of the tool
                     rotation = -cut_angle
-                    if tool_angle and tool_tip_height and cut.kind == 'flat-root':
+                    if tool.angle and tool.tip_height and cut.kind == 'flat-root':
                         # Skip root clearing for gear cutter type tools
                         # TODO-this should determine if root gap is narrower than 2 * tool_tip_height
                         continue
                 else:
                     if inward:
-                        rotation = -tool_angle/2 - cut_angle
+                        rotation = -tool.angle_degrees/2 - cut_angle
                     else:
-                        rotation = tool_angle/2 - cut_angle
+                        rotation = tool.angle_degrees/2 - cut_angle
 
                 t = Transform().rotate(-rotation)
                 cut_origin = adjusted_cut.origin
@@ -462,14 +401,13 @@ class GearInstance:
 
         return classified
 
-    def classify_cuts(self, tool_angle, tool_tip_height=0.0) -> List[ClassifiedCut]:
+    def classify_cuts(self, tool: Tool) -> List[ClassifiedCut]:
         """
             Classify the cuts in this polygon.
             Calls first pass and then performs error checking and reorients the cut.cut_line to
             tool alignment.
 
-            :param tool_angle: tool angle in degrees
-            :param tool_tip_height:
+            :param tool: the tool to use
             :returns: List of (cut, cut-kind, convex, allowed overshoot)
 
             Overshoot is allowed if the cut is along a convex part of the polygon.
@@ -490,18 +428,17 @@ class GearInstance:
                                in
 
         """
-        classified = self.classify_cuts_pass1(tool_angle, tool_tip_height)
-        refined = self.classify_cuts_pass2(classified, tool_angle, tool_tip_height)
+        classified = self.classify_cuts_pass1(tool)
+        refined = self.classify_cuts_pass2(classified, tool)
         return refined
 
-    def cut_params(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float, str, int]]:
+    def cut_params(self, tool: Tool) -> List[Tuple[float, float, float, str, int]]:
         """
             Generate list of (rotation, y-position, z-position) from polygon
-            :param tool_angle:          In radians
-            :param tool_tip_height:     Tool tip height
+            :param tool: the tool to use
             :return: List of (r, y, z, cut-kind, tooth-number)
         """
-        classified = self.classify_cuts(tool_angle, tool_tip_height)
+        classified = self.classify_cuts(tool)
 
         # Rotate classified cuts until we find the first edge after an "in" edge
         orig_len = len(classified)

@@ -1,9 +1,8 @@
 import json
 import sys
-from math import radians, degrees, tan, cos, sin, pi
-
+from math import radians, degrees, tan, pi
+# noinspection PyPackageRequirements
 import configargparse
-
 from anim.geom import Point, Vector
 from anim.utils import arc
 
@@ -135,6 +134,11 @@ class Tool:
         """Create from json string"""
         return Tool.from_dict(json.loads(js))
 
+    def tip_flat_length(self):
+        """Return the length of the tip to be used for flat clearance"""
+        # TODO-consider using 90% of tip_radius because the first part is still nearly flat
+        return self.tip_height - 2 * self.tip_radius
+
     def cutter_poly(self, shaft_length=40.0):
         """Return a polygon representing this tool"""
 
@@ -150,7 +154,7 @@ class Tool:
             cy = half_tip-self.tip_radius*tan(pi/4-self.angle_radians/4)
             center = Point(cx, cy)
             sa = pi/2-self.angle_radians/2
-            ep = center + self.tip_radius * Vector(cos(sa), sin(sa))
+            # ep = center + self.tip_radius * Vector(cos(sa), sin(sa))
             t1 = arc(self.tip_radius, 90-self.angle_degrees/2, 0, c=Point(cx, cy), steps=3)
             t2 = [(x, -y) for x, y in reversed(t1)]
             tip = t1 + [(self.radius, 0)] + t2 + []

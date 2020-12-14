@@ -24,7 +24,8 @@ import configargparse
 
 import gear_plot
 from anim.geom import Point
-from gear_base import GearInstance, min_rotation
+from gear_base import GearInstance
+from anim.utils import min_rotation
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute
 from tool import Tool
@@ -38,7 +39,7 @@ def rotate(a, x, y):
 class Gear:
     """The Gear class is used to generate G Code of involute gears."""
 
-    def __init__(self, tool, module=1., pressure_angle=20., relief_factor=1.25, steps=5, root_steps=1,
+    def __init__(self, tool: Tool, module=1., pressure_angle=20., relief_factor=1.25, steps=5, root_steps=1,
                  cutter_clearance=2., clear_max_angle=0., right_rotary=False, algo='old'):
         if module <= 0:
             raise ValueError('Gear: Module must be greater than 0.')
@@ -210,7 +211,7 @@ M30
         gcode.append(cut.start())
 
         verbose_gcode_output = not True
-        cut_params = the_gear.cut_params(self.tool.angle_degrees, self.tool.tip_height)
+        cut_params = the_gear.cut_params(self.tool)
         tooth_last = -1
         tooth_angle = None
         cuts = []

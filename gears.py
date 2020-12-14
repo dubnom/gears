@@ -24,7 +24,7 @@ import configargparse
 
 import gear_plot
 from anim.geom import Point
-from gear_base import GearInstance
+from gear_base import GearInstance, min_rotation
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute
 from tool import Tool
@@ -207,39 +207,37 @@ M30
                   outside_radius, clear_max_angle=self.clear_max_angle)
         gcode.append(cut.start())
 
-        cut_params = the_gear.cut_params(degrees(self.tool.angle), self.tool.tip_height)
-        params_per_tooth = len(cut_params) // the_gear.teeth
-        cuts_outer = []
-        cuts_inner = []
+        verbose_gcode_output = not True
+        cut_params = the_gear.cut_params(self.tool.angle_degrees, self.tool.tip_height)
+        tooth_last = -1
         tooth_angle = None
-        for cut_num, (r, y, z, k) in enumerate(cut_params):
+        cuts = []
+        for cut_num, (r, y, z, k, tooth_num) in enumerate(cut_params):
+            # TODO-move these calculations to GearInstance.cut_params()
             r = -r
-            if cut_num % params_per_tooth == 0:
-                tooth_angle = None
-                tooth_num = cut_num / params_per_tooth
-                cuts_inner.append('')
-                cuts_inner.append('( Tooth: %d )' % (cut_num / params_per_tooth))
-                cuts_outer.append('')
-                cuts_outer.append('( Tooth: %d )' % (cut_num / params_per_tooth))
             y += self.tool.radius
-            if k == 'flat-tip':
-                gcc = cut.cut(r, y, z)
-                cuts_outer.append(gcc)
-            else:
-                if tooth_angle is None:
-                    tooth_angle = r % 360      # Starting angle for this tooth
-                    adjusted_angle = tooth_angle
-                    # cuts_inner.append('( Inner: InputAngle=%.4f ToothAngle=%.4f Adjusted=%.4f )' % (r, tooth_angle, adjusted_angle))
+
+            if tooth_num != tooth_last:
+                # TODO-this could just calculate new tooth_angle based on the last one
+                #     -and keep rotation moving in one direction
+                #     > tooth_angle = tooth_angle + min_rotation(r, tooth_angle)
+                if k == 'flat-tip':
+                    tooth_angle = r     # Starting angle for this tooth
                 else:
-                    delta_mod = (tooth_angle - r % 360) % 360
-                    if delta_mod > 180:
-                        delta_mod -= 360
-                    adjusted_angle = tooth_angle - delta_mod
-                    # cuts_inner.append('( Inner: InputAngle=%.4f ToothAngle=%.4f Adjusted=%.4f Delta=%.4f)' % (r, tooth_angle, adjusted_angle, delta_mod))
-                gcc = cut.cut(adjusted_angle, y, z)
-                cuts_inner.append(gcc)
-        gcode.extend(cuts_outer)
-        gcode.extend(cuts_inner)
+                    tooth_angle = r % 360
+                adjusted_angle = tooth_angle
+                gcode.append('')
+                gcode.append('( Tooth: %d )' % tooth_num)
+                tooth_last = tooth_num
+            else:
+                # Adjust rotation amount to be 'near' starting angle for this tooth
+                adjusted_angle = tooth_angle + min_rotation(r, tooth_angle)
+
+            if verbose_gcode_output:
+                gcode.append('( Kind:%-13s Rotation:%9.4f=>%9.4f Y:%9.4f Z:%9.4f Tooth:%-3d )' %
+                             (k, r, adjusted_angle, y, z, tooth_num))
+            gcc = cut.cut(adjusted_angle, y, z)
+            gcode.append(gcc)
 
         return '\n'.join(gcode)
 

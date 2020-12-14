@@ -38,6 +38,18 @@ def check_point_list(lst):
             raise ValueError('%s of lst is not a BasePoint' % repr(elem))
 
 
+def min_rotation(target_degrees, source_degrees):
+    """
+        Return the smallest rotation required to move
+        from source angle to target angle::
+
+            min_rotation(20, 10) => 10
+            min_rotation(-340, 10) => 10
+            min_rotation(20, 370) => 10
+    """
+    return (target_degrees - source_degrees + 180) % 360 - 180
+
+
 def t_range(steps, t_low=0.0, t_high=1.0, closed=True):
     """Range from t_low to t_high in steps.  If closed, include t_high"""
     t_len = t_high - t_low
@@ -59,9 +71,9 @@ def path_translate(path: PointList, dxy: Union[Point, Vector], as_pt=False) -> P
         return [(p + dxy).xy() for p in path]
 
 
-def arc(r, sa, ea, c=Point(0, 0)) -> XYList:
+def arc(r, sa, ea, c=Point(0, 0), steps=-1) -> XYList:
     """Generate an arc of radius r about c as a list of x,y pairs"""
-    steps = int(abs(ea-sa)+1)
+    steps = int(abs(ea-sa)+1) if steps < 0 else steps
     return [(r * cos(t) + c.x, r * sin(t) + c.y) for t in t_range(steps, radians(sa), radians(ea))]
 
 
@@ -482,12 +494,12 @@ class GearInstance:
         refined = self.classify_cuts_pass2(classified, tool_angle, tool_tip_height)
         return refined
 
-    def cut_params(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float, str]]:
+    def cut_params(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float, str, int]]:
         """
             Generate list of (rotation, y-position, z-position) from polygon
             :param tool_angle:          In radians
             :param tool_tip_height:     Tool tip height
-            :return: List of (r, y, z, cut-kind)
+            :return: List of (r, y, z, cut-kind, tooth-number)
         """
         classified = self.classify_cuts(tool_angle, tool_tip_height)
 
@@ -500,8 +512,21 @@ class GearInstance:
             classified = classified[last_in+1:] + classified[:last_in+1]
         assert len(classified) == orig_len
 
-        cut_params = []
+        # Flatten the list of classified cuts
+        flattened = []
         for outer_cut in classified:
             for detail_cut in outer_cut.cut_details:
-                cut_params.append((detail_cut.angle, detail_cut.y, detail_cut.z, detail_cut.kind))
-        return cut_params
+                flattened.append((detail_cut.angle, detail_cut.y, detail_cut.z, detail_cut.kind))
+
+        # Extract outer & inner and compute tooth number
+        cuts_per_tooth = len(flattened) / self.teeth
+        outer = []
+        inner = []
+        for idx, (a, y, z, k) in enumerate(flattened):
+            tooth_num = idx // cuts_per_tooth
+            if k == 'flat-tip':
+                outer.append((a, y, z, k, tooth_num))
+            else:
+                inner.append((a, y, z, k, tooth_num))
+
+        return outer + inner

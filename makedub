@@ -24,6 +24,10 @@
 # python3 ./render.py orrery/jupiter_y_45_new.nc -azp -t 6
 # python3 ./gears.py --algo=new -m 1.16336 -s 4 -t 97 -k 2 --clear_max_angle 5 -T cutter45.cfg orrery/uranus_x_45_new.nc
 # python3 ./render.py orrery/uranus_x_45_new.nc -azp -t 6
-python3 ./gears.py --algo=new -m 1.16336 -s 5 -t 34 -k 2 --clear_max_angle 5 -T cutter45.cfg orrery/uranus_y_45_new.nc
-python3 ./render.py orrery/uranus_y_45_new.nc -azp -t 6
-# python3 ./render.py orrery/mercury_y_45_new.nc -ap -f 62 -t 17
+# python3 ./gears.py --algo=new -m 1.16336 -s 5 -t 34 -k 2 --clear_max_angle 5 -T saw32nd.cfg orrery/uranus_y_32_new.nc
+# python3 ./render.py orrery/uranus_y_32_new.nc -azp -t 6
+# python3 ./gears.py --algo=new -m .72227 -s 3 -t 179 -k 2 --clear_max_angle 5 -T cutter45.cfg orrery/neptune_x_45_new.nc
+# python3 ./render.py orrery/neptune_x_45_new.nc -azp -t 6
+python3 ./gears.py --algo=new -m .72227 -s 5 -t 32 -k 2 --clear_max_angle 5 -T saw32nd.cfg orrery/neptune_y_32_new.nc
+python3 ./render.py orrery/neptune_y_32_new.nc -azp -t 6
+

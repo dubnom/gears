@@ -130,7 +130,7 @@ M30
 
         if self.cycloidal_gear:
             the_gear = self.cycloidal_gear
-            print('Involute: ', the_gear)
+            print('Cycloidal: ', the_gear)
         else:
             the_gear = GearInvolute(teeth=teeth, module=self.module,
                                     relief_factor=self.relief_factor, steps=self.steps,
@@ -163,7 +163,6 @@ M30
             tool_angle_offset = self.tool.angle / 2. - self.pressure_angle
 
             z_offset = (circular_pitch / 2. - 2. * sin(self.pressure_angle) * h_dedendum - self.tool.tip_height) / 2.
-            root_incr = z_offset / (self.root_steps + 1)
 
             x_offset = self.cutter_clearance + blank_thickness / 2. + sqrt(
                 self.tool.radius ** 2 - (self.tool.radius - h_total) ** 2)
@@ -235,6 +234,9 @@ M30
             else:
                 # Adjust rotation amount to be 'near' starting angle for this tooth
                 adjusted_angle = tooth_angle + min_rotation(r, tooth_angle)
+
+            if self.root_steps < 0 and k == 'flat-multi-a':
+                continue
 
             if verbose_gcode_output:
                 gcode.append('( Kind:%-13s Rotation:%9.4f=>%9.4f Y:%9.4f Z:%9.4f Tooth:%-3d )' %

@@ -1,9 +1,15 @@
 # python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 -T saw32nd.cfg orrery/mercury_x_32_new.nc
 # python3 ./render.py orrery/mercury_x_32_new.nc -azp -t 6
+
+python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 -T saw64th.cfg orrery/mercury_x_64_new.nc
+python3 ./render.py orrery/mercury_x_64_new.nc -azp -t 6
+
 # python3 ./gears.py --algo=new -m .89647 -s 7 -t 13 -k 2 -T cutter40.cfg orrery/mercury_x_40_new.nc
 # python3 ./render.py orrery/mercury_x_40_new.nc -azp -t 4
-# python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 -T cutter45.cfg orrery/mercury_x_45_new.nc
+
+# python3 ./gears.py --algo=new -m .89647 -s 7 -t 33 -k 2 --clear_max_angle 5 -T cutter45.cfg orrery/mercury_x_45_new.nc
 # python3 ./render.py orrery/mercury_x_45_new.nc -azp -t 6
+
 # python3 ./gears.py --algo=new -m 1.29153 -s 4 -t 59 -k 4 --clear_max_angle 5 -T cutter45.cfg orrery/earth_xy_45_new.nc
 # python3 ./render.py orrery/earth_xy_45_new.nc -azp -t 6
 # python3 ./gears.py --algo=new -m 1.20952 -s 4 -t 48 -k 2 --clear_max_angle 5 -T cutter45.cfg orrery/venus_x_45_new.nc
@@ -28,6 +34,8 @@
 # python3 ./render.py orrery/uranus_y_32_new.nc -azp -t 6
 # python3 ./gears.py --algo=new -m .72227 -s 3 -t 179 -k 2 --clear_max_angle 5 -T cutter45.cfg orrery/neptune_x_45_new.nc
 # python3 ./render.py orrery/neptune_x_45_new.nc -azp -t 6
-python3 ./gears.py --algo=new -m .72227 -s 5 -t 32 -k 2 --clear_max_angle 5 -T saw32nd.cfg orrery/neptune_y_32_new.nc
-python3 ./render.py orrery/neptune_y_32_new.nc -azp -t 6
+# python3 ./gears.py --algo=new -m .72227 -s 5 -t 32 -k 2 --clear_max_angle 5 -T saw32nd.cfg orrery/neptune_y_32_new.nc
+# python3 ./render.py orrery/neptune_y_32_new.nc -azp -t 6
+# python3 ./gears.py --algo=new -m .72227 -s 5 -t 32 -k 2 --clear_max_angle 5 -T saw64th.cfg orrery/neptune_y_64_new.nc
+# python3 ./render.py orrery/neptune_y_64_new.nc -azp -t 6
 

@@ -47,11 +47,12 @@ p.add('--A', '-A', nargs=1, default='animation.gif', metavar='filename', help='O
 p.add('--P', '-P', nargs=1, default='picture.png', metavar='filename', help='Output picture file')
 p.add('--G', '-G', nargs=1, default='gear.svg', metavar='filename', help='Output SVG file')
 p.add('--zerror', '-Z', type=float, default=0., help='Z-axis error in mm')
+p.add('--yerror', '-Y', type=float, default=0., help='Y-axis error in mm')
 p.add('--animate', '-a', action='store_true', help='Generate animation')
 p.add('--picture', '-p', action='store_true', help='Generate picture')
 p.add('--svg', '-g', action='store_true', help='Generate svg file')
 p.add('--stats', '-s', action='store_true', help='Generate statistics')
-p.add('--zoom', '-z', action='store_true', help='Zoom into one/two teeth in picture')
+p.add('--zoom', '-z', action='count', help='Zoom into two teeth in picture (-zz for tighter zoom)')
 p.add('--inches', '-i', action='store_true', help='Show statistics in imperial units')
 p.add('--teeth', '-t', nargs=1, default=[-1], type=int, help='Number of teeth to draw')
 p.add('--first', '-f', default=0, type=int, help='First tooth to draw')
@@ -73,6 +74,7 @@ inches = args.inches
 infile = args.infile
 zoom = args.zoom
 zerror = args.zerror
+yerror = args.yerror
 
 if not (picture or animate or svg or stats):
     p.print_help()
@@ -257,8 +259,10 @@ for line_number, line in enumerate(infile):
                     cx = v['pitch_diameter'] / 2
                     cy = 0
                     # zr = max(v['h_total'] * 3, v['z_max'])
-                    zr = v['h_total'] * 0.9
-                    # zr = v['h_total'] * 2
+                    if zoom == 1:
+                        zr = v['h_total'] * 2
+                    else:
+                        zr = v['h_total'] * 0.9
                 else:
                     cx, cy = 0, 0
                     zr = zy = v['pitch_diameter']
@@ -378,7 +382,7 @@ for line_number, line in enumerate(infile):
                             plt.axis('equal')
                             camera.snap()
             elif axis == 'Y':
-                cutter_y = amt
+                cutter_y = amt + yerror
             elif axis == 'Z':
                 cutter_z = amt + zerror
 

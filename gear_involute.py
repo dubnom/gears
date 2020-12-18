@@ -104,7 +104,7 @@ class GearInvolute(object):
             \___/      \___/
         """
         addendum = self.module
-        dedendum = self.module * 1.25
+        dedendum = self.module * self.relief_factor
         tooth = self.pitch / 2
         addendum_offset = addendum * tan(self.pressure_angle)
         dedendum_offset = dedendum * tan(self.pressure_angle)
@@ -289,7 +289,7 @@ class GearInvolute(object):
 
     def plot(self, color='red', tool_angle=40.0, gear_space=None, mill_space=None):
         addendum = self.module
-        dedendum = self.module * 1.25
+        dedendum = self.module * self.relief_factor
         pitch_radius = self.pitch_radius
         if mill_space is None and gear_space is None:
             gear_space = True

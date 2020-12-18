@@ -14,5 +14,8 @@
 # python3 ./gears.py --algo=new -m .89647 -s 3 -t 33 -k 2 -T gear_cutter_06.cfg orrery/mercury_x_06_new.nc
 # python3 ./render.py orrery/mercury_x_06_new.nc -azp -t 6
 
-python3 ./gears.py --algo=new -m .89647 -s 2 -t 137 -k 2 -T gear_cutter_06.cfg orrery/mercury_y_06_new.nc
-python3 ./render.py orrery/mercury_y_06_new.nc -azp -t 6
+# python3 ./gears.py --algo=new -m .89647 -s 2 -t 137 -k 2 -T gear_cutter_06.cfg orrery/mercury_y_06_new.nc
+# python3 ./render.py orrery/mercury_y_06_new.nc -azp -t 6
+
+python3 ./gears.py --algo=new -m 1.16336 -s 5 -t 32 -k 2 --clear_max_angle 5 --relief 1.1 --roots -1 -T cutter45.cfg orrery/something_y_45_new.nc
+python3 ./render.py orrery/something_y_45_new.nc -azp -t 6

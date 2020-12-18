@@ -79,8 +79,8 @@ class Tool:
 
     def __repr__(self):
         fields = 'depth,radius,tip_height,tip_radius,shaft_extension,number,rpm,feed,flutes,mist,flood,mill'
-        field_vals = ', '.join('%s=%s' % (f, getattr(self, f)) for f in fields.split(','))
-        return 'Tool(angle=%s, %s)' % (self.angle_degrees, field_vals)
+        field_vals = ', '.join('%s=%r' % (f, getattr(self, f)) for f in fields.split(','))
+        return 'Tool(angle=%r, %s)' % (self.angle_degrees, field_vals)
 
     def __eq__(self, other):
         return type(self) == type(other) and \
@@ -186,7 +186,7 @@ class Tool:
         ]
         return shaft
 
-    def plot(self, title='', do_show=True):
+    def plot(self, title='', do_show=True):     # pragma: no cover
         # noinspection PyPackageRequirements
         import matplotlib.pyplot as plt
         plt.plot(*zip(*self.cutter_poly(self.radius)))
@@ -198,7 +198,7 @@ class Tool:
             plt.show()
 
 
-def test(args):
+def test(args):     # pragma: no cover
     args = args or ['gear_cutter_06.cfg']
     args = args or ['saw32nd.cfg', 'cutter45.cfg', 'gear_cutter_06.cfg']
     for fn in args:
@@ -213,5 +213,5 @@ def test(args):
         t.plot(title=fn)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':      # pragma: no cover
     test(sys.argv[1:])

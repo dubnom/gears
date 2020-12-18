@@ -1,22 +1,42 @@
+* Include overshoot on saw tip clearing.  Eg, neptune_y (32 teeth) with saw64th.
+* Generate cut plan for small end cutter including radius compensation
+
 DONE: Bottom clearing for new algo with pointy cutters
 DONE: Separate tip clearing from gear cutting
 * Stand-alone tip-clearing with optimization (maybe keep mill in place and use rotation only?)
 * Add cut strategy capability to reorder/modify cuts
+
 DONE: Change to tooth-based generation instead of full polygon
 * Change to tooth-based cut analysis instead of full polygon
 * Add backlash parameter
 PARTIAL: Improved sequencing of cuts to minimize movement of mill (sort by rotation?)
 PARTIAL: Avoid outputting angles that cause 360 degree rotation
   - what was the exact issue?   (something like G0 A350 // G0 A-10?)
-* Add cutters that have flat & rounded tips (like gear cutters)
-* Add cutter far side to gear intersection tests during cut generation
+
 DONE: Make simple (non-radiused) gear cutter work
-* Model gear cutter with radius at tip corners
-* Make gear cutter with radius work
+DONE: Add cutters that have flat & rounded tips (like gear cutters)
+DONE: Model gear cutter with radius at tip corners
+DONE: Make gear cutter with radius work
+* Determine proper tip_radius for gear_cutter_06
+
+DONE: Put Tool class in stand-alone file
+* Eliminate extra Tool classes and refactor calls with tool_ args to use Tool arg
+
+* Add cutter far side to gear intersection tests during cut generation
 * Cleanup gcode_vars
   - make gears and tools know how to output / load from gcode_vars
-DONE: Put Tool class in stand-alone file
 * Use gcode loop instead of outputting gcode for every tooth
 * Make render generate zoomed and non-zoomed results at the same time
 * Move /tmp/anim_opt.gif into local directory
 * Generate movie files instead of GIFs
+
+NOTES:
+    # Separate code for each type of cut:
+    #   * using tip, flute top, flute bottom
+    #   * on ascending, descending, or flat
+    # Only some combinations make sense
+    def cut_edge_descending(self): pass
+    def cut_edge_ascending(self): pass
+    def cut_edge_flat(self): pass
+    def cut_tip_flat(self): pass
+    def cut_pointy_flat(self): pass

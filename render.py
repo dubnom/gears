@@ -265,7 +265,7 @@ for line_number, line in enumerate(infile):
                         zr = v['h_total'] * 0.9
                 else:
                     cx, cy = 0, 0
-                    zr = zy = v['pitch_diameter']
+                    zr = v['pitch_diameter']
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
 

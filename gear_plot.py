@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from typing import Tuple, Optional
 import matplotlib.pyplot as plt
@@ -12,12 +13,13 @@ from gear_involute import GearInvolute, InvolutePair, Involute
 
 # setenv SHOW_INTERACTIVE to 1 or true to display interactive plots
 from rack import Rack
+from tool import Tool
 
 SHOW_INTERACTIVE = os.environ.get('SHOW_INTERACTIVE', 'false').lower() in {'1', 'true'}
 
 
-def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
-    classified = gear.classify_cuts(tool_angle, tool_tip_height)
+def plot_classified_cuts(gear: GearInstance, tool: Tool):
+    classified = gear.classify_cuts(tool)
     check_cut = True
     if check_cut:
         found = 0
@@ -70,7 +72,7 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
             if outer_cut.inward():
                 dcn = -1 * dcn
             p1 = detail_cut.line.origin
-            p2 = p1+dcn*tool_tip_height
+            p2 = p1+dcn*tool.tip_height
             pm = p1.mid(p2)
             # print('  ', detail_cut.kind, detail_cut.line.p1.round(2), detail_cut.line.p2.round(2))
             kind = detail_cut.kind.split('-')[0]
@@ -81,7 +83,7 @@ def plot_classified_cuts(gear: GearInstance, tool_angle, tool_tip_height=0.0):
     plt.show()
     print_fake_gcode = False
     if print_fake_gcode:
-        for r, y, z, k in gear.cut_params(tool_angle, tool_tip_height):
+        for r, y, z, k in gear.cut_params(tool.angle, tool.tip_height):
             print('( kind: %s )' % k)
             print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
@@ -193,7 +195,7 @@ def test_cuts():
     ]
     poly = [Point(*xy) for xy in points]
     gear = GearInstance(1, 1, 'Test', 'thingie', poly, Point(0, 0))
-    plot_classified_cuts(gear, 0)
+    plot_classified_cuts(gear, Tool(angle=0.0, tip_height=0.1))
 
 
 def pplot(rt, color='black', plotter=None):
@@ -232,7 +234,6 @@ def test_inv(num_teeth=None, do_plot=True):
     base_radius = pitch_radius*cos(radians(pressure_angle))
     addendum = module
     half_tooth = pitch / 4
-    rack = Rack(module=module, pressure_angle=pressure_angle)
     tip_half_tooth = half_tooth - addendum*tan(radians(pressure_angle))
     # print('tht: ', tip_half_tooth)
     # print('rack.tth: ', rack.tooth_tip_high)
@@ -390,8 +391,9 @@ def main():
     # pair = InvolutePair(137, 33, module=2)
     # pair = InvolutePair(31, 27, module=2)
     pair = CycloidalPair(137, 33, module=0.89647)
-    plot_classified_cuts(pair.wheel(), tool_angle=0.0, tool_tip_height=1/32*25.4)
-    plot_classified_cuts(pair.pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4)
+    tool = Tool(angle=0.0, tip_height=1/32*25.4)
+    plot_classified_cuts(pair.wheel(), tool)
+    plot_classified_cuts(pair.pinion(), tool)
     pair.plot()
     pair.wheel().plot_show()
     return

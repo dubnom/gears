@@ -1,11 +1,11 @@
 from __future__ import annotations
 import os
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List, Callable
 import matplotlib.pyplot as plt
 import scipy.optimize
 from math import cos, sin, tan, tau, pi, radians, hypot, atan2
 
-from anim.geom import Line, Vector, Point
+from anim.geom import Line, Vector, Point, BBox
 from gear_base import plot, GearInstance, CUT_KIND_COLOR_MAP
 from anim.utils import t_range, arc, circle
 from gear_cycloidal import CycloidalPair
@@ -207,6 +207,7 @@ def pplot(rt, color='black', plotter=None):
 
 def test_inv(num_teeth=None, do_plot=True):
     def inv(radius=0.0, angle=0.0, offset_angle=0.0, offset_radius=0.0, offset_norm=0.0, clip=None):
+        """Involute with offset_radius and offset_norm (which makes this a generalized trochoid)"""
         # x = r * cos(a) + r*(a-oa) * sin(a)
         # x = (r-or) * cos(a) + r*(a-oa-on) * sin(a)
         x = (radius-offset_radius) * cos(angle) + (radius*(angle - offset_angle)-offset_norm) * sin(angle)
@@ -214,7 +215,7 @@ def test_inv(num_teeth=None, do_plot=True):
         # y = self.radius * (sin(angle) - (angle - offset) * cos(angle))
         return (x, y) if clip is None or hypot(x, y) < clip else None
 
-    def pp(t_l, t_h, fn, radius=None):
+    def pp(t_l: float, t_h: float, fn: Callable, radius=None):
         curve = list(filter(None, [fn(t) for t in t_range(50, t_l, t_h)]))
         if radius:
             if t_l + t_h < 0:
@@ -222,6 +223,11 @@ def test_inv(num_teeth=None, do_plot=True):
             else:
                 curve = curve + [(Vector(*curve[-1]).unit() * radius).xy()]
         return curve
+
+    def cross(r, c, color='black'):
+        u = Vector(r, r)
+        d = Vector(r, -r)
+        plot([c - u, c + u, c, c - d, c + d], color)
 
     module = 1
     num_teeth = num_teeth or 17
@@ -238,8 +244,9 @@ def test_inv(num_teeth=None, do_plot=True):
     # print('tht: ', tip_half_tooth)
     # print('rack.tth: ', rack.tooth_tip_high)
     tr = pitch_radius + addendum
-    dr = pitch_radius - addendum * 1.25
-    tall_addendum = addendum * 1.25
+    relief_factor = 1.25
+    dr = pitch_radius - addendum * relief_factor
+    tall_addendum = addendum * relief_factor
     tall_tip_half_tooth = half_tooth - tall_addendum * tan(radians(pressure_angle))
 
     # Calc pitch point where involute intersects pitch circle and offset
@@ -257,10 +264,23 @@ def test_inv(num_teeth=None, do_plot=True):
         return inv(angle=theta - oa, radius=base_radius, offset_angle=-oa, clip=tr)
 
     def f_undercut_edge(t):
+        """Trochoid for undercut"""
         offset_angle = 0
         cr = pitch_radius*200
         return inv(angle=t + offset_angle, radius=pitch_radius, offset_angle=offset_angle,
                    offset_radius=addendum, offset_norm=tip_half_tooth, clip=cr)
+
+    def calc_trochoid_end() -> Point:
+        # https://math.stackexchange.com/questions/2130212/finding-the-point-of-intersection-of-the-involute-profile-and-trochoidal-root-cu
+        # addendum/(delta Y + y_0) == tan(pressure_angle)
+        # addendum/(t * pitch_radius + tip_half_tooth) == tan(pressure_angle)
+        # addendum/tan(pressure_angle) == t*pitch_radius + tip_half_tooth
+        # t*pitch_radius = addendum/tan(pressure_angle) - tip_half_tooth
+        # t = (addendum/tan(pressure_angle) - tip_half_tooth)/pitch_radius
+
+        # Calculate trochoid parameter
+        t = (addendum/tan(radians(pressure_angle)) - tip_half_tooth)/pitch_radius
+        return Point(*f_undercut_edge(-t))
 
     def solve_this_points(t) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         x, y = f_undercut_edge(t)
@@ -308,18 +328,19 @@ def test_inv(num_teeth=None, do_plot=True):
     if better_solution:
         print(better_solution)
 
-        plot([(solution, -1), (solution, 1)])
+        plot([(solution, -1), (solution, 1)], label='solution')
         curve = [(t, solve_this_distance(t)) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'lightgreen')
+        plot(curve, 'lightgreen', 'distance')
         curve = [(t, solve_this_distance(t)) for t in t_range(5000, solution-0.1, solution+0.1)]
         plot(curve, 'green')
         curve = [(t, solve_this_radius(t)) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'blue')
+        plot(curve, 'blue', 'solve by radius')
         curve = [(t, solve_this_radii(t)[0]) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'yellow')
+        plot(curve, 'yellow', 'solve by radii 0')
         curve = [(t, solve_this_radii(t)[1]) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'orange')
+        plot(curve, 'orange', 'solve by radii 1')
         plt.title('Solution for distance and radius (teeth=%d)' % num_teeth)
+        plt.legend()
         plt.show()
 
     # tip_half_tooth = half_tooth - addendum * tan(radians(pressure_angle))
@@ -336,32 +357,99 @@ def test_inv(num_teeth=None, do_plot=True):
         undercut_point = Point(*f_undercut_edge(solution))
         print('Undercut at %s, distance=%.4f' % (undercut_point, solve_this_distance(solution)))
         plot(circle(0.1, undercut_point), 'pink')
-
-    def cross(r, c, color='black'):
-        u = Vector(r, r)
-        d = Vector(r, -r)
-        plot([c-u, c+u, c, c-d, c+d], color)
         cross(0.05, undercut_point, 'pink')
+        cross(0.05, calc_trochoid_end(), 'red')
+
+    # https://math.stackexchange.com/questions/3791094/how-do-i-find-the-intersection-of-an-involute-gears-involute-face-curves-and-tr
+    # gamma_max = -2*(relief_factor-profile_shift) tan(pressure_angle) / num_teeth
+    # t_max = gamma_max = -2*relief_factor/num_teeth * tan(pressure_angle)
+    def t_max(rf=relief_factor, profile_shift=0):
+        return -2 * (rf-profile_shift) / num_teeth * tan(radians(pressure_angle))
+
+    def plot_t_max(t, fna, fnb, color):
+        a = fna(-t)
+        b = fnb(t)
+        cross(0.05, Point(*a), color)
+        cross(0.05, Point(*b), color)
+        plot([a, b], color)
+
+    def find_intersections(a_vals, b_vals):
+        a_low, a_high, a_fn = a_vals
+        b_low, b_high, b_fn = b_vals
+
+        # plot(pp(a_low, a_high, a_fn), 'red')
+        # plot(pp(b_low, b_high, b_fn), 'red')
+
+        def offset_points(t_pt, x_offset):
+            return [(x + x_offset, y) for t, (x, y) in t_pt]
+
+        for n in range(10):
+            steps = 10
+            offset = 2 - 1 / (n + 1)
+            a_points = [(t, a_fn(t)) for t in t_range(steps, a_low, a_high)]
+            a_segs = [(t1, t2, Line(Point(*p1), Point(*p2))) for (t1, p1), (t2, p2) in zip(a_points, a_points[1:])]
+            b_points = [(t, b_fn(t)) for t in t_range(steps, b_low, b_high)]
+            b_segs = [(t1, t2, Line(Point(*p1), Point(*p2))) for (t1, p1), (t2, p2) in zip(b_points, b_points[1:])]
+            plot(offset_points(a_points, offset), 'green')
+            plot(offset_points(b_points, offset), 'red')
+
+            # Find an a_segment which intersects a b_segment
+            found = False
+            for a_t1, a_t2, a_seg in a_segs:
+                for b_t1, b_t2, b_seg in b_segs:
+                    intersection = a_seg.segment_intersection(b_seg)
+                    if intersection:
+                        a_low = a_t1
+                        a_high = a_t2
+                        b_low = b_t1
+                        b_high = b_t2
+                        found = True
+                        break
+            if not found:
+                print('What? n=', n)
+            else:
+                print('Found: da=%.15f db=%.15f' % (a_high - a_low, b_high - b_low))
+        return (a_low + a_high) / 2, (b_low + b_high) / 2
+
+    def under(neg: int, off_r: float, off_n: float, clip=None) -> Callable[[float], Tuple]:
+        """Return function for undercut curve"""
+        offset_angle = 0
+        return lambda t: inv(angle=t + offset_angle, radius=pitch_radius, offset_angle=offset_angle,
+                             offset_radius=off_r, offset_norm=neg * off_n, clip=clip)
+
+    oa = 0 - tooth_offset_angle
+    th, tl = 0 - 2, 0 + 2
+    t_u, t_inv = find_intersections(
+        (-t_max(), th, under(1, addendum, tip_half_tooth, clip=None)),
+        (tl, 0, lambda t: inv(angle=t-oa, radius=base_radius, offset_angle=-oa)))
+
     # print('ht/pr:', half_tooth / pitch_radius, ' hta rad:', half_tooth_angle)
     for tc in [0]:
         th, tl = tc-1, tc+1
         th, tl = tc-2, tc+2
         # th, tl = tc-6, tc+6
-        for offset_angle in t_range(num_teeth, 0, tau, False):
+        for idx, offset_angle in enumerate(t_range(num_teeth, 0, tau, False)):
             oa = offset_angle - tooth_offset_angle
             plot(pp(0, th, lambda t: inv(angle=t+oa, radius=base_radius, offset_angle=oa, clip=tr), radius=dr), 'darkgreen')
             plot(pp(tl, 0, lambda t: inv(angle=t-oa, radius=base_radius, offset_angle=-oa, clip=tr), radius=dr), 'darkblue')
             # plot(pp(th, tl, lambda t: inv(angle=t+offset_angle, radius=base_radius, offset_angle=offset_angle)), 'black')
             cr = pitch_radius+addendum*0.3
 
-            plot(pp(tl/4, th, lambda t: inv(angle=t+offset_angle, radius=pitch_radius, offset_angle=offset_angle,
-                                            offset_radius=tall_addendum, offset_norm=tall_tip_half_tooth, clip=cr)), 'lightblue')
-            plot(pp(tl, th/4, lambda t: inv(angle=t-offset_angle, radius=pitch_radius, offset_angle=-offset_angle,
-                                            offset_radius=tall_addendum, offset_norm=-tall_tip_half_tooth, clip=cr)), 'lightgreen')
-            plot(pp(tl/4, th, lambda t: inv(angle=t+offset_angle, radius=pitch_radius, offset_angle=offset_angle,
-                                            offset_radius=addendum, offset_norm=tip_half_tooth, clip=cr)), 'blue')
-            plot(pp(tl, th/4, lambda t: inv(angle=t-offset_angle, radius=pitch_radius, offset_angle=-offset_angle,
-                                            offset_radius=addendum, offset_norm=-tip_half_tooth, clip=cr)), 'green')
+            def under(neg: int, off_r: float, off_n: float, clip=cr) -> Callable[[float], Tuple]:
+                """Return function for undercut curve"""
+                return lambda t: inv(angle=t+offset_angle, radius=pitch_radius, offset_angle=offset_angle,
+                                     offset_radius=off_r, offset_norm=neg*off_n, clip=clip)
+
+            tm = t_max(1.25)
+            plot(pp(-tm, th, under(1, tall_addendum, tall_tip_half_tooth)), 'lightblue')
+            plot(pp(tl, tm, under(-1, tall_addendum, tall_tip_half_tooth)), 'lightgreen')
+            plot_t_max(tm, under(1, tall_addendum, tall_tip_half_tooth), under(-1, tall_addendum, tall_tip_half_tooth), 'lightgreen')
+
+            tm = t_max()
+            plot(pp(-tm, th, under(1, addendum, tip_half_tooth)), 'blue')
+            plot(pp(tl, tm, under(-1, addendum, tip_half_tooth)), 'green')
+            plot_t_max(tm, under(1, addendum, tip_half_tooth), under(-1, addendum, tip_half_tooth), 'green')
+
     # pplot(pp(-1, 1, lambda t: (pitch_radius * (1 - t * tan(radians(pressure_angle))), t)), 'pink')
     gi = GearInvolute(teeth=num_teeth, module=module, pressure_angle=pressure_angle)
     # gi.plot('red', gear_space=True)
@@ -382,7 +470,8 @@ def find_nt():
 
 def main():
     # find_nt(); return
-    # [test_inv(n) for n in range(3, 34)]; return
+    [test_inv(n) for n in [5]]; return
+    [test_inv(n) for n in range(9, 18, 2)]; return
     # test_inv(137); test_inv(42); test_inv(142); return
     # test_cuts(); return
     all_gears(cycloidal=not False); return

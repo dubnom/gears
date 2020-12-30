@@ -28,9 +28,12 @@ class CutError(Exception):
     pass
 
 
-def plot(xy, color='black', plotter=None):
+def plot(xy, color='black', label=None, plotter=None):
     plotter = plotter or plt
-    plotter.plot(*zip(*xy), color)
+    artists = plotter.plot(*zip(*xy), color)
+    if label:
+        for artist in artists:
+            artist.set_label(label)
 
 
 class CutDetail:

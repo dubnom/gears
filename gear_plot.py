@@ -3,6 +3,7 @@ import os
 from typing import Tuple, Optional, List, Callable
 import matplotlib.pyplot as plt
 import scipy.optimize
+import numpy as np
 from math import cos, sin, tan, tau, pi, radians, hypot, atan2
 
 from anim.geom import Line, Vector, Point, BBox
@@ -325,6 +326,7 @@ def test_inv(num_teeth=None, do_plot=True):
     if not do_plot:
         return
 
+    better_solution = None
     if better_solution:
         print(better_solution)
 
@@ -377,14 +379,24 @@ def test_inv(num_teeth=None, do_plot=True):
         a_low, a_high, a_fn = a_vals
         b_low, b_high, b_fn = b_vals
 
+        def ab_func(ab):
+            a, b = ab
+            ax, ay = a_fn(a)
+            bx, by = b_fn(b)
+            return np.array([ax-bx, ay-by])
+
+        result = scipy.optimize.fsolve(ab_func, np.array([(a_low+a_high)/2, (b_low+b_high)/2]), full_output=True)
+        from pprint import pp
+        pp(result)
+
         # plot(pp(a_low, a_high, a_fn), 'red')
         # plot(pp(b_low, b_high, b_fn), 'red')
 
         def offset_points(t_pt, x_offset):
             return [(x + x_offset, y) for t, (x, y) in t_pt]
 
-        for n in range(10):
-            steps = 10
+        for n in range(15):
+            steps = 20
             offset = 2 - 1 / (n + 1)
             a_points = [(t, a_fn(t)) for t in t_range(steps, a_low, a_high)]
             a_segs = [(t1, t2, Line(Point(*p1), Point(*p2))) for (t1, p1), (t2, p2) in zip(a_points, a_points[1:])]
@@ -405,11 +417,19 @@ def test_inv(num_teeth=None, do_plot=True):
                         b_high = b_t2
                         found = True
                         break
+            threshold = 1e-9        # TODO-should be relative
+            if abs(a_high-a_low) < threshold and abs(b_high-b_low) < threshold:
+                break
             if not found:
-                print('What? n=', n)
-            else:
-                print('Found: da=%.15f db=%.15f' % (a_high - a_low, b_high - b_low))
-        return (a_low + a_high) / 2, (b_low + b_high) / 2
+                print('Not Found: n=%d da=%.15f db=%.15f' % (n, a_high - a_low, b_high - b_low))
+                break
+            # else:
+            #     print('Found: da=%.15f db=%.15f' % (a_high - a_low, b_high - b_low))
+        # TODO-Use the t_value from the intersection to improve this result
+        print('res: %.15f %.15f [%2d iters]  found: %.15f %.15f' %
+              (result[0][0], result[0][1], result[1]['nfev'], (a_low + a_high) / 2, (b_low + b_high) / 2))
+        # return (a_low + a_high) / 2, (b_low + b_high) / 2
+        return result[0][0], result[0][1]
 
     def under(neg: int, off_r: float, off_n: float, clip=None) -> Callable[[float], Tuple]:
         """Return function for undercut curve"""
@@ -419,20 +439,23 @@ def test_inv(num_teeth=None, do_plot=True):
 
     oa = 0 - tooth_offset_angle
     th, tl = 0 - 2, 0 + 2
+    # TODO-improve initial guesses, probably by using range of expected radius at intersection
     t_u, t_inv = find_intersections(
         (-t_max(), th, under(1, addendum, tip_half_tooth, clip=None)),
+        (tl, 0, lambda t: inv(angle=t-oa, radius=base_radius, offset_angle=-oa)))
+    cross(0.1, Point(*under(1, addendum, tip_half_tooth, clip=None)(t_u)), 'cyan')
+
+    tt_u, tt_inv = find_intersections(
+        (-t_max(relief_factor), th, under(1, tall_addendum, tall_tip_half_tooth, clip=None)),
         (tl, 0, lambda t: inv(angle=t-oa, radius=base_radius, offset_angle=-oa)))
 
     # print('ht/pr:', half_tooth / pitch_radius, ' hta rad:', half_tooth_angle)
     for tc in [0]:
-        th, tl = tc-1, tc+1
         th, tl = tc-2, tc+2
-        # th, tl = tc-6, tc+6
         for idx, offset_angle in enumerate(t_range(num_teeth, 0, tau, False)):
             oa = offset_angle - tooth_offset_angle
-            plot(pp(0, th, lambda t: inv(angle=t+oa, radius=base_radius, offset_angle=oa, clip=tr), radius=dr), 'darkgreen')
-            plot(pp(tl, 0, lambda t: inv(angle=t-oa, radius=base_radius, offset_angle=-oa, clip=tr), radius=dr), 'darkblue')
-            # plot(pp(th, tl, lambda t: inv(angle=t+offset_angle, radius=base_radius, offset_angle=offset_angle)), 'black')
+            plot(pp(-t_inv, th, lambda t: inv(angle=t+oa, radius=base_radius, offset_angle=oa, clip=tr), radius=None), 'darkgreen')
+            plot(pp(tl, t_inv, lambda t: inv(angle=t-oa, radius=base_radius, offset_angle=-oa, clip=tr), radius=None), 'darkblue')
             cr = pitch_radius+addendum*0.3
 
             def under(neg: int, off_r: float, off_n: float, clip=cr) -> Callable[[float], Tuple]:
@@ -441,13 +464,13 @@ def test_inv(num_teeth=None, do_plot=True):
                                      offset_radius=off_r, offset_norm=neg*off_n, clip=clip)
 
             tm = t_max(1.25)
-            plot(pp(-tm, th, under(1, tall_addendum, tall_tip_half_tooth)), 'lightblue')
-            plot(pp(tl, tm, under(-1, tall_addendum, tall_tip_half_tooth)), 'lightgreen')
+            plot(pp(-tm, tt_u, under(1, tall_addendum, tall_tip_half_tooth)), 'lightblue')
+            plot(pp(-tt_u, tm, under(-1, tall_addendum, tall_tip_half_tooth)), 'lightgreen')
             plot_t_max(tm, under(1, tall_addendum, tall_tip_half_tooth), under(-1, tall_addendum, tall_tip_half_tooth), 'lightgreen')
 
             tm = t_max()
-            plot(pp(-tm, th, under(1, addendum, tip_half_tooth)), 'blue')
-            plot(pp(tl, tm, under(-1, addendum, tip_half_tooth)), 'green')
+            plot(pp(-tm, t_u, under(1, addendum, tip_half_tooth)), 'blue')
+            plot(pp(-t_u, tm, under(-1, addendum, tip_half_tooth)), 'green')
             plot_t_max(tm, under(1, addendum, tip_half_tooth), under(-1, addendum, tip_half_tooth), 'green')
 
     # pplot(pp(-1, 1, lambda t: (pitch_radius * (1 - t * tan(radians(pressure_angle))), t)), 'pink')
@@ -470,8 +493,8 @@ def find_nt():
 
 def main():
     # find_nt(); return
-    [test_inv(n) for n in [5]]; return
-    [test_inv(n) for n in range(9, 18, 2)]; return
+    [test_inv(n) for n in [3, 7, 17, 21, 101]]; return
+    [test_inv(n) for n in range(3, 18, 3)]; return
     # test_inv(137); test_inv(42); test_inv(142); return
     # test_cuts(); return
     all_gears(cycloidal=not False); return

@@ -227,7 +227,7 @@ class GearInvolute(object):
                     points.append((root_radius * cos(t), root_radius * sin(t)))
         # return points
 
-    def gen_gear_tooth_with_undercut(self) -> PointList:
+    def gen_gear_tooth(self) -> PointList:
         r"""
             Generate one tooth centered on the tip of the tooth.
             Does not include the root flats since they will be created when adjoining
@@ -318,48 +318,6 @@ class GearInvolute(object):
             plot(points, 'r+-')
 
         return [Point(x, y) for x, y in reversed(points)]
-
-    def gen_gear_tooth(self) -> PointList:
-        r"""
-            Generate one tooth centered on the tip of the tooth.
-            Does not include the root flats since they will be created when adjoining
-            tooth is placed.
-                  ____
-                 /    \
-            \___/      \___/
-        """
-        return self.gen_gear_tooth_with_undercut()
-        addendum = self.module
-        dedendum = self.module * self.relief_factor
-        tooth = self.pitch / 2
-        addendum_offset = addendum * tan(self.pressure_angle)
-        dedendum_offset = dedendum * tan(self.pressure_angle)
-        # print(self.pitch, tooth, addendum_offset)
-        # print('pitch=', self.pitch, ' cp=', tau / self.teeth)
-        points = []
-        br = self.base_radius
-        pr = self.pitch_radius
-        dr = self.pitch_radius - dedendum
-        cx, cy = self.center
-        inv = Involute(self.base_radius, self.pitch_radius + addendum, dr)
-        # Calc pitch point where involute intersects pitch circle and offset
-        pp_inv_angle = inv.calc_angle(self.pitch_radius)
-        ppx, ppy = inv.calc_point(pp_inv_angle)
-        pp_off_angle = atan2(ppy, ppx)
-        # Multiply pp_off_angle by pr to move from angular to pitch space
-        tooth_offset = tooth / 2 - pp_off_angle * pr
-
-        start_angle = -tooth_offset / pr
-        pts = inv.path(offset=start_angle, center=self.center, up=-1, steps=self.steps)
-        # TODO-fix all of this reversing
-        points.extend(reversed(pts))
-        if not inv.clipped:
-            # Add the direct line to the dedendum radius
-            # TODO-this should handle undercutting
-            points.append((dr * cos(start_angle) + cx, dr * sin(start_angle) + cy))
-        points.extend(Point(x, -y) for x, y in list(reversed(points)))
-        points = [Point(x, y) for x, y in reversed(points)]
-        return points
 
     def gen_by_rack(self):
         """Generate the gear shape by moving a rack past the gear"""
@@ -610,9 +568,16 @@ class InvolutePair:
     """Wheel and Pinion involute gears"""
     def __init__(self, wheel_teeth=30, pinion_teeth=6,
                  module=1.0, relief_factor=1.25,
+                 steps=4, tip_arc=0.0, root_arc=0.0, curved_root=False, debug=False,
                  pressure_angle=20.0):
-        self.gear_wheel = GearInvolute(teeth=wheel_teeth, module=module, relief_factor=relief_factor, pressure_angle=pressure_angle)
-        self.gear_pinion = GearInvolute(teeth=pinion_teeth, module=module, relief_factor=relief_factor, pressure_angle=pressure_angle)
+        self.gear_wheel = GearInvolute(teeth=wheel_teeth, module=module,
+                                       relief_factor=relief_factor, pressure_angle=pressure_angle,
+                                       steps=steps, tip_arc=tip_arc, root_arc=root_arc, curved_root=curved_root,
+                                       debug=debug)
+        self.gear_pinion = GearInvolute(teeth=pinion_teeth, module=module,
+                                        relief_factor=relief_factor, pressure_angle=pressure_angle,
+                                        steps=steps, tip_arc=tip_arc, root_arc=root_arc, curved_root=curved_root,
+                                        debug=debug)
 
     def wheel(self):
         return self.gear_wheel.instance()
@@ -630,29 +595,8 @@ class InvolutePair:
 
 if __name__ == '__main__':
     # gi = GearInvolute(37, **GearInvolute.HIGH_QUALITY)
-    gi = GearInvolute(8, pressure_angle=32)
+    gi = GearInvolute(8, **GearInvolute.HIGH_QUALITY)
     g = gi.instance()
-    gi.gen_gear_tooth_with_undercut(); g.plot('c--'); plot(g.tooth_path, 'b:'); g.plot_show(3); exit(0)
-    g.plot('cyan')
-    inv = Involute(g.base_radius, g.tip_radius)
-    # plot(circle(g.pitch_radius, Point(0, 0)), 'green')
-    plot(inv.path(10, offset=0.1), 'red')
-
-    invwo = InvoluteWithOffsets(g.base_radius, radius_max=g.tip_radius)
-    plot(invwo.path(100), 'purple')
-
-    addendum = gi.module
-    half_tooth = gi.module * pi / 4
-    short_tip_half_tooth = half_tooth - addendum*tan(gi.pressure_angle)
-    dedendum = addendum * gi.relief_factor
-    tip_half_tooth = half_tooth - dedendum * tan(gi.pressure_angle)
-
-    invwo = InvoluteWithOffsets(g.pitch_radius, radius_max=g.tip_radius,
-                                offset_radius=dedendum,
-                                offset_norm=tip_half_tooth)
-    plot(invwo.path(100), 'pink')
-    invwo = InvoluteWithOffsets(g.pitch_radius, radius_max=g.tip_radius,
-                                offset_radius=addendum,
-                                offset_norm=short_tip_half_tooth)
-    plot(invwo.path(100), 'pink')
-    g.plot_show()
+    g.plot('c')
+    plot(g.tooth_path, 'b:')
+    g.plot_show(3)

@@ -161,7 +161,7 @@ class GearInstance:
         path.append(path[0])        # Make sure it is closed
         plot(path, color, plotter=plotter)
         # Add a pointer to make it possible to visually track rotation
-        plot(path_translate(path_rotate([Point(0, 0), self.poly[5*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
+        plot(path_translate(path_rotate([Point(0, 0), self.poly[2*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
 
     def set_zoom(self, zoom_radius=0.0, plotter=None):
         plotter = plotter or plt

@@ -283,67 +283,8 @@ def test_inv(num_teeth=None, do_plot=True):
         t = (addendum/tan(radians(pressure_angle)) - tip_half_tooth)/pitch_radius
         return Point(*f_undercut_edge(-t))
 
-    def solve_this_points(t) -> Tuple[Tuple[float, float], Tuple[float, float]]:
-        x, y = f_undercut_edge(t)
-        x2, y2 = f_tooth_edge(atan2(y, x))
-        return (x, y), (x2, y2)
-
-    def solve_this_radii(t) -> Tuple[float, float]:
-        (x, y), (x2, y2) = solve_this_points(t)
-        return hypot(x, y), hypot(x2, y2)
-
-    def solve_this_radius(t):
-        x, y = f_undercut_edge(t)
-        x2, y2 = f_tooth_edge(atan2(y, x))
-        return hypot(x, y) - hypot(x2, y2)
-
-    def solve_this_distance(t):
-        x, y = f_undercut_edge(t)
-        x2, y2 = f_tooth_edge(atan2(y, x))
-        return hypot(x-x2, y-y2)
-
-    def solve_this(fn, low, high, epsilon=1e-8):
-        found: scipy.optimize.RootResults
-        found = scipy.optimize.root_scalar(fn, bracket=(low, high), method='brentq', xtol=epsilon)
-        # print(found)
-        if not found.converged:
-            print('Not-solved')
-        return found.root
-
-    better_solution = None
-    solution = None
-    try:
-        solution = solve_this(solve_this_radius, -2, 0)
-        better_solution: Optional[scipy.optimize.OptimizeResult]
-        better_solution = scipy.optimize.minimize_scalar(
-            solve_this_distance, bounds=(solution-0.3, 0), tol=1e-8)
-        print('Solved [%3d]: %9.4f %9.4f %9.4f %9.4f' % (
-            num_teeth, solution, better_solution.x,
-            solve_this_distance(solution), solve_this_distance(better_solution.x)))
-    except ValueError as err:
-        print('Failed [%3d]: %s' % (num_teeth, err))
-
     if not do_plot:
         return
-
-    better_solution = None
-    if better_solution:
-        print(better_solution)
-
-        plot([(solution, -1), (solution, 1)], label='solution')
-        curve = [(t, solve_this_distance(t)) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'lightgreen', 'distance')
-        curve = [(t, solve_this_distance(t)) for t in t_range(5000, solution-0.1, solution+0.1)]
-        plot(curve, 'green')
-        curve = [(t, solve_this_radius(t)) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'blue', 'solve by radius')
-        curve = [(t, solve_this_radii(t)[0]) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'yellow', 'solve by radii 0')
-        curve = [(t, solve_this_radii(t)[1]) for t in t_range(50, solution-1, solution+1)]
-        plot(curve, 'orange', 'solve by radii 1')
-        plt.title('Solution for distance and radius (teeth=%d)' % num_teeth)
-        plt.legend()
-        plt.show()
 
     # tip_half_tooth = half_tooth - addendum * tan(radians(pressure_angle))
     # print('tth: ', tip_half_tooth)
@@ -355,12 +296,6 @@ def test_inv(num_teeth=None, do_plot=True):
     plot(circle(base_radius), 'orange')
     plot(circle(tr), 'yellow')
     plot(circle(dr), 'yellow')
-    if solution:
-        undercut_point = Point(*f_undercut_edge(solution))
-        print('Undercut at %s, distance=%.4f' % (undercut_point, solve_this_distance(solution)))
-        plot(circle(0.1, undercut_point), 'pink')
-        cross(0.05, undercut_point, 'pink')
-        cross(0.05, calc_trochoid_end(), 'red')
 
     # https://math.stackexchange.com/questions/3791094/how-do-i-find-the-intersection-of-an-involute-gears-involute-face-curves-and-tr
     # gamma_max = -2*(relief_factor-profile_shift) tan(pressure_angle) / num_teeth
@@ -469,9 +404,12 @@ def test_inv(num_teeth=None, do_plot=True):
             plot_t_max(tm, under(1, tall_addendum, tall_tip_half_tooth), under(-1, tall_addendum, tall_tip_half_tooth), 'lightgreen')
 
             tm = t_max()
+            plot_t_max(tm, under(1, addendum, tip_half_tooth), under(-1, addendum, tip_half_tooth), 'green')
+            # Make the curve a bit longer for plotting
+            tmu = t_u+tm
+            t_u, tm = t_u+tmu, tm+tmu
             plot(pp(-tm, t_u, under(1, addendum, tip_half_tooth)), 'blue')
             plot(pp(-t_u, tm, under(-1, addendum, tip_half_tooth)), 'green')
-            plot_t_max(tm, under(1, addendum, tip_half_tooth), under(-1, addendum, tip_half_tooth), 'green')
 
     # pplot(pp(-1, 1, lambda t: (pitch_radius * (1 - t * tan(radians(pressure_angle))), t)), 'pink')
     gi = GearInvolute(teeth=num_teeth, module=module, pressure_angle=pressure_angle)
@@ -493,16 +431,16 @@ def find_nt():
 
 def main():
     # find_nt(); return
-    [test_inv(n) for n in [3, 7, 17, 21, 101]]; return
-    [test_inv(n) for n in range(3, 18, 3)]; return
+    # [test_inv(n) for n in [3, 7, 17, 21, 101]]; return
+    # [test_inv(n) for n in range(3, 18, 3)]; return
     # test_inv(137); test_inv(42); test_inv(142); return
     # test_cuts(); return
-    all_gears(cycloidal=not False); return
+    # all_gears(cycloidal=not False); return
     # do_gears(zoom_radius=5, wheel_teeth=137, pinion_teeth=5, cycloidal=True, animate=True); return
 
     # pair = InvolutePair(137, 33, module=2)
-    # pair = InvolutePair(31, 27, module=2)
-    pair = CycloidalPair(137, 33, module=0.89647)
+    pair = InvolutePair(31, 27, module=2)
+    # pair = CycloidalPair(137, 33, module=0.89647)
     tool = Tool(angle=0.0, tip_height=1/32*25.4)
     plot_classified_cuts(pair.wheel(), tool)
     plot_classified_cuts(pair.pinion(), tool)

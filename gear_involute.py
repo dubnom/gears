@@ -1,14 +1,99 @@
-from math import sqrt, cos, sin, pi, radians, tan, atan2, degrees
+import numpy as np
+import scipy.optimize
+from math import sqrt, cos, sin, pi, radians, tan, atan2, degrees, hypot, tau
 from numbers import Number
-from typing import List, Tuple
+from typing import List, Tuple, Iterator, cast
 
 from matplotlib import pyplot as plt
 
 from anim.geom import Point, Vector, Line
 from anim.transform import Transform
 from gear_base import plot, GearInstance
-from anim.utils import PointList, circle
+from anim.utils import PointList, circle, t_range
 from rack import Rack
+
+
+class InvoluteWithOffsets(object):
+    """
+        Involute curve, with added x & y offsets to be more usable for gears.
+
+        See https://en.wikipedia.org/wiki/Involute#Involutes_of_a_circle
+    """
+
+    def __init__(self, radius=0.0, offset_angle=0.0, offset_radius=0.0, offset_norm=0.0,
+                 radius_min=0.0, radius_max=0.0):
+        """
+            :param radius:          Base radius for gear involutes, pitch radius for gear trochoids
+            :param offset_angle:    Starting rotation of curve
+            :param offset_radius:   Offset of point into circle (taller rack)
+            :param offset_norm:     Offset of point perpendicular (CCW) to radius (wider rack tooth)
+            :param radius_min:      Minimum radius (== 0 implies calculated minimum)
+            :param radius_max:      Maximum radius (== 0 implies no maximum)
+        """
+
+        self.radius = radius
+        self.offset_angle = offset_angle
+        self.offset_radius = offset_radius
+        self.offset_norm = offset_norm
+        if radius_min:
+            if radius_min < radius-offset_radius:
+                raise ValueError('radius_min')
+            self.radius_min = radius_min
+        else:
+            self.radius_min = radius-offset_radius
+        self.radius_max = radius_max
+        self.start_angle = self.calc_angle(self.radius_min)
+        self.end_angle = self.calc_angle(self.radius_max) if radius_max else (2*tau)
+        debug_print = False
+        if debug_print:
+            print('InvWO: r=%.6f mnr=%.6f mxr=%.6f sa=%.6f ea=%.6f' %
+                  (self.radius, self.radius_min, self.radius_max, self.start_angle, self.end_angle))
+
+    def mid_angle(self):
+        """Average of .start_angle and .end_angle"""
+        return (self.start_angle + self.end_angle) / 2
+
+    def calc_point(self, angle, clip=True):
+        """Involute with offset_radius and offset_norm (which makes this a generalized trochoid)"""
+        # x = r * cos(a) + r*(a-oa) * sin(a)
+        # x = (r-or) * cos(a) + r*(a-oa-on) * sin(a)
+        angle += self.offset_angle
+        x = (self.radius-self.offset_radius) * cos(angle) + (self.radius*(angle - self.offset_angle)-self.offset_norm) * sin(angle)
+        y = (self.radius-self.offset_radius) * sin(angle) - (self.radius*(angle - self.offset_angle)-self.offset_norm) * cos(angle)
+        # y = self.radius * (sin(angle) - (angle - offset) * cos(angle))
+        return x, y
+
+    def calc_angle(self, distance) -> float:
+        """Calculate angle (radians) for corresponding distance (> radius)"""
+        if self.offset_norm or self.offset_radius:
+            # Need to calculate numerically
+            def objective(t):
+                x, y = self.calc_point(t[0], False)
+                return np.array([distance - hypot(x, y)])
+            solution, info, ok, msg = scipy.optimize.fsolve(objective, np.array([0]), full_output=True)
+            if not ok:
+                raise ValueError(msg)
+            return solution[0]
+        else:
+            # Simple closed form exists for plain involute
+            assert distance >= self.radius
+            return sqrt(distance * distance / (self.radius * self.radius) - 1)
+
+    def x_calc_undercut_t_at_r(self, r):
+        # r = rp*sqrt(sqr(1-2*relief/N) + sqr(pi/(2*N) - 2*relief/N*tan(pa)-t))
+        # solve rp*sqrt((1-2*relief/N)^2 + (pi/(2*N) - 2*relief/N*tan(pa)-t)^2) - r = 0 for t
+        # solve p*sqrt((1-2*k/N)^2 + (pi/(2*N) - 2*k/N*tan(a)-t)^2) = r for t
+        # t = 1/2 (-(4 k tan(a))/N + (2 sqrt(-4 k^2 p^2 + 4 k N p^2 - N^2 p^2 + N^2 r^2))/(N p) + π/N)
+        pass
+
+    def path(self, steps=10, offset=0.0, up=1, clip=False) -> List[Tuple[float, float]]:
+        """Generate path for involute"""
+        t_vals = t_range(steps, self.start_angle, self.end_angle)
+        points = (self.calc_point(t) for t in t_vals)
+        # Sigh.  Pycharm thinks filter(None, ...) is Iterator[None]
+        if clip:
+            points = ((x, y) for x, y in points if self.radius_min <= hypot(x, y) <= self.radius_max)
+        return list(points)
 
 
 class Involute(object):
@@ -38,6 +123,13 @@ class Involute(object):
         assert distance >= self.radius
         return sqrt(distance * distance / (self.radius * self.radius) - 1)
 
+    def calc_undercut_t_at_r(self, r):
+        # r = rp*sqrt(sqr(1-2*relief/N) + sqr(pi/(2*N) - 2*relief/N*tan(pa)-t))
+        # solve rp*sqrt((1-2*relief/N)^2 + (pi/(2*N) - 2*relief/N*tan(pa)-t)^2) - r = 0 for t
+        # solve p*sqrt((1-2*k/N)^2 + (pi/(2*N) - 2*k/N*tan(a)-t)^2) = r for t
+        # t = 1/2 (-(4 k tan(a))/N + (2 sqrt(-4 k^2 p^2 + 4 k N p^2 - N^2 p^2 + N^2 r^2))/(N p) + π/N)
+        pass
+
     def calc_point(self, angle, offset=0.0, offset_r=0.0, offset_n=0.0):
         """
             Calculate the x,y for a given angle and offset angle
@@ -64,9 +156,11 @@ class Involute(object):
 
 
 class GearInvolute(object):
+    HIGH_QUALITY = dict(steps=20, tip_arc=0.5, root_arc=0.5, curved_root=True)
+
     def __init__(self, teeth=30, center=Point(0, 0), rot=0.0,
                  module=1.0, relief_factor=1.25,
-                 steps=4,
+                 steps=4, tip_arc=0.0, root_arc=0.0, curved_root=False, debug=False,
                  pressure_angle=20.0, pressure_line=True):
         """
             Plot an involute gear
@@ -75,7 +169,11 @@ class GearInvolute(object):
             :param rot: 	Rotation in #teeth
             :param module:	Module of gear
             :param relief_factor: Relief factor
-            :param steps:   Number of steps in the involute side
+            :param steps:   Number of steps on the gear face (and the undercut)
+            :param tip_arc: Max degrees per step for arc at tip of tooth (0==no arc, just straight line)
+            :param root_arc: Max degrees per step for arc at root of tooth (0==no arc, just straight line)
+            :param curved_root: True to include root curve even if no undercut
+            :param debug: True for verbose messages and plotting during construction
             :param pressure_angle: Pressure angle
             :param pressure_line: True to plot pressure lines
         """
@@ -86,6 +184,10 @@ class GearInvolute(object):
         self.rot = rot * self.pitch  # Now rotation is in pitch distance
         self.relief_factor = relief_factor
         self.steps = steps
+        self.tip_arc = tip_arc
+        self.root_arc = root_arc
+        self.curved_root = curved_root
+        self.debug = debug
         self.pressure_angle = radians(pressure_angle)
         self.pressure_line = pressure_line
         self.pitch_radius = self.module * self.teeth / 2
@@ -93,6 +195,129 @@ class GearInvolute(object):
         self.tip_radius = self.pitch_radius + self.module   # add addendum
         self.dedendum_radius = self.pitch_radius - self.module * self.relief_factor
         # print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
+
+    def min_teeth_without_undercut(self):
+        sin_pa = sin(self.pressure_angle)
+        return 2 / (sin_pa * sin_pa)
+
+    def _finish_tooth(self, points, root_radius=0.0):
+        root_radius = root_radius or self.dedendum_radius
+        other_side = [(x, -y) for x, y in reversed(points)]
+
+        if self.tip_arc:
+            tip_angle = abs(atan2(points[-1][1], points[-1][0]))
+            tip_angle_degrees = degrees(tip_angle * 2)
+            if tip_angle_degrees > self.tip_arc:
+                steps = int(tip_angle_degrees / self.tip_arc) + 1
+                if self.debug:
+                    print('total tip angle=%.2f  steps=%d' % (tip_angle_degrees, steps))
+                for n in range(1, steps):
+                    t = n / steps * tip_angle * 2 - tip_angle
+                    points.append((self.tip_radius * cos(t), self.tip_radius * sin(t)))
+        points.extend(other_side)
+        if self.root_arc:
+            root_angle = abs(pi / self.teeth - (atan2(points[-1][1], points[-1][0])))
+            root_angle_degrees = degrees(root_angle * 2)
+            if root_angle_degrees > self.root_arc:
+                steps = int(root_angle_degrees / self.root_arc) + 1
+                if self.debug:
+                    print('total root angle=%.2f  steps=%d' % (root_angle_degrees, steps))
+                for n in range(1, steps):
+                    t = n / steps * root_angle * 2 - root_angle + pi / self.teeth
+                    points.append((root_radius * cos(t), root_radius * sin(t)))
+        # return points
+
+    def gen_gear_tooth_with_undercut(self) -> PointList:
+        r"""
+            Generate one tooth centered on the tip of the tooth.
+            Does not include the root flats since they will be created when adjoining
+            tooth is placed.
+                  ____
+                 /    \
+            \___/      \___/
+        """
+        debug = self.debug
+
+        addendum = self.module
+        dedendum = self.module * self.relief_factor
+        tooth = self.pitch / 2
+        half_tooth = tooth / 2
+        addendum_offset = half_tooth - addendum * tan(self.pressure_angle)
+        dedendum_offset = half_tooth - dedendum * tan(self.pressure_angle)
+
+        points = []
+        br = self.base_radius
+        pr = self.pitch_radius
+        rr = self.pitch_radius - dedendum
+        cx, cy = self.center
+
+        gear_face = InvoluteWithOffsets(self.base_radius, radius_max=self.tip_radius,
+                                        radius_min=max(self.base_radius, self.dedendum_radius))
+        if debug:
+            plot(gear_face.path(10), 'pink')
+        # gear_face = Involute(self.base_radius, self.pitch_radius + addendum, dr)
+
+        # Calc pitch point where involute intersects pitch circle and offset
+        pp_inv_angle = gear_face.calc_angle(self.pitch_radius)
+        ppx, ppy = gear_face.calc_point(pp_inv_angle)
+        pp_off_angle = atan2(ppy, ppx)
+        # Multiply pp_off_angle by pr to move from angular to pitch space
+        tooth_offset = tooth / 2 - pp_off_angle * pr
+        gear_face.offset_angle = (tooth_offset - tooth) / pr
+
+        points = []
+
+        undercut_required = self.teeth < self.min_teeth_without_undercut()
+        if undercut_required or self.curved_root:
+            short_tip = not True
+            if short_tip:       # Use just addendum to generate undercut (mostly for plotting)
+                undercut = InvoluteWithOffsets(self.pitch_radius, offset_angle=-tooth/pr,
+                                               offset_radius=addendum, offset_norm=addendum_offset,
+                                               radius_min=0, radius_max=self.tip_radius)
+            else:
+                undercut = InvoluteWithOffsets(self.pitch_radius, offset_angle=-tooth/pr,
+                                               offset_radius=dedendum, offset_norm=dedendum_offset,
+                                               radius_min=0, radius_max=self.tip_radius)
+
+            # Find the intersection of gear_face and undercut
+            def objective(ab):
+                a, b = ab
+                ax, ay = gear_face.calc_point(a)
+                bx, by = undercut.calc_point(b)
+                return np.array([ax - bx, ay - by])
+
+            guesses = np.array([gear_face.mid_angle(), undercut.mid_angle()])
+            result, info, ok, message = scipy.optimize.fsolve(objective, guesses, full_output=True)
+            if not ok:
+                if debug:
+                    from pprint import pp
+                    pp((result, info, ok, message))
+                raise ValueError('Undercut / Face intersection: %s' % message)
+
+            gear_face.start_angle = result[0]
+            undercut.end_angle = result[1]
+
+            points.extend(undercut.path(self.steps)[:-1])
+            points.extend(gear_face.path(self.steps))
+
+            self._finish_tooth(points, root_radius=undercut.radius - undercut.offset_radius)
+
+            if debug:
+                intersection = Point(*gear_face.calc_point(result[0]))
+                plot(circle(0.1, intersection), 'pink')
+                plot(circle(0.01, intersection), 'pink')
+        else:
+            points.extend(gear_face.path(self.steps))
+            if self.base_radius > self.dedendum_radius:
+                points.insert(0, (Vector(*points[0]).unit()*self.dedendum_radius).xy())
+            self._finish_tooth(points)
+            # other_side = [(x, -y) for x, y in reversed(points)]
+            # points.extend(other_side)
+
+        if debug:
+            plot(points, 'r+-')
+
+        return [Point(x, y) for x, y in reversed(points)]
 
     def gen_gear_tooth(self) -> PointList:
         r"""
@@ -103,6 +328,7 @@ class GearInvolute(object):
                  /    \
             \___/      \___/
         """
+        return self.gen_gear_tooth_with_undercut()
         addendum = self.module
         dedendum = self.module * self.relief_factor
         tooth = self.pitch / 2
@@ -400,3 +626,33 @@ class InvolutePair:
     def plot(self, color='blue', rotation=0.0, plotter=None):
         self.wheel().plot(color, rotation, plotter)
         self.pinion().plot(color, rotation, plotter)
+
+
+if __name__ == '__main__':
+    # gi = GearInvolute(37, **GearInvolute.HIGH_QUALITY)
+    gi = GearInvolute(8, pressure_angle=32)
+    g = gi.instance()
+    gi.gen_gear_tooth_with_undercut(); g.plot('c--'); plot(g.tooth_path, 'b:'); g.plot_show(3); exit(0)
+    g.plot('cyan')
+    inv = Involute(g.base_radius, g.tip_radius)
+    # plot(circle(g.pitch_radius, Point(0, 0)), 'green')
+    plot(inv.path(10, offset=0.1), 'red')
+
+    invwo = InvoluteWithOffsets(g.base_radius, radius_max=g.tip_radius)
+    plot(invwo.path(100), 'purple')
+
+    addendum = gi.module
+    half_tooth = gi.module * pi / 4
+    short_tip_half_tooth = half_tooth - addendum*tan(gi.pressure_angle)
+    dedendum = addendum * gi.relief_factor
+    tip_half_tooth = half_tooth - dedendum * tan(gi.pressure_angle)
+
+    invwo = InvoluteWithOffsets(g.pitch_radius, radius_max=g.tip_radius,
+                                offset_radius=dedendum,
+                                offset_norm=tip_half_tooth)
+    plot(invwo.path(100), 'pink')
+    invwo = InvoluteWithOffsets(g.pitch_radius, radius_max=g.tip_radius,
+                                offset_radius=addendum,
+                                offset_norm=short_tip_half_tooth)
+    plot(invwo.path(100), 'pink')
+    g.plot_show()

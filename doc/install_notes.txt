@@ -1,0 +1,24 @@
+print('Platform: uname=', os.uname())
+# Not sure if this will work or not
+images[0].save('/tmp/images.png')
+images[0].save(output, save_all=True, append_images=images[1:], disposal=1, duration=ms_per_frame, loop=0)
+# os.system('cmd.exe /c "/linux%s"' % output)
+os.system('cmd.exe /c "//wsl$/Ubuntu/%s"' % output)
+
+
+
+Install notes:
+
+C:\Users\glenn>git clone -b x7_refactor https://gribbg@bitbucket.org/dubnom/gears.git gears_branch
+Cloning into 'gears_branch'...
+remote: Counting objects: 937, done.
+remote: Compressing objects: 100% (241/241), done.
+
+Receiving objects: 100% (937/937), 251.93 KiB | 8.13 MiB/s, done.
+Resolving deltas: 100% (584/584), done.
+
+C:\Users\glenn>cd gears_branch
+
+C:\Users\glenn\gears_branch>"c:\Program Files\Python38"\python -m venv venv
+
+C:\Users\glenn\gears_branch>.\venv\Scripts\python.exe -m pip install -r requirements.txt

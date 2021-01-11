@@ -2,9 +2,9 @@
     Rack creation functions
 """
 
-from math import pi, tan, degrees, radians
+from math import pi, tan, radians
 from typing import Tuple, List
-from anim.geom import Point, Line, Vector
+from x7.geom.geom import Point, Line, Vector
 
 
 class Rack(object):

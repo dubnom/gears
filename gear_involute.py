@@ -2,14 +2,15 @@ import numpy as np
 import scipy.optimize
 from math import sqrt, cos, sin, pi, radians, tan, atan2, degrees, hypot, tau
 from numbers import Number
-from typing import List, Tuple, Iterator, cast
+from typing import List, Tuple
 
 from matplotlib import pyplot as plt
 
-from anim.geom import Point, Vector, Line
-from anim.transform import Transform
-from gear_base import plot, GearInstance
-from anim.utils import PointList, circle, t_range
+from x7.lib.iters import t_range
+from x7.geom.geom import Point, Vector, Line, PointList
+from x7.geom.transform import Transform
+from x7.geom.utils import circle, plot
+from gear_base import GearInstance
 from rack import Rack
 
 
@@ -161,7 +162,7 @@ class GearInvolute(object):
     def __init__(self, teeth=30, center=Point(0, 0), rot=0.0,
                  module=1.0, relief_factor=1.25,
                  steps=4, tip_arc=0.0, root_arc=0.0, curved_root=False, debug=False,
-                 pressure_angle=20.0, pressure_line=True):
+                 pressure_angle=20.0):
         """
             Plot an involute gear
             :param teeth:	Number of teeth in gear
@@ -175,13 +176,12 @@ class GearInvolute(object):
             :param curved_root: True to include root curve even if no undercut
             :param debug: True for verbose messages and plotting during construction
             :param pressure_angle: Pressure angle
-            :param pressure_line: True to plot pressure lines
         """
         self.teeth = teeth
         self.module = module
         self.center = center
         self.pitch = self.module * pi
-        self.rot = rot * self.pitch  # Now rotation is in pitch distance
+        self.rot = rot
         self.relief_factor = relief_factor
         self.steps = steps
         self.tip_arc = tip_arc
@@ -189,12 +189,71 @@ class GearInvolute(object):
         self.curved_root = curved_root
         self.debug = debug
         self.pressure_angle = radians(pressure_angle)
-        self.pressure_line = pressure_line
+
+        self.pitch_radius = self.base_radius = self.tip_radius = self.dedendum_radius = 0.0
+        self.set_teeth(teeth)
+        # print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
+
+    def copy(self):
+        """Deep copy"""
+        return type(self)(
+            teeth=self.teeth,
+            center=self.center.copy(),
+            rot=self.rot,
+            module=self.module,
+            relief_factor=self.relief_factor,
+            steps=self.steps,
+            tip_arc=self.tip_arc,
+            root_arc=self.root_arc,
+            curved_root=self.curved_root,
+            debug=self.debug,
+            pressure_angle=degrees(self.pressure_angle),
+        )
+
+    def restore(self, other: 'GearInvolute'):
+        """Restore in place"""
+        self.teeth = other.teeth
+        self.center = other.center.copy()
+        self.rot = other.rot
+        self.module = other.module
+        self.relief_factor = other.relief_factor
+        self.steps = other.steps
+        self.tip_arc = other.tip_arc
+        self.root_arc = other.root_arc
+        self.curved_root = other.curved_root
+        self.debug = other.debug
+        self.pressure_angle = other.pressure_angle
+        self.set_teeth(self.teeth)
+
+    def __eq__(self, other):
+        return (self.teeth == other.teeth
+                and self.center == other.center
+                and self.rot == other.rot
+                and self.module == other.module
+                and self.relief_factor == other.relief_factor
+                and self.steps == other.steps
+                and self.tip_arc == other.tip_arc
+                and self.root_arc == other.root_arc
+                and self.curved_root == other.curved_root
+                and self.debug == other.debug
+                and self.pressure_angle == other.pressure_angle
+                )
+
+    @property
+    def pressure_angle_degrees(self):
+        return degrees(self.pressure_angle)
+
+    @pressure_angle_degrees.setter
+    def pressure_angle_degrees(self, pa):
+        self.pressure_angle = radians(pa)
+
+    def set_teeth(self, new_teeth: int):
+        """Set the number of teeth and recalc as needed"""
+        self.teeth = new_teeth
         self.pitch_radius = self.module * self.teeth / 2
         self.base_radius = self.pitch_radius * cos(self.pressure_angle)
         self.tip_radius = self.pitch_radius + self.module   # add addendum
         self.dedendum_radius = self.pitch_radius - self.module * self.relief_factor
-        # print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
 
     def min_teeth_without_undercut(self):
         sin_pa = sin(self.pressure_angle)
@@ -245,7 +304,6 @@ class GearInvolute(object):
         addendum_offset = half_tooth - addendum * tan(self.pressure_angle)
         dedendum_offset = half_tooth - dedendum * tan(self.pressure_angle)
 
-        points = []
         br = self.base_radius
         pr = self.pitch_radius
         rr = self.pitch_radius - dedendum
@@ -471,14 +529,14 @@ class GearInvolute(object):
         offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
         return [(p+offset).xy() for p in tooth_pts]
 
-    def plot(self, color='red', tool_angle=40.0, gear_space=None, mill_space=None):
+    def plot(self, color='red', tool_angle=40.0, gear_space=None, mill_space=None, pressure_line=True):
         addendum = self.module
         dedendum = self.module * self.relief_factor
         pitch_radius = self.pitch_radius
         if mill_space is None and gear_space is None:
             gear_space = True
 
-        if self.pressure_line:
+        if pressure_line:
             dx = self.module*5*sin(self.pressure_angle)
             dy = self.module*5*cos(self.pressure_angle)
             cx = pitch_radius + self.center.x
@@ -556,10 +614,16 @@ class GearInvolute(object):
             ax.set_ylim(-zoom_radius, zoom_radius)
         plt.show()
 
-    def instance(self, x_pos=0):
-        """Return a gear instance that represents this gear"""
+    def instance(self):
+        """
+            Return a gear instance that represents this gear
+            :return: GearInstance
+        """
+        """"""
         # x_pos = wheel_pitch_radius + pinion_pitch_radius
-        return GearInstance(self.module, self.teeth, 'Involute', '', self.gen_gear_tooth(), Point(x_pos, 0),
+
+        return GearInstance(self.module, self.teeth, 'Involute', '', self.gen_gear_tooth(),
+                            center=self.center, rotation_extra=self.rot,
                             tip_radius=self.tip_radius, base_radius=self.base_radius,
                             root_radius=self.dedendum_radius)
 

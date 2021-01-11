@@ -20,8 +20,8 @@ from shapely.affinity import rotate, translate
 
 # Parse the command line arguments
 import gear_plot
-from anim.geom import BBox
-from anim.simple import SimpleAnimation
+from x7.geom.geom import BBox
+from x7.geom.anim_simple import SimpleAnimation
 from gear_cycloidal import CycloidalPair
 from rack import Rack
 from tool import Tool
@@ -268,7 +268,6 @@ for line_number, line in enumerate(infile):
                     zr = v['pitch_diameter']
                 sa.model_bbox = BBox(cx - zr, cy - zr, cx + zr, cy + zr)
 
-
         # Move and cut based on each axis
         for axis, amt in mgCode:
             step_number += 1
@@ -364,8 +363,8 @@ for line_number, line in enumerate(infile):
                                 else:
                                     plt.plot(*gear_blank.intersection(clip).exterior.xy, color='b')
                                     plt.plot(*cur_cutter.intersection(clip).exterior.xy, color='r')
-                                #plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
-                                #plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
+                                # plt.plot((0., cos(radians(-cur_angle)) * v['outside_radius']), (0., sin(radians(-cur_angle)) * v['outside_radius']), color='b')
+                                # plt.plot((-direction*(v['outside_radius'] - v['h_total']), -direction*(v['outside_radius'] - v['h_total'])), (-v['z_max'], v['z_max']), color='y')
                                 plt.grid()
                                 plt.axis('equal')
                                 camera.snap()

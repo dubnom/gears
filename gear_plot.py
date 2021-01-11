@@ -4,9 +4,9 @@ from typing import Optional
 import matplotlib.pyplot as plt
 from math import cos, sin, radians
 
-from anim.geom import Line, Vector, Point
-from gear_base import plot, GearInstance, CUT_KIND_COLOR_MAP
-from anim.utils import arc
+from x7.geom.geom import Line, Vector, Point
+from x7.geom.utils import arc, plot
+from gear_base import GearInstance, CUT_KIND_COLOR_MAP
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvolutePair
 
@@ -81,7 +81,7 @@ def plot_classified_cuts(gear: GearInstance, tool: Tool):
     plt.show()
     print_fake_gcode = False
     if print_fake_gcode:
-        for r, y, z, k in gear.cut_params(tool.angle, tool.tip_height):
+        for r, y, z, k in gear.cut_params(tool):
             print('( kind: %s )' % k)
             print('G_ A%10.4f Y%10.4f Z%10.4f' % (r, y, z))
 
@@ -121,7 +121,7 @@ def do_gears(rot=0., zoom_radius=0., cycloidal=True, wheel_teeth=40, pinion_teet
         pinion = pair.pinion()
 
     if animate:
-        from anim.viewer import PlotViewer
+        from x7.geom.plot_viewer import PlotViewer
         rotation = [0]
         if cycloidal:
             extra = 0.08 if pinion.teeth < 10 else 0.05
@@ -157,7 +157,7 @@ def all_gears(cycloidal=True, animate=True, zoom=False):
         gears.append((pair, gear_x, gear_y))
 
     if animate:
-        from anim.viewer import PlotViewer
+        from x7.geom.plot_viewer import PlotViewer
         rotation = [0]
 
         def update(ax):

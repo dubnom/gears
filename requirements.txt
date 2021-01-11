@@ -6,3 +6,4 @@ Pillow
 numpy
 pygifsicle
 scipy
+x7

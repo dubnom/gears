@@ -3,9 +3,9 @@
 
 from typing import List, Tuple
 from unittest import TestCase
-from gg.devtools.testing.annotations import tests
+from x7.lib.annotations import tests
 import tool
-from gg.devtools.testing.extended import TestCaseExtended
+from x7.testing.extended import TestCaseExtended
 from tool import Tool
 
 

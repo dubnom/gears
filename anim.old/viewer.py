@@ -1,7 +1,7 @@
 import math
 from typing import Callable, Optional
 
-from anim.utils import t_range
+from x7.geom.utils import t_range
 
 import matplotlib
 matplotlib.use("TkAgg")

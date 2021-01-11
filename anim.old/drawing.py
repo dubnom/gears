@@ -1,8 +1,8 @@
 from PIL import Image, ImageDraw, ImageFilter, ImageChops, ImageEnhance, ImageFont
 
-from anim.geom import BasePoint
-from anim.typing import *
-from anim.transform import Transform
+from x7.geom.geom import BasePoint
+from x7.geom.typing import *
+from x7.geom.transform import Transform
 
 
 def bbox_max(bbox_a, bbox_b):

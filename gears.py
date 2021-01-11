@@ -23,9 +23,9 @@ from typing import Optional
 import configargparse
 
 import gear_plot
-from anim.geom import Point
+from x7.geom.geom import Point
 from gear_base import GearInstance
-from anim.utils import min_rotation
+from x7.geom.utils import min_rotation
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute
 from tool import Tool

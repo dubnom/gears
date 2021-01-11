@@ -3,8 +3,8 @@ import sys
 from math import radians, degrees, tan, pi
 # noinspection PyPackageRequirements
 import configargparse
-from anim.geom import Point, Vector
-from anim.utils import arc
+from x7.geom.geom import Point, Vector
+from x7.geom.utils import arc
 
 
 class Tool:

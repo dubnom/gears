@@ -1,13 +1,14 @@
 from math import sin, cos, radians, ceil, tan
 from typing import List, Tuple, Optional
 from matplotlib import pyplot as plt
-from anim.geom import Point, Vector, Line, polygon_area, iter_rotate
-from anim.transform import Transform
-from anim.utils import PointList, check_point_list, t_range, path_rotate, path_translate, circle
+from x7.lib.iters import iter_rotate, t_range
+from x7.geom.geom import Point, Vector, Line, polygon_area, PointList
+from x7.geom.transform import Transform
+from x7.geom.utils import check_point_list, path_rotate, path_translate, circle
+from x7.geom.utils import plot
 from tool import Tool
 
 __all__ = [
-    'plot',
     'GearInstance', 'CUT_KIND_COLOR_MAP', 'CutError',
 ]
 
@@ -26,14 +27,6 @@ CUT_KINDS = set(CUT_KIND_COLOR_MAP.keys())
 
 class CutError(Exception):
     pass
-
-
-def plot(xy, color='black', label=None, plotter=None):
-    plotter = plotter or plt
-    artists = plotter.plot(*zip(*xy), color)
-    if label:
-        for artist in artists:
-            artist.set_label(label)
 
 
 class CutDetail:
@@ -110,7 +103,7 @@ class GearInstance:
         self.kind = kind
         self.tooth_path = tooth_path
         check_point_list(tooth_path)
-        self.poly = poly or self.gen_poly()
+        self.poly = list(poly or self.gen_poly())
         check_point_list(self.poly)
         self.rotation_extra = rotation_extra
         self.center = center
@@ -122,7 +115,12 @@ class GearInstance:
         self.root_radius = root_radius
 
     def gen_poly(self, rotation=0.0) -> PointList:
-        """Generate the full polygon from the tooth path"""
+        """
+            Generate the full polygon at 0,0 with 0 rotation from the tooth path
+
+            :param rotation: Amount of rotation in #teeth
+            :return:
+        """
         degrees_per_tooth = 360 / self.teeth
         rotation *= degrees_per_tooth
 
@@ -132,6 +130,17 @@ class GearInstance:
             points.extend(path_rotate(self.tooth_path, mid, True))
         check_point_list(points)
         return points
+
+    def poly_at(self, rotation=0.0, offset=Vector(0, 0)) -> List[Tuple[float, float]]:
+        """
+            Transform the base polygon by default_rotation+rotation and default_center+offset
+            :param rotation: Additional rotation in #teeth
+            :param offset:   Additional offset from center
+            :return:
+        """
+        rotation += self.rotation_extra
+        rotation *= 360 / self.teeth
+        return path_translate(path_rotate(self.poly, rotation, True), self.center+offset)
 
     def description(self):
         return '%s %s%d teeth' % (self.shape, (self.kind + ' ' if self.kind else ''), self.teeth)
@@ -157,7 +166,8 @@ class GearInstance:
             plot(circle(self.tip_radius, self.center), 'yellow', plotter=plotter)
         if self.root_radius:
             plot(circle(self.root_radius, self.center), 'yellow', plotter=plotter)
-        path = path_translate(path_rotate(self.poly, rotation, True), self.center)
+        # path = path_translate(path_rotate(self.poly, rotation, True), self.center)
+        path = self.poly_at(rotation=rotation)
         path.append(path[0])        # Make sure it is closed
         plot(path, color, plotter=plotter)
         # Add a pointer to make it possible to visually track rotation

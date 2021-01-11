@@ -7,9 +7,9 @@ import os
 from PIL import Image
 from typing import List
 
-from anim.drawing import DrawingContext
-from anim.geom import BBox, Point
-from anim.transform import Transform
+from x7.geom.drawing import DrawingContext
+from x7.geom.geom import BBox, Point
+from x7.geom.transform import Transform
 
 if sys.platform == 'linux':
     TMP_ANIM = '/tmp/sa.gif'

@@ -1,8 +1,8 @@
 from math import cos, sin, radians, tau
 from typing import List, Union, Tuple
 
-from anim.geom import BasePoint, Point, Vector, XYList
-from anim.transform import Transform
+from x7.geom.geom import BasePoint, Point, Vector, XYList
+from x7.geom.transform import Transform
 
 PointList = List[BasePoint]
 PointUnionList = List[Union[BasePoint, float, Tuple[float, float]]]

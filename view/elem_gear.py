@@ -1,3 +1,4 @@
+import tkinter as tk
 from PIL import ImagePath
 
 from gear_involute import GearInvolute
@@ -7,7 +8,7 @@ from x7.geom.model import Elem, Path, ControlPath, DumpContext
 from x7.geom.typing import *
 from x7.geom.transform import *
 from x7.geom.geom import *
-from x7.view.details import DetailPoint, DetailFloat
+from x7.view.details import DetailPoint, DetailFloat, DetailInt
 from x7.view.digibase import DigiDraw
 from x7.view.shapes import DigitizeShape
 from x7.view.shapes.shape import EditHandle
@@ -94,18 +95,30 @@ class ElemGear(Elem):
 class ViewGear(DigitizeShape):
     def __init__(self, dd: Optional[DigiDraw], gear: ElemGear):
         super().__init__(dd, gear)
+        self.elem = gear        # type fix
 
     def details(self):
-        elem = cast(ElemGear, self.elem)
+        elem = self.elem
         return super().details() + [
             None,
-            DetailPoint(elem.gear, 'center', True),
-            DetailFloat(elem.gear, 'teeth'),
+            DetailPoint(elem.gear, 'center'),
+            DetailInt(elem.gear, 'teeth'),
             DetailFloat(elem.gear, 'module'),
             DetailFloat(elem.gear, 'relief_factor'),
             DetailFloat(elem.gear, 'pressure_angle_degrees'),
-            # DetailPoint(self.elem, 'p2', True),
+            DetailFloat(elem.gear, 'rot'),
         ]
+
+    def menu_child_gear(self):
+        from .main import ModeAddGear
+        mode = ModeAddGear(self.dd.dc, parent=self)
+        self.dd.mode_set(mode)
+        # self.dc.view.mode_set(mode_class(self.dc))
+
+    def context_extra(self, menu: tk.Menu):
+        """Add extra menu items to select context menu based on shape type"""
+        menu.add_separator()
+        menu.add_command(label='Add Child Gear', command=self.menu_child_gear)
 
     def edit_handle_create(self) -> List[EditHandle]:
         return super().edit_handle_create()

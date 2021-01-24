@@ -180,7 +180,6 @@ class GearInvolute(object):
         self.teeth = teeth
         self.module = module
         self.center = center
-        self.pitch = self.module * pi
         self.rot = rot
         self.relief_factor = relief_factor
         self.steps = steps
@@ -190,9 +189,25 @@ class GearInvolute(object):
         self.debug = debug
         self.pressure_angle = radians(pressure_angle)
 
-        self.pitch_radius = self.base_radius = self.tip_radius = self.dedendum_radius = 0.0
-        self.set_teeth(teeth)
-        # print('pr=%8.6f br=%8.6f cpa=%9.7f' % (self.pitch_radius, self.base_radius, cos(self.pressure_angle)))
+    @property
+    def pitch(self):
+        return self.module * pi
+
+    @property
+    def pitch_radius(self):
+        return self.module * self.teeth / 2
+
+    @property
+    def base_radius(self):
+        return self.pitch_radius * cos(self.pressure_angle)
+
+    @property
+    def tip_radius(self):
+        return self.pitch_radius + self.module   # add addendum
+
+    @property
+    def dedendum_radius(self):
+        return self.pitch_radius - self.module * self.relief_factor
 
     def copy(self):
         """Deep copy"""
@@ -223,7 +238,6 @@ class GearInvolute(object):
         self.curved_root = other.curved_root
         self.debug = other.debug
         self.pressure_angle = other.pressure_angle
-        self.set_teeth(self.teeth)
 
     def __eq__(self, other):
         return (self.teeth == other.teeth
@@ -246,14 +260,6 @@ class GearInvolute(object):
     @pressure_angle_degrees.setter
     def pressure_angle_degrees(self, pa):
         self.pressure_angle = radians(pa)
-
-    def set_teeth(self, new_teeth: int):
-        """Set the number of teeth and recalc as needed"""
-        self.teeth = new_teeth
-        self.pitch_radius = self.module * self.teeth / 2
-        self.base_radius = self.pitch_radius * cos(self.pressure_angle)
-        self.tip_radius = self.pitch_radius + self.module   # add addendum
-        self.dedendum_radius = self.pitch_radius - self.module * self.relief_factor
 
     def min_teeth_without_undercut(self):
         sin_pa = sin(self.pressure_angle)

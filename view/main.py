@@ -1,6 +1,8 @@
 from typing import cast, Optional
 
 import x7.view.digi
+from x7.view.modes.common import ViewEvent
+
 from gear_involute import GearInvolute
 from x7.geom.colors import PenBrush
 from x7.geom.geom import Vector
@@ -32,7 +34,7 @@ class ModeAddGear(ModeAddDrag):
             gear = GearInvolute(teeth=3, center=mp)
         return ViewGear(self.controller.view, ElemGear('gearN', PenBrush('black'), gear))
 
-    def drag_extend(self, start, mp, shape: 'ViewGear'):
+    def drag_extend(self, start, event: ViewEvent, shape: 'ViewGear'):
         """Extend a drag operation to model space point mp"""
         # shape = cast(ViewGear, shape)
         elem = cast(ElemGear, shape.elem)
@@ -41,15 +43,17 @@ class ModeAddGear(ModeAddDrag):
             # If parent, then gear center is set based on distance from parent gear
             parent_gear = self.parent.elem.gear
             parent_center = self.parent.elem.center()       # Computed center based on translations
-            rv: Vector = mp - parent_center
-            gear.teeth = max(3, round((rv.length()-parent_gear.pitch_radius) * 2 / gear.module))
+            rv: Vector = event.mp - parent_center
+            if not event.shift:
+                gear.teeth = max(3, round((rv.length()-parent_gear.pitch_radius) * 2 / gear.module))
             rvu = rv.unit()
             gear.center = rvu * (parent_gear.pitch_radius + gear.pitch_radius) + parent_center
             parent_rot = -rv.angle() / 360 * parent_gear.teeth - parent_gear.rot
             gear.rot = -rv.angle() / 360 * gear.teeth + parent_rot + (0.0 if gear.teeth & 0x1 else 0.5)
         else:
-            rv: Vector = mp - gear.center
-            gear.teeth = max(3, round(rv.length() * 2 / gear.module))
+            rv: Vector = event.mp - gear.center
+            if not event.shift:
+                gear.teeth = max(3, round(rv.length() * 2 / gear.module))
             gear.rot = -rv.angle() / 360 * gear.teeth
 
 

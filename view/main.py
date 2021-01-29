@@ -16,6 +16,7 @@ class ModeAddGear(ModeAddDrag):
     """Mode for adding via a single drag operation"""
 
     SHAPE_NAME = 'Gear'
+    HELP = 'Add Gear: click for center, drag to set pitch radius'
 
     def __init__(self, controller: DigitizeController, parent: Optional[ViewGear] = None):
         super().__init__(controller)
@@ -27,11 +28,11 @@ class ModeAddGear(ModeAddDrag):
         # return ViewGear(self.controller.view, ElemEllipse('gearN', PenBrush('black'), mp, mp))
         if self.parent:
             parent_gear = self.parent.elem.gear
-            # rv: Vector = mp - parent_gear.center
-            gear = GearInvolute(teeth=3, center=mp,
-                                module=parent_gear.module, relief_factor=parent_gear.relief_factor)
+            gear = parent_gear.copy()
+            gear.center = mp
+            gear.teeth = 3
         else:
-            gear = GearInvolute(teeth=3, center=mp)
+            gear = GearInvolute(teeth=3, center=mp, module=10)
         return ViewGear(self.controller.view, ElemGear('gearN', PenBrush('black'), gear))
 
     def drag_extend(self, start, event: ViewEvent, shape: 'ViewGear'):

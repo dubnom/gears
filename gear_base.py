@@ -103,8 +103,6 @@ class GearInstance:
         self.kind = kind
         self.tooth_path = tooth_path
         check_point_list(tooth_path)
-        self.poly = list(poly or self.gen_poly())
-        check_point_list(self.poly)
         self.rotation_extra = rotation_extra
         self.center = center
         # self.circular_pitch = self.module * pi
@@ -113,6 +111,8 @@ class GearInstance:
         self.tip_radius = tip_radius
         self.base_radius = base_radius
         self.root_radius = root_radius
+        self.poly = list(poly or self.gen_poly())
+        check_point_list(self.poly)
 
     def gen_poly(self, rotation=0.0) -> PointList:
         """
@@ -125,9 +125,18 @@ class GearInstance:
         rotation *= degrees_per_tooth
 
         points = []
-        for n in range(self.teeth):
+        for n in range(int(self.teeth)):
             mid = n * degrees_per_tooth + rotation
             points.extend(path_rotate(self.tooth_path, mid, True))
+        extra_tooth = self.teeth - int(self.teeth)
+        if extra_tooth:
+            # Draw a shrunken tooth (mainly useful for animations)
+            avg = (int(self.teeth) - 1 + self.teeth)/2
+            mid = avg * degrees_per_tooth + rotation
+            zero = Point(self.root_radius, 0)
+            scale = extra_tooth * extra_tooth * extra_tooth
+            shrunken = [zero + (p-zero)*scale for p in self.tooth_path]
+            points.extend(path_rotate(shrunken, mid, True))
         check_point_list(points)
         return points
 

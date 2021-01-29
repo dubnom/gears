@@ -8,14 +8,19 @@ from x7.geom.model import Elem, Path, ControlPath, DumpContext
 from x7.geom.typing import *
 from x7.geom.transform import *
 from x7.geom.geom import *
-from x7.view.details import DetailPoint, DetailFloat, DetailInt
+from x7.view.details import DetailPoint, DetailFloat, DetailInt, DetailBool
 from x7.view.digibase import DigiDraw
 from x7.view.shapes import DigitizeShape
 from x7.view.shapes.shape import EditHandle
 
 
-# TODO-make ElemGear take a gear: GearInvolute
 class ElemGear(Elem):
+    ELEM_IMPORTS = ['from view.elem_gear import ElemGear, GearInvolute']
+    GEAR_INVOLUTE_ATTRS = ('teeth', 'center', 'rot', 'module',
+                           'relief_factor', 'steps', 'tip_arc',
+                           'root_arc', 'curved_root', 'debug',
+                           ('pressure_angle', 'pressure_angle_degrees'))
+
     def __init__(self, name: str, penbrush: PenBrush,
                  gear: GearInvolute,
                  closed=True, xform: Optional[Transform] = None):
@@ -86,13 +91,23 @@ class ElemGear(Elem):
             print('%s %s' % (prefix, self.gear))
 
     def dump(self, context: DumpContext) -> DumpContext:
-        raise TypeError('Gear does not support dump yet')
+        # self.dump_elem(context, gear=list)
+        # context.lines[-1] = context.lines[-1][:-1] + 'GearInvolute('
+        self.dump_elem(context, gear=GearInvolute)
+        with context:
+            for attr in self.GEAR_INVOLUTE_ATTRS:
+                attr_set, attr_get = attr if isinstance(attr, tuple) else (attr, attr)
+                context.append('%s=%r,' % (attr_set, getattr(self.gear, attr_get)))
+        context.append('))')
+        return context
 
     def as_digi_points(self):
         raise TypeError('Gear does not support as_digi_points yet')
 
 
 class ViewGear(DigitizeShape):
+    ELEM_TYPE = ElemGear
+
     def __init__(self, dd: Optional[DigiDraw], gear: ElemGear):
         super().__init__(dd, gear)
         self.elem = gear        # type fix
@@ -102,11 +117,15 @@ class ViewGear(DigitizeShape):
         return super().details() + [
             None,
             DetailPoint(elem.gear, 'center'),
-            DetailInt(elem.gear, 'teeth'),
+            DetailFloat(elem.gear, 'teeth'),
             DetailFloat(elem.gear, 'module'),
             DetailFloat(elem.gear, 'relief_factor'),
             DetailFloat(elem.gear, 'pressure_angle_degrees'),
             DetailFloat(elem.gear, 'rot'),
+            DetailInt(elem.gear, 'steps'),
+            DetailBool(elem.gear, 'curved_root'),
+            DetailFloat(elem.gear, 'tip_arc'),
+            DetailFloat(elem.gear, 'root_arc'),
         ]
 
     def menu_child_gear(self):

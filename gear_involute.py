@@ -213,7 +213,7 @@ class GearInvolute(object):
         return self.pitch_radius + self.module * (1 + self.profile_shift)
 
     @property
-    def dedendum_radius(self):
+    def root_radius(self):
         return self.pitch_radius - self.module * (self.relief_factor - self.profile_shift)
 
     def copy(self):
@@ -285,7 +285,7 @@ class GearInvolute(object):
         return 2 / (sin_pa * sin_pa)
 
     def _finish_tooth(self, points, root_radius=0.0):
-        root_radius = root_radius or self.dedendum_radius
+        root_radius = root_radius or self.root_radius
         other_side = [(x, -y) for x, y in reversed(points)]
 
         if self.tip_arc:
@@ -312,7 +312,7 @@ class GearInvolute(object):
         # return points
 
     def _finish_tooth_parts(self, parts, root_radius=0.0, closed=False):
-        root_radius = root_radius or self.dedendum_radius
+        root_radius = root_radius or self.root_radius
         other_side = [(tag, [(x, -y) for x, y in reversed(points)]) for tag, points in reversed(parts)]
         cs = 1 if closed else 0
 
@@ -366,7 +366,7 @@ class GearInvolute(object):
         pr = self.pitch_radius
 
         gear_face = InvoluteWithOffsets(self.base_radius, radius_max=self.tip_radius,
-                                        radius_min=max(self.base_radius, self.dedendum_radius))
+                                        radius_min=max(self.base_radius, self.root_radius))
         if debug:
             plot(gear_face.path(10), 'pink')
 
@@ -426,8 +426,8 @@ class GearInvolute(object):
                 plot(circle(0.01, intersection), 'pink')
         else:
             points.extend(gear_face.path(self.steps))
-            if self.base_radius > self.dedendum_radius:
-                points.insert(0, (Vector(*points[0]).unit()*self.dedendum_radius).xy())
+            if self.base_radius > self.root_radius:
+                points.insert(0, (Vector(*points[0]).unit() * self.root_radius).xy())
             self._finish_tooth(points)
             # other_side = [(x, -y) for x, y in reversed(points)]
             # points.extend(other_side)
@@ -465,7 +465,7 @@ class GearInvolute(object):
         pr = self.pitch_radius
 
         gear_face = InvoluteWithOffsets(self.base_radius, radius_max=self.tip_radius,
-                                        radius_min=max(self.base_radius, self.dedendum_radius))
+                                        radius_min=max(self.base_radius, self.root_radius))
         # Calc pitch point where involute intersects pitch circle and offset
         pp_inv_angle = gear_face.calc_angle(self.pitch_radius)
         ppx, ppy = gear_face.calc_point(pp_inv_angle)
@@ -523,8 +523,8 @@ class GearInvolute(object):
             parts.append(('_face_root_intersection', [intersection]))
         else:
             face_path = gear_face.path(self.steps)
-            if self.base_radius > self.dedendum_radius:
-                dropcut = [(Vector(*face_path[0]).unit()*self.dedendum_radius).xy()]
+            if self.base_radius > self.root_radius:
+                dropcut = [(Vector(*face_path[0]).unit() * self.root_radius).xy()]
                 if closed:
                     dropcut.append(face_path[0])
                 parts.append(('dropcut', dropcut ))
@@ -688,7 +688,9 @@ class GearInvolute(object):
         teeth //= 2
         return [(p+offset+y_shift*tooth).xy() for tooth in range(-teeth, teeth+1) for p in tooth_pts]
 
-    def plot(self, color='red', tool_angle=40.0, gear_space=None, mill_space=None, pressure_line=True):
+    def plot(self, color='red', tool_angle=40.0, gear_space=None, mill_space=None, pressure_line=True, linewidth=1) -> str:
+        """Plot the gear, along with construction lines & circles.  Returns additional text to display"""
+
         addendum = self.module
         dedendum = self.module * self.relief_factor
         pitch_radius = self.pitch_radius
@@ -700,18 +702,24 @@ class GearInvolute(object):
             dy = self.module*5*cos(self.pressure_angle)
             cx = pitch_radius + self.center.x
             cy = 0 + self.center.y
-            plot([(cx+dx, cy+dy), (cx-dx, cy-dy)], color='#FFA0FF')
-            plot([(cx-dx, cy+dy), (cx+dx, cy-dy)], color='#FFA0FF')
+            plot([(cx+dx, cy+dy), (cx-dx, cy-dy)], color='#FFA0FF', label='Pressure Line')
+            if pressure_line > 1:
+                plot([(cx-dx, cy+dy), (cx+dx, cy-dy)], color='#FFA0FF')
 
+        extra_text = '\n'.join([
+            'Module: $m$',
+            'Number of Teeth: $z$',
+            'Profile Shift: $x$',
+            'Pressure Angle: $\\alpha$'])
         if self.pitch_radius != self.pitch_radius_effective:
-            plot(circle(pitch_radius, c=self.center), color='g:', label='Pitch Radius')
-            plot(circle(self.pitch_radius_effective, c=self.center), color='g', label='Pitch Radius Effective')
+            plot(circle(pitch_radius, c=self.center), color='green', linestyle=':', label='Pitch Radius: $r_p = \\frac{m\\/\\/z}{2}$')
+            plot(circle(self.pitch_radius_effective, c=self.center), color='green', label='Pitch Radius Effective: $r_e= r_p + x$')
         else:
-            plot(circle(pitch_radius, c=self.center), color='green', label='Pitch Radius')
-        plot(circle(self.tip_radius, c=self.center), color='yellow', label='Tip Radius')
-        plot(circle(self.dedendum_radius, c=self.center), color='blue', label='Root Radius')
-        plot(circle(self.pitch_radius_effective - addendum, c=self.center), color='cyan', label='Max Tip Depth')
-        plot(circle(self.base_radius, c=self.center), color='orange', label='Base Radius')
+            plot(circle(pitch_radius, c=self.center), color='green', label='Pitch Radius: $r_p = \\frac{m\\/\\/z}{2}$')
+        plot(circle(self.tip_radius, c=self.center), color='yellow', label='Tip Radius: $r_t = r_p + H_a$')
+        plot(circle(self.root_radius, c=self.center), color='blue', label='Root Radius: $r_r = r_p - H_d$')
+        plot(circle(self.pitch_radius_effective - addendum, c=self.center), color='cyan', label='Max Tip Depth: $td_{max} = r_e - H_a$')
+        plot(circle(self.base_radius, c=self.center), color='orange', label='Base Radius: $r_b = r_p \cos \\alpha$')
 
         # plot(circle(2 * self.module, c=self.center), color='red')
         # plot(circle(self.module, c=self.center), color='blue')
@@ -766,8 +774,9 @@ class GearInvolute(object):
 
         poly = self.instance().poly_at()
         poly.append(poly[0])
-        plot(poly, color=color)
+        plot(poly, color=color, linewidth=linewidth)
         # self.gen_gcode()
+        return extra_text
 
     def plot_show(self, zoom_radius: Union[None, float, Tuple[float, float, float]] = None):
         plt.axis('equal')
@@ -791,7 +800,7 @@ class GearInvolute(object):
         return GearInstance(self.module, self.teeth, 'Involute', '', self.gen_gear_tooth(),
                             center=self.center, rotation_extra=self.rot,
                             tip_radius=self.tip_radius, base_radius=self.base_radius,
-                            root_radius=self.dedendum_radius)
+                            root_radius=self.root_radius)
 
 
 class InvolutePair:

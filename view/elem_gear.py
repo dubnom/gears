@@ -19,6 +19,7 @@ class ElemGear(Elem):
     GEAR_INVOLUTE_ATTRS = ('teeth', 'center', 'rot', 'module',
                            'relief_factor', 'steps', 'tip_arc',
                            'root_arc', 'curved_root', 'debug',
+                           'profile_shift',
                            ('pressure_angle', 'pressure_angle_degrees'))
 
     def __init__(self, name: str, penbrush: PenBrush,
@@ -53,6 +54,7 @@ class ElemGear(Elem):
     def transform(self, matrix: Transform):
         """Return a copy of this shape transformed by matrix.  .transform(identity) is like .copy()"""
 
+        # TODO-at least adjust the center of self.gear
         xform = matrix.copy().compose(self.xform)
         return ElemGear(self.name, self.penbrush, self.gear, self.closed, xform)
 
@@ -126,6 +128,8 @@ class ViewGear(DigitizeShape):
             DetailBool(elem.gear, 'curved_root'),
             DetailFloat(elem.gear, 'tip_arc'),
             DetailFloat(elem.gear, 'root_arc'),
+            DetailFloat(elem.gear, 'profile_shift'),
+            DetailBool(elem.gear, 'debug'),
         ]
 
     def menu_child_gear(self):

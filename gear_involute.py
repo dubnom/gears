@@ -162,7 +162,7 @@ class GearInvolute(object):
     def __init__(self, teeth=30, center=Point(0, 0), rot=0.0,
                  module=1.0, relief_factor=1.25,
                  steps=4, tip_arc=0.0, root_arc=0.0, curved_root=False, debug=False,
-                 pressure_angle=20.0):
+                 pressure_angle=20.0, profile_shift=0.0):
         """
             Plot an involute gear
             :param teeth:	Number of teeth in gear
@@ -176,6 +176,7 @@ class GearInvolute(object):
             :param curved_root: True to include root curve even if no undercut
             :param debug: True for verbose messages and plotting during construction
             :param pressure_angle: Pressure angle
+            :param profile_shift: Profile shift as fraction of module
         """
         self.teeth = teeth
         self.module = module
@@ -188,6 +189,7 @@ class GearInvolute(object):
         self.curved_root = curved_root
         self.debug = debug
         self.pressure_angle = radians(pressure_angle)
+        self.profile_shift = profile_shift
 
     @property
     def pitch(self):
@@ -198,16 +200,21 @@ class GearInvolute(object):
         return self.module * self.teeth / 2
 
     @property
+    def pitch_radius_effective(self):
+        """Pitch radius with profile_shift considered"""
+        return self.pitch_radius + self.module * self.profile_shift
+
+    @property
     def base_radius(self):
         return self.pitch_radius * cos(self.pressure_angle)
 
     @property
     def tip_radius(self):
-        return self.pitch_radius + self.module   # add addendum
+        return self.pitch_radius + self.module * (1 + self.profile_shift)
 
     @property
     def dedendum_radius(self):
-        return self.pitch_radius - self.module * self.relief_factor
+        return self.pitch_radius - self.module * (self.relief_factor + self.profile_shift)
 
     def copy(self):
         """Deep copy"""
@@ -223,6 +230,7 @@ class GearInvolute(object):
             curved_root=self.curved_root,
             debug=self.debug,
             pressure_angle=degrees(self.pressure_angle),
+            profile_shift=self.profile_shift,
         )
 
     def restore(self, other: 'GearInvolute'):
@@ -238,6 +246,7 @@ class GearInvolute(object):
         self.curved_root = other.curved_root
         self.debug = other.debug
         self.pressure_angle = other.pressure_angle
+        self.profile_shift = other.profile_shift
 
     def __eq__(self, other):
         return (self.teeth == other.teeth
@@ -251,6 +260,7 @@ class GearInvolute(object):
                 and self.curved_root == other.curved_root
                 and self.debug == other.debug
                 and self.pressure_angle == other.pressure_angle
+                and self.profile_shift == other.profile_shift
                 )
 
     @property
@@ -261,7 +271,16 @@ class GearInvolute(object):
     def pressure_angle_degrees(self, pa):
         self.pressure_angle = radians(pa)
 
+    @property
+    def pressure_angle_radians(self):
+        return self.pressure_angle
+
+    @pressure_angle_radians.setter
+    def pressure_angle_radians(self, pa):
+        self.pressure_angle = pa
+
     def min_teeth_without_undercut(self):
+        # TODO-include profile_shift
         sin_pa = sin(self.pressure_angle)
         return 2 / (sin_pa * sin_pa)
 
@@ -303,44 +322,46 @@ class GearInvolute(object):
         """
         debug = self.debug
 
-        addendum = self.module
-        dedendum = self.module * self.relief_factor
+        ps = self.profile_shift * self.module
+        addendum_ps = self.module - ps
+        dedendum_ps = self.module * self.relief_factor - ps
         tooth = self.pitch / 2
         half_tooth = tooth / 2
-        addendum_offset = half_tooth - addendum * tan(self.pressure_angle)
-        dedendum_offset = half_tooth - dedendum * tan(self.pressure_angle)
+        addendum_offset = half_tooth - (addendum_ps+ps) * tan(self.pressure_angle)
+        dedendum_offset = half_tooth - (dedendum_ps+ps) * tan(self.pressure_angle)
 
-        br = self.base_radius
         pr = self.pitch_radius
-        rr = self.pitch_radius - dedendum
-        cx, cy = self.center
 
         gear_face = InvoluteWithOffsets(self.base_radius, radius_max=self.tip_radius,
                                         radius_min=max(self.base_radius, self.dedendum_radius))
         if debug:
             plot(gear_face.path(10), 'pink')
-        # gear_face = Involute(self.base_radius, self.pitch_radius + addendum, dr)
 
         # Calc pitch point where involute intersects pitch circle and offset
         pp_inv_angle = gear_face.calc_angle(self.pitch_radius)
         ppx, ppy = gear_face.calc_point(pp_inv_angle)
         pp_off_angle = atan2(ppy, ppx)
+
+        # Calculate expected gap width at pitch_radius including profile_shift
+        gap_width = tooth / 2 - ps * tan(self.pressure_angle_radians)
+
         # Multiply pp_off_angle by pr to move from angular to pitch space
-        tooth_offset = tooth / 2 - pp_off_angle * pr
+        tooth_offset = gap_width - pp_off_angle * pr
+        # tooth_offset = tooth / 2 - pp_off_angle * pr
         gear_face.offset_angle = (tooth_offset - tooth) / pr
 
         points = []
 
         undercut_required = self.teeth < self.min_teeth_without_undercut()
         if undercut_required or self.curved_root:
-            short_tip = not True
+            short_tip = False
             if short_tip:       # Use just addendum to generate undercut (mostly for plotting)
                 undercut = InvoluteWithOffsets(self.pitch_radius, offset_angle=-tooth/pr,
-                                               offset_radius=addendum, offset_norm=addendum_offset,
+                                               offset_radius=addendum_ps, offset_norm=addendum_offset,
                                                radius_min=0, radius_max=self.tip_radius)
             else:
                 undercut = InvoluteWithOffsets(self.pitch_radius, offset_angle=-tooth/pr,
-                                               offset_radius=dedendum, offset_norm=dedendum_offset,
+                                               offset_radius=dedendum_ps, offset_norm=dedendum_offset,
                                                radius_min=0, radius_max=self.tip_radius)
 
             # Find the intersection of gear_face and undercut
@@ -663,10 +684,27 @@ class InvolutePair:
         self.pinion().plot(color, rotation, plotter)
 
 
+def main():
+    nt = 14
+    # for rot in [0, 0.25, 0.5]:
+    # for rot in t_range(10, 0, 0.5):
+    # for rot in [0, 0.5, 1, 3, 5, nt]:
+    for rot in [0]:
+        gi = GearInvolute(nt, rot=rot, module=3, **GearInvolute.HIGH_QUALITY)
+        g = gi.instance()
+        # g.plot('c')
+        plot(g.tooth_path, 'b:')
+        for ps in [0, 0.5]:
+            gi2 = GearInvolute(nt, rot=rot, module=g.module, profile_shift=ps, center=Point(0.0, 0), **GearInvolute.HIGH_QUALITY)
+            g2 = gi2.instance()
+            g2.plot('g')
+            show_rack = True
+            if show_rack:
+                rack = GearInvolute(129, rot=-rot, module=g.module, profile_shift=0, **GearInvolute.HIGH_QUALITY)
+                rack.center = Point(rack.pitch_radius_effective + gi2.pitch_radius_effective, 0.0)
+                rack.instance().plot()
+        g.plot_show(5*g.module)
+
+
 if __name__ == '__main__':
-    # gi = GearInvolute(37, **GearInvolute.HIGH_QUALITY)
-    gi = GearInvolute(8, **GearInvolute.HIGH_QUALITY)
-    g = gi.instance()
-    g.plot('c')
-    plot(g.tooth_path, 'b:')
-    g.plot_show(3)
+    main()

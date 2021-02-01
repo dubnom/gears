@@ -166,8 +166,6 @@ class GearInstance:
             :param plotter:     matplotlib Axes or None for top-level plot
             :return:
         """
-        rotation += self.rotation_extra
-        rotation *= 360 / self.teeth
         plot(circle(self.pitch_radius, self.center), 'lightgreen', plotter=plotter)
         if self.base_radius:
             plot(circle(self.base_radius, self.center), 'wheat', plotter=plotter)
@@ -180,7 +178,9 @@ class GearInstance:
         path.append(path[0])        # Make sure it is closed
         plot(path, color, plotter=plotter)
         # Add a pointer to make it possible to visually track rotation
-        plot(path_translate(path_rotate([Point(0, 0), self.poly[2*len(self.poly)//self.teeth]], rotation, True), self.center), color, plotter=plotter)
+        pointer_rotation = (rotation + 1 + self.rotation_extra) * 360 / self.teeth
+        rotated = path_rotate([Point(0, 0), Point(self.pitch_radius, 0)], pointer_rotation, True)
+        plot(path_translate(rotated, self.center), color, plotter=plotter)
 
     def set_zoom(self, zoom_radius=0.0, plotter=None):
         plotter = plotter or plt

@@ -31,6 +31,8 @@ class ModeAddGear(ModeAddDrag):
             gear = parent_gear.copy()
             gear.center = mp
             gear.teeth = 3
+            # gear.profile_shift = -parent_gear.profile_shift
+            gear.profile_shift = 0
         else:
             gear = GearInvolute(teeth=3, center=mp, module=10)
         return ViewGear(self.controller.view, ElemGear('gearN', PenBrush('black'), gear))
@@ -48,7 +50,8 @@ class ModeAddGear(ModeAddDrag):
             if not event.shift:
                 gear.teeth = max(3, round((rv.length()-parent_gear.pitch_radius) * 2 / gear.module))
             rvu = rv.unit()
-            gear.center = rvu * (parent_gear.pitch_radius + gear.pitch_radius) + parent_center
+            center_dist = parent_gear.pitch_radius_effective + gear.pitch_radius_effective
+            gear.center = rvu * center_dist + parent_center
             parent_rot = -rv.angle() / 360 * parent_gear.teeth - parent_gear.rot
             gear.rot = -rv.angle() / 360 * gear.teeth + parent_rot + (0.0 if gear.teeth & 0x1 else 0.5)
         else:

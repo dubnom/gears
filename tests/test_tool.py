@@ -1,6 +1,3 @@
-# Originally auto-generated on 2020-12-13-00:47:21 -0500 EST
-# By '--verbose --verbose tool'
-
 from typing import List, Tuple
 from unittest import TestCase
 from x7.lib.annotations import tests

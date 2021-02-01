@@ -56,7 +56,8 @@ class TestGearInvolute(TestCaseExtended):
         # gen_cuts_by_rack(self) -> Tuple[List[x7.geom.geom.Line], List[x7.geom.geom.Line]]
         pass  # TODO-impl gear_involute.GearInvolute.gen_cuts_by_rack test
 
-    @tests(gear_involute.GearInvolute._finish_tooth)
+    @tests(gear_involute.GearInvolute._finish_tooth_parts)
+    @tests(gear_involute.GearInvolute.gen_gear_tooth_parts)
     @tests(gear_involute.GearInvolute.gen_gear_tooth)
     def test_gen_gear_tooth(self):
         gears = self.gears_for_tests()
@@ -64,28 +65,6 @@ class TestGearInvolute(TestCaseExtended):
             with self.subTest(gear=tag):
                 coords = [p.xy() for p in gear.gen_gear_tooth()]
                 self.assertMatch(coords, tag)
-
-    @tests(gear_involute.GearInvolute._finish_tooth_parts)
-    @tests(gear_involute.GearInvolute.gen_gear_tooth_parts)
-    def test_gen_gear_tooth_parts(self):
-        gear = GearInvolute(10, **GearInvolute.HIGH_QUALITY)
-        print_stuff = False
-        if print_stuff:
-            coords = [p.xy() for p in gear.gen_gear_tooth()]
-            p_coords = [(tag, p.xy()) for tag, points in gear.gen_gear_tooth_parts() for p in points]
-            for (x, y), (tag, (px, py)) in zip(coords, p_coords):
-                print('%8.5f,%8.5f %12s %8.5f,%8.5f' % (x, y, tag, px, py))
-
-        coords = [p.xy() for p in gear.gen_gear_tooth()]
-        p_coords = [p.xy() for p in gear.gen_gear_tooth_old()]
-        self.assertEqual(coords, p_coords)
-
-        gears = self.gears_for_tests()
-        for tag, gear in gears:
-            with self.subTest(gear=tag):
-                coords = [p.xy() for p in gear.gen_gear_tooth()]
-                p_coords = [p.xy() for p in gear.gen_gear_tooth_old()]
-                self.assertEqual(coords, p_coords)
 
     @tests(gear_involute.GearInvolute.gen_rack_tooth)
     def test_gen_rack_tooth(self):

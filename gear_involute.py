@@ -2,7 +2,7 @@ import numpy as np
 import scipy.optimize
 from math import sqrt, cos, sin, pi, radians, tan, atan2, degrees, hypot, tau
 from numbers import Number
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from matplotlib import pyplot as plt
 
@@ -214,7 +214,7 @@ class GearInvolute(object):
 
     @property
     def dedendum_radius(self):
-        return self.pitch_radius - self.module * (self.relief_factor + self.profile_shift)
+        return self.pitch_radius - self.module * (self.relief_factor - self.profile_shift)
 
     def copy(self):
         """Deep copy"""
@@ -311,7 +311,40 @@ class GearInvolute(object):
                     points.append((root_radius * cos(t), root_radius * sin(t)))
         # return points
 
-    def gen_gear_tooth(self) -> PointList:
+    def _finish_tooth_parts(self, parts, root_radius=0.0, closed=False):
+        root_radius = root_radius or self.dedendum_radius
+        other_side = [(tag, [(x, -y) for x, y in reversed(points)]) for tag, points in reversed(parts)]
+        cs = 1 if closed else 0
+
+        if self.tip_arc:
+            last_point = parts[-1][-1][-1]
+            tip_angle = abs(atan2(last_point[1], last_point[0]))
+            tip_angle_degrees = degrees(tip_angle * 2)
+            if tip_angle_degrees > self.tip_arc:
+                steps = int(tip_angle_degrees / self.tip_arc) + 1
+                if self.debug:
+                    print('total tip angle=%.2f  steps=%d' % (tip_angle_degrees, steps))
+                tip_arc = []
+                for n in range(1-cs, steps+cs):
+                    t = n / steps * tip_angle * 2 - tip_angle
+                    tip_arc.append((self.tip_radius * cos(t), self.tip_radius * sin(t)))
+                parts.append(('tip_arc', tip_arc))
+        parts.extend(other_side)
+        if self.root_arc:
+            last_point = parts[-1][-1][-1]
+            root_angle = abs(pi / self.teeth - (atan2(last_point[1], last_point[0])))
+            root_angle_degrees = degrees(root_angle * 2)
+            if root_angle_degrees > self.root_arc:
+                steps = int(root_angle_degrees / self.root_arc) + 1
+                if self.debug:
+                    print('total root angle=%.2f  steps=%d' % (root_angle_degrees, steps))
+                root_arc = []
+                for n in range(1-cs, steps+cs):
+                    t = n / steps * root_angle * 2 - root_angle + pi / self.teeth
+                    root_arc.append((root_radius * cos(t), root_radius * sin(t)))
+                parts.append(('root_arc', root_arc))
+
+    def gen_gear_tooth_old(self) -> PointList:
         r"""
             Generate one tooth centered on the tip of the tooth.
             Does not include the root flats since they will be created when adjoining
@@ -403,6 +436,102 @@ class GearInvolute(object):
             plot(points, 'r+-')
 
         return [Point(x, y) for x, y in reversed(points)]
+
+    def gen_gear_tooth(self) -> PointList:
+        """Convert gen_gear_tooth_parts result into plain list of points"""
+        return [p for tag, points in self.gen_gear_tooth_parts() for p in points if tag[0] != '_']
+
+    def gen_gear_tooth_parts(self, closed=False) -> List[Tuple[str, PointList]]:
+        r"""
+            Generate one tooth centered on the tip of the tooth.
+            Does not include the root flats since they will be created when adjoining
+            tooth is placed.
+                  ____
+                 /    \
+            \___/      \___/
+
+
+            :param closed: True to include duplicate points and make each part stand-alone plottable
+            :return: List of (part-name, part-path)
+        """
+        ps = self.profile_shift * self.module
+        addendum_ps = self.module - ps
+        dedendum_ps = self.module * self.relief_factor - ps
+        tooth = self.pitch / 2
+        half_tooth = tooth / 2
+        addendum_offset = half_tooth - (addendum_ps+ps) * tan(self.pressure_angle)
+        dedendum_offset = half_tooth - (dedendum_ps+ps) * tan(self.pressure_angle)
+
+        pr = self.pitch_radius
+
+        gear_face = InvoluteWithOffsets(self.base_radius, radius_max=self.tip_radius,
+                                        radius_min=max(self.base_radius, self.dedendum_radius))
+        # Calc pitch point where involute intersects pitch circle and offset
+        pp_inv_angle = gear_face.calc_angle(self.pitch_radius)
+        ppx, ppy = gear_face.calc_point(pp_inv_angle)
+        pp_off_angle = atan2(ppy, ppx)
+
+        # Calculate expected gap width at pitch_radius including profile_shift
+        gap_width = tooth / 2 - ps * tan(self.pressure_angle_radians)
+
+        # Multiply pp_off_angle by pr to move from angular to pitch space
+        tooth_offset = gap_width - pp_off_angle * pr
+        # tooth_offset = tooth / 2 - pp_off_angle * pr
+        gear_face.offset_angle = (tooth_offset - tooth) / pr
+
+        parts = []
+
+        undercut_required = self.teeth < self.min_teeth_without_undercut()
+        if undercut_required or self.curved_root:
+            short_tip = False
+            if short_tip:       # Use just addendum to generate undercut (mostly for plotting)
+                undercut = InvoluteWithOffsets(self.pitch_radius, offset_angle=-tooth/pr,
+                                               offset_radius=addendum_ps, offset_norm=addendum_offset,
+                                               radius_min=0, radius_max=self.tip_radius)
+            else:
+                undercut = InvoluteWithOffsets(self.pitch_radius, offset_angle=-tooth/pr,
+                                               offset_radius=dedendum_ps, offset_norm=dedendum_offset,
+                                               radius_min=0, radius_max=self.tip_radius)
+
+            # Find the intersection of gear_face and undercut
+            def objective(ab):
+                a, b = ab
+                ax, ay = gear_face.calc_point(a)
+                bx, by = undercut.calc_point(b)
+                return np.array([ax - bx, ay - by])
+
+            guesses = np.array([gear_face.mid_angle(), undercut.mid_angle()])
+            result, info, ok, message = scipy.optimize.fsolve(objective, guesses, full_output=True)
+            if not ok:
+                if self.debug:
+                    from pprint import pp
+                    pp((result, info, ok, message))
+                raise ValueError('Undercut / Face intersection: %s' % message)
+
+            gear_face.start_angle = result[0]
+            undercut.end_angle = result[1]
+
+            if closed:
+                parts.append(('root_cut', undercut.path(self.steps)))
+            else:
+                parts.append(('root_cut', undercut.path(self.steps)[:-1]))
+            parts.append(('face', gear_face.path(self.steps)))
+
+            self._finish_tooth_parts(parts, root_radius=undercut.radius - undercut.offset_radius, closed=closed)
+
+            intersection = Point(*gear_face.calc_point(result[0]))
+            parts.append(('_face_root_intersection', [intersection]))
+        else:
+            face_path = gear_face.path(self.steps)
+            if self.base_radius > self.dedendum_radius:
+                dropcut = [(Vector(*face_path[0]).unit()*self.dedendum_radius).xy()]
+                if closed:
+                    dropcut.append(face_path[0])
+                parts.append(('dropcut', dropcut ))
+            parts.append(('face', face_path))
+            self._finish_tooth_parts(parts, closed=closed)
+
+        return [(tag, [Point(x, y) for x, y in reversed(points)]) for tag, points in reversed(parts)]
 
     def gen_by_rack(self):
         """Generate the gear shape by moving a rack past the gear"""
@@ -550,11 +679,14 @@ class GearInvolute(object):
             low_params.append((rotation, y, z+half_tool_tip))
         return high_params + center_params + list(reversed(low_params)) + tip_params
 
-    def gen_rack_tooth(self):
-        rack = Rack(module=self.module, pressure_angle=degrees(self.pressure_angle), relief_factor=self.relief_factor)
+    def gen_rack_tooth(self, teeth=1, rot=0.5):
+        """Generate a rack with teeth (must be odd)"""
+        rack = Rack(module=self.module, pressure_angle=self.pressure_angle_degrees, relief_factor=self.relief_factor)
         tooth_pts = [rack.tooth_base_high, rack.tooth_tip_high, rack.tooth_tip_low, rack.tooth_base_low]
-        offset = Vector(self.pitch_radius, 0) + Vector(*self.center)
-        return [(p+offset).xy() for p in tooth_pts]
+        y_shift = Vector(0, -self.pitch)
+        offset = Vector(self.pitch_radius_effective, 0) + Vector(*self.center) + y_shift * rot
+        teeth //= 2
+        return [(p+offset+y_shift*tooth).xy() for tooth in range(-teeth, teeth+1) for p in tooth_pts]
 
     def plot(self, color='red', tool_angle=40.0, gear_space=None, mill_space=None, pressure_line=True):
         addendum = self.module
@@ -571,11 +703,15 @@ class GearInvolute(object):
             plot([(cx+dx, cy+dy), (cx-dx, cy-dy)], color='#FFA0FF')
             plot([(cx-dx, cy+dy), (cx+dx, cy-dy)], color='#FFA0FF')
 
-        plot(circle(pitch_radius, c=self.center), color='green')
-        plot(circle(pitch_radius + addendum, c=self.center), color='yellow')
-        plot(circle(pitch_radius - dedendum, c=self.center), color='blue')
-        plot(circle(pitch_radius - addendum, c=self.center), color='cyan')
-        plot(circle(self.base_radius, c=self.center), color='orange')
+        if self.pitch_radius != self.pitch_radius_effective:
+            plot(circle(pitch_radius, c=self.center), color='g:', label='Pitch Radius')
+            plot(circle(self.pitch_radius_effective, c=self.center), color='g', label='Pitch Radius Effective')
+        else:
+            plot(circle(pitch_radius, c=self.center), color='green', label='Pitch Radius')
+        plot(circle(self.tip_radius, c=self.center), color='yellow', label='Tip Radius')
+        plot(circle(self.dedendum_radius, c=self.center), color='blue', label='Root Radius')
+        plot(circle(self.pitch_radius_effective - addendum, c=self.center), color='cyan', label='Max Tip Depth')
+        plot(circle(self.base_radius, c=self.center), color='orange', label='Base Radius')
 
         # plot(circle(2 * self.module, c=self.center), color='red')
         # plot(circle(self.module, c=self.center), color='blue')
@@ -628,17 +764,20 @@ class GearInvolute(object):
                 # print('rot: %9.5f  z: %9.5f  y: %9.5f' % (rotation, z, y))
             plot(pts, 'green')
 
-        plot(self.instance().poly, color=color)
+        poly = self.instance().poly_at()
+        poly.append(poly[0])
+        plot(poly, color=color)
         # self.gen_gcode()
 
-    def plot_show(self, zoom_radius=0):
+    def plot_show(self, zoom_radius: Union[None, float, Tuple[float, float, float]] = None):
         plt.axis('equal')
         plt.grid()
         # Set zoom_radius to zoom in around where gears meet
         if zoom_radius:
+            zxl, zxr, zy = zoom_radius if isinstance(zoom_radius, tuple) else (zoom_radius, zoom_radius, zoom_radius)
             ax = plt.gca()
-            ax.set_xlim(self.teeth / 2 - zoom_radius, self.teeth / 2 + zoom_radius)
-            ax.set_ylim(-zoom_radius, zoom_radius)
+            ax.set_xlim(self.pitch_radius_effective - zxl, self.pitch_radius_effective + zxr)
+            ax.set_ylim(-zy, zy)
         plt.show()
 
     def instance(self):

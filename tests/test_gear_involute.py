@@ -1,5 +1,4 @@
 import math
-import unittest
 from typing import List, Tuple
 from unittest import TestCase
 
@@ -10,10 +9,13 @@ from x7.testing.extended import TestCaseExtended
 import gear_involute
 from gear_involute import GearInvolute, Involute, InvoluteWithOffsets
 
+include_interactive = False
+
 
 @tests(gear_involute.GearInvolute)
 class TestGearInvolute(TestCaseExtended):
     SAVE_MATCH = False
+    maxDiff = 10000
 
     @staticmethod
     def gears_for_tests() -> List[Tuple[str, GearInvolute]]:
@@ -21,7 +23,8 @@ class TestGearInvolute(TestCaseExtended):
         g1 = GearInvolute(teeth=5)
         g2 = GearInvolute(teeth=7, center=Point(1, 2), rot=1.5, module=3.5, relief_factor=1.1, steps=3,
                           tip_arc=1.1, root_arc=1.2, curved_root=True, debug=False, pressure_angle=14.5)
-        return [('g1', g1), ('g2', g2)]
+        g3 = GearInvolute(teeth=5, center=Point(2, 1), rot=1.5, module=1.5, steps=3, profile_shift=0.3)
+        return [('g1', g1), ('g2', g2), ('g3', g3)]
 
     @tests(gear_involute.GearInvolute.copy)
     @tests(gear_involute.GearInvolute.__eq__)
@@ -62,6 +65,28 @@ class TestGearInvolute(TestCaseExtended):
                 coords = [p.xy() for p in gear.gen_gear_tooth()]
                 self.assertMatch(coords, tag)
 
+    @tests(gear_involute.GearInvolute._finish_tooth_parts)
+    @tests(gear_involute.GearInvolute.gen_gear_tooth_parts)
+    def test_gen_gear_tooth_parts(self):
+        gear = GearInvolute(10, **GearInvolute.HIGH_QUALITY)
+        print_stuff = False
+        if print_stuff:
+            coords = [p.xy() for p in gear.gen_gear_tooth()]
+            p_coords = [(tag, p.xy()) for tag, points in gear.gen_gear_tooth_parts() for p in points]
+            for (x, y), (tag, (px, py)) in zip(coords, p_coords):
+                print('%8.5f,%8.5f %12s %8.5f,%8.5f' % (x, y, tag, px, py))
+
+        coords = [p.xy() for p in gear.gen_gear_tooth()]
+        p_coords = [p.xy() for p in gear.gen_gear_tooth_old()]
+        self.assertEqual(coords, p_coords)
+
+        gears = self.gears_for_tests()
+        for tag, gear in gears:
+            with self.subTest(gear=tag):
+                coords = [p.xy() for p in gear.gen_gear_tooth()]
+                p_coords = [p.xy() for p in gear.gen_gear_tooth_old()]
+                self.assertEqual(coords, p_coords)
+
     @tests(gear_involute.GearInvolute.gen_rack_tooth)
     def test_gen_rack_tooth(self):
         # gen_rack_tooth(self)
@@ -77,14 +102,14 @@ class TestGearInvolute(TestCaseExtended):
         # min_teeth_without_undercut(self)
         pass  # TODO-impl gear_involute.GearInvolute.min_teeth_without_undercut test
 
-    @unittest.skipIf(True, 'Skipping because this is an interactive test')
-    @tests(gear_involute.GearInvolute.plot_show)
-    @tests(gear_involute.GearInvolute.plot)
-    def test_plot(self):
-        gears = self.gears_for_tests()
-        for tag, gear in gears:
-            gear.plot(mill_space=False, gear_space=False)
-        gears[-1][1].plot_show()
+    if include_interactive:
+        @tests(gear_involute.GearInvolute.plot_show)
+        @tests(gear_involute.GearInvolute.plot)
+        def test_plot(self):
+            gears = self.gears_for_tests()
+            for tag, gear in gears:
+                gear.plot(mill_space=False, gear_space=False)
+            gears[-1][1].plot_show()
 
     def test_plot_show(self):
         # plot_show(self, zoom_radius=0)

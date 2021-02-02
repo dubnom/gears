@@ -2,7 +2,7 @@ import numpy as np
 import scipy.optimize
 from math import sqrt, cos, sin, pi, radians, tan, atan2, degrees, hypot, tau
 from numbers import Number
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Any
 
 from matplotlib import pyplot as plt
 
@@ -147,7 +147,7 @@ class Involute(object):
         y = self.radius * (sin(angle) - (angle - offset) * cos(angle))
         return x, y
 
-    def path(self, steps=10, offset=0.0, up=1, center=(0.0, 0.0)) -> List[Tuple[Number, Number]]:
+    def path(self, steps=10, offset=0.0, up=1, center=(0.0, 0.0)) -> List[Tuple[float, float]]:
         """Generate path for involute"""
         factor = up * (self.end_angle - self.start_angle) / steps
         sa = up * self.start_angle
@@ -321,7 +321,7 @@ class GearInvolute(object):
         """Convert gen_gear_tooth_parts result into plain list of points"""
         return [p for tag, points in self.gen_gear_tooth_parts() for p in points if tag[0] != '_']
 
-    def gen_gear_tooth_parts(self, closed=False) -> List[Tuple[str, PointList]]:
+    def gen_gear_tooth_parts(self, closed=False, include_extras=False) -> List[Tuple[str, Union[PointList, Any]]]:
         r"""
             Generate one tooth centered on the tip of the tooth.
             Does not include the root flats since they will be created when adjoining
@@ -332,6 +332,7 @@ class GearInvolute(object):
 
 
             :param closed: True to include duplicate points and make each part stand-alone plottable
+            :param include_extras: True to include extra items in parts with '_' tags
             :return: List of (part-name, part-path)
         """
         ps = self.profile_shift * self.module
@@ -360,6 +361,7 @@ class GearInvolute(object):
         gear_face.offset_angle = (tooth_offset - tooth) / pr
 
         parts = []
+        extras = []
 
         undercut_required = self.teeth < self.min_teeth_without_undercut()
         if undercut_required or self.curved_root:
@@ -399,8 +401,10 @@ class GearInvolute(object):
 
             self._finish_tooth_parts(parts, root_radius=undercut.radius - undercut.offset_radius, closed=closed)
 
-            intersection = Point(*gear_face.calc_point(result[0]))
-            parts.append(('_face_root_intersection', [intersection]))
+            if include_extras:
+                intersection = Point(*gear_face.calc_point(result[0]))
+                extras.append(('_face_root_intersection', intersection))
+                extras.append(('_root_cut', undercut))
         else:
             face_path = gear_face.path(self.steps)
             if self.base_radius > self.root_radius:
@@ -411,7 +415,14 @@ class GearInvolute(object):
             parts.append(('face', face_path))
             self._finish_tooth_parts(parts, closed=closed)
 
-        return [(tag, [Point(x, y) for x, y in reversed(points)]) for tag, points in reversed(parts)]
+        if include_extras:
+            extras.extend([
+                ('_gear_face', gear_face),
+                ('_locals', locals()),
+            ])
+
+        parts = [(tag, [Point(x, y) for x, y in reversed(points)]) for tag, points in reversed(parts)]
+        return parts + extras
 
     def gen_by_rack(self):
         """Generate the gear shape by moving a rack past the gear"""

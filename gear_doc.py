@@ -8,7 +8,7 @@ from typing import Union, Optional, Tuple
 import matplotlib.pyplot as plt
 from matplotlib.legend import Legend
 from x7.geom.geom import PointList, Point, Vector, XYList, XYTuple
-from x7.geom.utils import plot, circle, plus, cross, plot_show, min_rotation
+from x7.geom.utils import plot, circle, min_rotation
 from x7.lib.iters import t_range
 
 from gear_involute import GearInvolute, Involute, InvoluteWithOffsets
@@ -68,7 +68,7 @@ def arc(r, sa, ea, c=Point(0, 0), steps=-1, direction='shortest',
 
 
 def angle(text: str, center: Point, p1: Union[Vector, Point],
-          p2: Union[Vector, Point, None] = None, angle: Optional[float] = None,
+          p2: Union[Vector, Point, None] = None, degrees: Optional[float] = None,
           xytext: Optional[XYTuple] = None, vlen: Optional[float] = None, arc_pos=None,
           color='cyan', direction=None,
           arc_color=None, vec_color=None,
@@ -86,7 +86,7 @@ def angle(text: str, center: Point, p1: Union[Vector, Point],
         :param center:  Center point
         :param p1:      First point or vector to first point
         :param p2:      Second point or vector (exclusive with angle)
-        :param angle:   Angle to second point (exclusive with p2)
+        :param degrees: Angle to second point (exclusive with p2)
         :param xytext:  Override default xytext location
         :param vlen:    Override displayed p1 & p2 vector lengths
         :param arc_pos: Position of angular arc along vectors (default 0.5)
@@ -96,34 +96,33 @@ def angle(text: str, center: Point, p1: Union[Vector, Point],
         :param direction: Direction of arc (ccw, cw, shortest).  None defaults to shortest
         :return: value of plt.annotate()
     """
-    """Annotate an angle"""
     p1v = p1 if isinstance(p1, Vector) else (p1 - center)
     if p2 is None:
-        if angle is None:
-            # angle is required
-            raise ValueError('One of p2 or angle must be supplied')
-        p2v = p1v.rotate(angle)
+        if degrees is None:
+            # degrees is required
+            raise ValueError('One of p2 or degrees must be supplied')
+        p2v = p1v.rotate(degrees)
         if direction is None:
-            direction = 'ccw' if angle > 0 else 'cw'
+            direction = 'ccw' if degrees > 0 else 'cw'
     else:
-        if angle is not None:
-            raise ValueError('Only one of p2 or angle can be supplied')
+        if degrees is not None:
+            raise ValueError('Only one of p2 or degrees can be supplied')
         p2v = p2 if isinstance(p2, Vector) else (p2 - center)
     arc_color = arc_color or color
     vec_color = vec_color or color
     vlen = vlen if vlen else max(p1v.length(), p2v.length())
     if vec_color != 'none':
         plot([center+p1v.unit()*vlen, center, center+p2v.unit()*vlen], color=vec_color)
-    if angle is None:
-        angle = (p2v.angle() - p1v.angle()) % 360
+    if degrees is None:
+        degrees = (p2v.angle() - p1v.angle()) % 360
     text = text.replace('@', r'${angle:.1f}^\circ$')
-    text = text.format(angle=angle, at='@')
-    angle = abs(angle)
+    text = text.format(angle=degrees, at='@')
+    degrees = abs(degrees)
 
     if arc_pos is None:
-        if angle < 15:
+        if degrees < 15:
             arc_pos = 0.95
-        elif angle < 40:
+        elif degrees < 40:
             arc_pos = 0.75
         else:
             arc_pos = 0.5
@@ -200,14 +199,14 @@ def test_angle():
     angle(r'$\alpha$ is @', Point(-20, 0), Vector(8, 4), Vector(-8, 4), color='green', arc_pos=0.95)
     angle('Hi-precision is {angle:8.5f}', Point(-20, 0), Vector(8, 4), Vector(-8, 4), color='green', arc_pos=0.5)
     angle('Something Blue', Point(0, 0), Point(1, 0), Point(0, 1), vlen=15, color='blue')
-    angle('Something Else', Point(20, 0), Vector(10, 1), angle=-270)
+    angle('Something Else', Point(20, 0), Vector(10, 1), degrees=-270)
     angle('15,0 < 0,15', Point(0, 20), Vector(5, 0), Vector(0, 5), color='red', direction='ccw')
     angle('0,15 < 15,0', Point(0, -20), Vector(0, 5), Vector(5, 0), color='pink', direction='ccw')
-    angle('ang 10: @', Point(-30, -20), Vector(10, 10), angle=10, color='pink', arc_color='red', direction='ccw')
-    angle('ang 30{at}@', Point(-30, -20), Vector(10, 10), angle=30, color='pink', vec_color='red', xytext=(1, -40), direction='ccw')
-    angle('ang 100: @', Point(-30, -20), Vector(10, 10), angle=100, color='pink', direction='ccw')
-    angle('Just Arc', Point(20, -20), Vector(10, 10), angle=90, color='pink', vec_color='none', direction='ccw')
-    angle('Just Vecs', Point(20, -20), Vector(-10, -10), angle=90, color='pink', arc_color='none', direction='ccw')
+    angle('ang 10: @', Point(-30, -20), Vector(10, 10), degrees=10, color='pink', arc_color='red', direction='ccw')
+    angle('ang 30{at}@', Point(-30, -20), Vector(10, 10), degrees=30, color='pink', vec_color='red', xytext=(1, -40), direction='ccw')
+    angle('ang 100: @', Point(-30, -20), Vector(10, 10), degrees=100, color='pink', direction='ccw')
+    angle('Just Arc', Point(20, -20), Vector(10, 10), degrees=90, color='pink', vec_color='none', direction='ccw')
+    angle('Just Vecs', Point(20, -20), Vector(-10, -10), degrees=90, color='pink', arc_color='none', direction='ccw')
     plot([(0, -30)], color='white')
     plt.axis('equal')
     plt.grid()
@@ -264,9 +263,10 @@ def doc_tooth_equations():
 
 
 def main():
+    test_angle()
     # doc_radii()
     # doc_tooth_parts()
-    doc_tooth_equations()
+    # doc_tooth_equations()
 
 
 if __name__ == '__main__':

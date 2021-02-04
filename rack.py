@@ -4,7 +4,8 @@
 
 from math import pi, tan, radians
 from typing import Tuple, List
-from x7.geom.geom import Point, Line, Vector
+from x7.geom.geom import Point, Line, Vector, PointOrXYList
+from x7.geom.utils import path_to_xy, path_rotate_ccw
 
 
 class Rack(object):
@@ -44,6 +45,7 @@ class Rack(object):
         self.tooth_edge_low = Line.from_pts(self.tooth_tip_low, self.tooth_base_low)
 
     def points(self, teeth_in_gear=32, teeth_in_rack=10) -> List[Tuple[float, float]]:
+        # TODO-retire this API in favor of .path()
         # def make_rack(module, num_teeth, h_total, half_tooth, pressure_angle):
         """
             :param teeth_in_gear: number of teeth in gear (used to locate rack horizontally)
@@ -68,6 +70,32 @@ class Rack(object):
         rack_pts.extend([(back, top), (back, bot)])
 
         return rack_pts
+
+    def path(self, teeth=1, rot=0.5, pre=0, angle=0.0, closed=False, as_pt=True) -> PointOrXYList:
+        """
+            Generate a rack
+            :param teeth:   Number of teeth (must be odd)
+            :param rot:     Rotation of gear (shifts rack accordingly)
+            :param pre:     Pitch Radius Effective (aka offset)
+            :param angle:   Rotation (0=vertical on right, 90=horizontal on top)
+            :param closed:  True to 'close' the rack around the back
+            :param as_pt:   True to return points
+            :return:
+        """
+        tooth_pts = [self.tooth_base_high, self.tooth_tip_high, self.tooth_tip_low, self.tooth_base_low]
+        y_shift = Vector(0, -self.circular_pitch)
+        offset = Vector(pre, 0) + y_shift * (rot % 1)
+        teeth //= 2
+        path = [(p+offset+y_shift*tooth) for tooth in range(-teeth, teeth+1) for p in tooth_pts]
+        if closed:
+            # Add a back to the rack to make a closed polygon
+            top = path[-1].y
+            bot = path[0].y
+            back = self.module * 4 + pre
+            path.extend([Point(back, top), Point(back, bot)])
+        if angle:
+            path = path_rotate_ccw(path, angle, as_pt=True)
+        return path if as_pt else path_to_xy(path)
 
         # One tooth
         #      ____          +h_a    # addendum

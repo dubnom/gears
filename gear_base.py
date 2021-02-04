@@ -5,7 +5,7 @@ from x7.lib.iters import iter_rotate, t_range
 from x7.geom.geom import Point, Vector, Line, polygon_area, PointList
 from x7.geom.transform import Transform
 from x7.geom.utils import check_point_list, path_rotate, path_translate, circle
-from x7.geom.utils import plot
+from x7.geom.plot_utils import plot
 from tool import Tool
 
 __all__ = [

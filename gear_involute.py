@@ -9,7 +9,8 @@ from matplotlib import pyplot as plt
 from x7.lib.iters import t_range
 from x7.geom.geom import Point, Vector, Line, PointList
 from x7.geom.transform import Transform
-from x7.geom.utils import circle, plot
+from x7.geom.utils import circle, path_to_xy
+from x7.geom.plot_utils import plot
 from gear_base import GearInstance
 from rack import Rack
 
@@ -570,14 +571,18 @@ class GearInvolute(object):
             low_params.append((rotation, y, z+half_tool_tip))
         return high_params + center_params + list(reversed(low_params)) + tip_params
 
-    def gen_rack_tooth(self, teeth=1, rot=0.5):
+    def rack(self) -> Rack:
+        return Rack(module=self.module, pressure_angle=self.pressure_angle_degrees, relief_factor=self.relief_factor)
+
+    def gen_rack_tooth(self, teeth=1, rot=0.5, as_pt=False):
         """Generate a rack with teeth (must be odd)"""
-        rack = Rack(module=self.module, pressure_angle=self.pressure_angle_degrees, relief_factor=self.relief_factor)
+        rack = self.rack()
         tooth_pts = [rack.tooth_base_high, rack.tooth_tip_high, rack.tooth_tip_low, rack.tooth_base_low]
         y_shift = Vector(0, -self.pitch)
-        offset = Vector(self.pitch_radius_effective, 0) + Vector(*self.center) + y_shift * rot
+        offset = Vector(self.pitch_radius_effective, 0) + Vector(*self.center) + y_shift * (rot % 1)
         teeth //= 2
-        return [(p+offset+y_shift*tooth).xy() for tooth in range(-teeth, teeth+1) for p in tooth_pts]
+        path = [(p+offset+y_shift*tooth) for tooth in range(-teeth, teeth+1) for p in tooth_pts]
+        return path if as_pt else path_to_xy(path)
 
     def plot(self, color='red', tool_angle=40.0,
              gear_space=None, mill_space=None,
@@ -671,15 +676,23 @@ class GearInvolute(object):
         # self.gen_gcode()
         return extra_text
 
-    def plot_show(self, zoom_radius: Union[None, float, Tuple[float, float, float]] = None):
+    def plot_show(self, zoom_radius: Union[None, float, Tuple[float, float, float]] = None,
+                  axis='x', grid=True):
         plt.axis('equal')
-        plt.grid()
+        if grid:
+            plt.grid()
         # Set zoom_radius to zoom in around where gears meet
         if zoom_radius:
             zxl, zxr, zy = zoom_radius if isinstance(zoom_radius, tuple) else (zoom_radius, zoom_radius, zoom_radius)
             ax = plt.gca()
-            ax.set_xlim(self.pitch_radius_effective - zxl, self.pitch_radius_effective + zxr)
-            ax.set_ylim(-zy, zy)
+            if axis in ('x', '-x'):
+                pre = self.pitch_radius_effective if axis == 'x' else -self.pitch_radius_effective
+                ax.set_xlim(pre - zxl, pre + zxr)
+                ax.set_ylim(-zy, zy)
+            else:
+                pre = self.pitch_radius_effective if axis == 'y' else -self.pitch_radius_effective
+                ax.set_ylim(pre - zxl, pre + zxr)
+                ax.set_xlim(-zy, zy)
         plt.show()
 
     def instance(self):

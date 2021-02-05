@@ -4,6 +4,8 @@ This README would normally document whatever steps are necessary to get your app
 
 ### What is this repository for? ###
 
+![Gear](doc/images/gear_doc/intro_gears.png)
+
 Creating triangle-tooth gears
 * Version
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)

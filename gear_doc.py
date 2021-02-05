@@ -19,10 +19,10 @@ from x7.geom.geom import PointList, Point, Vector, XYList, XYTuple, PointUnionLi
 from x7.geom.utils import circle, min_rotation, path_rotate_ccw, path_from_xy
 from x7.geom.plot_utils import plot
 from x7.lib.iters import t_range, iter_rotate
-from gear_involute import GearInvolute, InvoluteWithOffsets
+from gear_involute import GearInvolute, InvoluteWithOffsets, InvolutePair
 
 GEAR_COLOR = 'lightgrey'
-GEAR_PS_COLOR = 'lightgrey'
+GEAR_PS_COLOR = 'darkgrey'
 RACK_COLOR = '#80CCFF'
 RACK_PS_COLOR = '#6099BF'
 RACK_CUTTER_COLOR = '#FF8080'
@@ -30,7 +30,7 @@ RACK_CUTTER_COLOR = '#FF8080'
 IMAGES_GEAR_DOC = './doc/images/gear_doc'
 
 
-def plot_show(fig_name: str, gear: GearInvolute, zoom: Union[float, tuple],
+def plot_show(fig_name: str, gear: GearInvolute, zoom: Union[None, float, tuple],
               axis='x', grid=False, title_loc='tc'):
     fig: Figure = plt.gcf()
     fig.subplots_adjust(0, 0, 1, 1)
@@ -496,13 +496,13 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
         plot_annotate('Tooth\n=\nPitch / 2', tooth_segment[0].mid(tooth_segment[1]), 'uc')
 
     if 'gear_ps' in fig:
-        plot(path_close(g_ps.instance().poly_at(base_rot)), 'darkgrey')
+        plot(path_close(g_ps.instance().poly_at(base_rot)), GEAR_PS_COLOR)
     if 'gear_ps_fill' in fig:
-        plot_fill(path_close(g_ps.instance().poly_at(base_rot)), 'darkgrey')
+        plot_fill(path_close(g_ps.instance().poly_at(base_rot)), GEAR_PS_COLOR)
     if 'gear' in fig:
-        plot_fill(path_close(g.instance().poly_at(base_rot)), 'lightgrey')
+        plot_fill(path_close(g.instance().poly_at(base_rot)), GEAR_COLOR)
     if 'gear_o' in fig:
-        plot(path_close(g.instance().poly_at(base_rot)), 'lightgrey', linestyle=':')
+        plot(path_close(g.instance().poly_at(base_rot)), GEAR_COLOR, linestyle=':')
     if 'gear_a' in fig:
         plot_annotate('Gear', Vector(g.root_radius-1.0, 0).rotate(ang), 'cc')
     if 'gear_ps_a' in fig:
@@ -640,8 +640,19 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
         print('Found:', ', '.join(sorted(fig.found)))
 
 
+def doc_intro():
+    g = InvolutePair(25, 9)
+    plot_fill(g.pinion().poly_at(), GEAR_PS_COLOR)
+    plot_fill(g.wheel().poly_at(), GEAR_COLOR)
+    gp = g.gear_pinion
+    off = g.gear_wheel.pitch_radius_effective + g.gear_pinion.pitch_radius_effective*2
+    plot_fill(gp.rack().path(9, pre=off, closed=True), RACK_COLOR)
+    plot_show('intro_gears', g.gear_wheel, None)
+
+
 def main():
     # test_angle()
+    doc_intro()
     doc_radii()
     doc_tooth_parts()
     doc_tooth_equations()

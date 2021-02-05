@@ -1,15 +1,14 @@
 import numpy as np
 import scipy.optimize
 from math import sqrt, cos, sin, pi, radians, tan, atan2, degrees, hypot, tau
-from numbers import Number
 from typing import List, Tuple, Union, Any
 
 from matplotlib import pyplot as plt
 
 from x7.lib.iters import t_range
-from x7.geom.geom import Point, Vector, Line, PointList
+from x7.geom.geom import Point, Vector, Line, PointList, XYList
 from x7.geom.transform import Transform
-from x7.geom.utils import circle, path_to_xy
+from x7.geom.utils import circle, path_to_xy, path_from_xy
 from x7.geom.plot_utils import plot
 from gear_base import GearInstance
 from rack import Rack
@@ -51,11 +50,23 @@ class InvoluteWithOffsets(object):
             print('InvWO: r=%.6f mnr=%.6f mxr=%.6f sa=%.6f ea=%.6f' %
                   (self.radius, self.radius_min, self.radius_max, self.start_angle, self.end_angle))
 
+    def copy(self):
+        return InvoluteWithOffsets(
+            radius=self.radius, offset_angle=self.offset_angle,
+            offset_radius=self.offset_radius, offset_norm=self.offset_norm,
+            radius_min=self.radius_min, radius_max=self.radius_max
+        )
+
+    def as_dict(self):
+        return dict(radius=self.radius, offset_angle=self.offset_angle,
+                    offset_radius=self.offset_radius, offset_norm=self.offset_norm,
+                    radius_min=self.radius_min, radius_max=self.radius_max)
+
     def mid_angle(self):
         """Average of .start_angle and .end_angle"""
         return (self.start_angle + self.end_angle) / 2
 
-    def calc_point(self, angle, clip=True):
+    def calc_point(self, angle):
         """Involute with offset_radius and offset_norm (which makes this a generalized trochoid)"""
         # x = r * cos(a) + r*(a-oa) * sin(a)
         # x = (r-or) * cos(a) + r*(a-oa-on) * sin(a)
@@ -70,7 +81,7 @@ class InvoluteWithOffsets(object):
         if self.offset_norm or self.offset_radius:
             # Need to calculate numerically
             def objective(t):
-                x, y = self.calc_point(t[0], False)
+                x, y = self.calc_point(t[0])
                 return np.array([distance - hypot(x, y)])
             solution, info, ok, msg = scipy.optimize.fsolve(objective, np.array([0]), full_output=True)
             if not ok:
@@ -88,7 +99,7 @@ class InvoluteWithOffsets(object):
         # t = 1/2 (-(4 k tan(a))/N + (2 sqrt(-4 k^2 p^2 + 4 k N p^2 - N^2 p^2 + N^2 r^2))/(N p) + π/N)
         pass
 
-    def path(self, steps=10, offset=0.0, up=1, clip=False) -> List[Tuple[float, float]]:
+    def path(self, steps=10, clip=False) -> XYList:
         """Generate path for involute"""
         t_vals = t_range(steps, self.start_angle, self.end_angle)
         points = (self.calc_point(t) for t in t_vals)
@@ -96,6 +107,9 @@ class InvoluteWithOffsets(object):
         if clip:
             points = ((x, y) for x, y in points if self.radius_min <= hypot(x, y) <= self.radius_max)
         return list(points)
+
+    def path_pt(self, steps=10, clip=False) -> PointList:
+        return path_from_xy(self.path(steps, clip))
 
 
 class Involute(object):
@@ -132,13 +146,11 @@ class Involute(object):
         # t = 1/2 (-(4 k tan(a))/N + (2 sqrt(-4 k^2 p^2 + 4 k N p^2 - N^2 p^2 + N^2 r^2))/(N p) + π/N)
         pass
 
-    def calc_point(self, angle, offset=0.0, offset_r=0.0, offset_n=0.0):
+    def calc_point(self, angle, offset=0.0):
         """
             Calculate the x,y for a given angle and offset angle
             :param angle:       Angle in radians
             :param offset:      Angular offset in radians
-            :param offset_r:    Offset along radial direction for final point
-            :param offset_n:    Offset normal (CCW) to radial direction
             :return:
         """
         """"""
@@ -353,13 +365,9 @@ class GearInvolute(object):
         ppx, ppy = gear_face.calc_point(pp_inv_angle)
         pp_off_angle = atan2(ppy, ppx)
 
-        # Calculate expected gap width at pitch_radius including profile_shift
-        gap_width = tooth / 2 - ps * tan(self.pressure_angle_radians)
-
-        # Multiply pp_off_angle by pr to move from angular to pitch space
-        tooth_offset = gap_width - pp_off_angle * pr
-        # tooth_offset = tooth / 2 - pp_off_angle * pr
-        gear_face.offset_angle = (tooth_offset - tooth) / pr
+        # Profile shift widens tooth a bit, divide by pitch radius to move to angular space (radians)
+        half_tooth_ps = (half_tooth + ps * tan(self.pressure_angle_radians)) / pr
+        gear_face.offset_angle = -(half_tooth_ps + pp_off_angle)
 
         parts = []
         extras = []
@@ -571,8 +579,9 @@ class GearInvolute(object):
             low_params.append((rotation, y, z+half_tool_tip))
         return high_params + center_params + list(reversed(low_params)) + tip_params
 
-    def rack(self) -> Rack:
-        return Rack(module=self.module, pressure_angle=self.pressure_angle_degrees, relief_factor=self.relief_factor)
+    def rack(self, tall_tooth=False) -> Rack:
+        return Rack(module=self.module, pressure_angle=self.pressure_angle_degrees,
+                    relief_factor=self.relief_factor, tall_tooth=tall_tooth)
 
     def gen_rack_tooth(self, teeth=1, rot=0.5, as_pt=False):
         """Generate a rack with teeth (must be odd)"""
@@ -588,11 +597,22 @@ class GearInvolute(object):
              gear_space=None, mill_space=None,
              pressure_line=True, linewidth=1) -> str:
         """Plot the gear, along with construction lines & circles.  Returns additional text to display"""
+        from gear_doc import plot_fill
 
         addendum = self.module
         pitch_radius = self.pitch_radius
         if mill_space is None and gear_space is None:
             gear_space = True
+        if color.startswith('fill-'):
+            color = color[5:]
+            fill = True
+        else:
+            fill = False
+
+        poly = self.instance().poly_at()
+        poly.append(poly[0])
+        if fill:
+            plot_fill(poly, color)
 
         if pressure_line:
             dx = self.module*5*sin(self.pressure_angle)
@@ -670,9 +690,8 @@ class GearInvolute(object):
                 # print('rot: %9.5f  z: %9.5f  y: %9.5f' % (rotation, z, y))
             plot(pts, 'green')
 
-        poly = self.instance().poly_at()
-        poly.append(poly[0])
-        plot(poly, color=color, linewidth=linewidth)
+        if not fill:
+            plot(poly, color=color, linewidth=linewidth)
         # self.gen_gcode()
         return extra_text
 

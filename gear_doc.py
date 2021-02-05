@@ -2,19 +2,27 @@
 Various plots to document gear calculations
 See also: https://www.tec-science.com/mechanical-power-transmission/involute-gear/calculation-of-involute-gears/
 """
-from math import cos, sin, radians, degrees
-from typing import Union, Optional, Tuple, List
+from math import cos, sin, radians, degrees, tau, tan
+from typing import Union, Optional, Tuple
 
 import matplotlib.pyplot as plt
+# plt.style.use('ggplot')
 from matplotlib.legend import Legend
 from matplotlib.artist import Artist
+from matplotlib.lines import Line2D
 from matplotlib.text import Annotation
 
-from x7.geom.geom import PointList, Point, Vector, XYList, XYTuple, PointOrXYList, PointUnionList, BasePoint
-from x7.geom.utils import circle, min_rotation, path_rotate, path_rotate_ccw, path_from_xy
+from x7.geom.geom import PointList, Point, Vector, XYList, XYTuple, PointUnionList, BasePoint
+from x7.geom.utils import circle, min_rotation, path_rotate_ccw, path_from_xy
 from x7.geom.plot_utils import plot
 from x7.lib.iters import t_range, iter_rotate
-from gear_involute import GearInvolute, Involute, InvoluteWithOffsets
+from gear_involute import GearInvolute, InvoluteWithOffsets
+
+GEAR_COLOR = 'lightgrey'
+GEAR_PS_COLOR = 'lightgrey'
+RACK_COLOR = '#80CCFF'
+RACK_PS_COLOR = '#6099BF'
+RACK_CUTTER_COLOR = '#FF8080'
 
 
 def plot_fill(xy: PointUnionList, color='black', label=None,
@@ -23,9 +31,10 @@ def plot_fill(xy: PointUnionList, color='black', label=None,
     """Quick entry to pyplot.fill() for List[Point]"""
 
     plotter = plotter or plt
-    artists = plotter.fill(*zip(*xy), color) #, label=label,
-                           # linestyle=linestyle, linewidth=linewidth,
-                           # solid_capstyle='round' if linewidth and linewidth > 1 else None)
+    artists = plotter.fill(*zip(*xy), color)  # , label=label,
+    # linestyle=linestyle, linewidth=linewidth,
+    # solid_capstyle='round' if linewidth and linewidth > 1 else None)
+
     # if label:
     #    for artist in artists:
     #        artist.set_label(label)
@@ -44,7 +53,7 @@ def plot_annotate(text, where, xytext) -> Annotation:
         v, h = xytext[0], xytext[1]
         h = {'c': 0, 'r': 1, 'l': -1}[h]
         v = {'c': 0, 'u': 1, 'd': -1}[v]
-        xytext = (10 * h, 20 * v)
+        xytext = ((25 if v == 0 else 10) * h, 20 * v)
     if xytext:
         ha, va = ha_va_from_xy(xytext)
     else:
@@ -55,13 +64,19 @@ def plot_annotate(text, where, xytext) -> Annotation:
 
     if isinstance(where, (BasePoint, Vector)):
         where = where.xy()
-    return plt.annotate(
+    elif isinstance(where, Line2D):
+        x_data = where.get_xdata()
+        y_data = where.get_ydata()
+        where = (x_data[0]+x_data[-1])/2, (y_data[0]+y_data[-1])/2
+    annotation = plt.annotate(
         text, where,
         xytext=xytext, textcoords='offset points',
         ha=ha, va=va,
         arrowprops=arrowprops,
         bbox=dict(facecolor='white', edgecolor='darkgrey', pad=4.0, alpha=0.8),
     )
+    annotation.draggable()
+    return annotation
 
 
 def path_close(path: PointList) -> PointList:
@@ -250,7 +265,7 @@ def angle(text: str, center: Point, p1: Union[Vector, Point],
 
 def doc_radii():
     def legend2():
-        line, = plot([(0, 0)], color='white')
+        line = plot([(0, 0)], color='white')
         leg1 = plt.legend(loc=3)
         leg2: Legend = plt.legend([line], [extra], loc=2)
         leg2.set_title('Inputs')
@@ -258,19 +273,19 @@ def doc_radii():
 
     rot = -0.35
 
-    g = GearInvolute(17, profile_shift=0.5, rot=rot, **GearInvolute.HIGH_QUALITY)
-    plot(g.gen_rack_tooth(teeth=5, rot=g.rot+0.5), color='lightgrey')
-    extra = g.plot(gear_space=False, mill_space=False, pressure_line=True, linewidth=1)
-    plt.title('Involute Radii with Profile Shift of 0.5')
-    legend2()
-    g.plot_show((6, 1, 3))
-
     g = GearInvolute(17, profile_shift=0, rot=rot, **GearInvolute.HIGH_QUALITY)
-    plot(g.gen_rack_tooth(teeth=5, rot=g.rot+0.5), color='lightgrey')
-    extra = g.plot(gear_space=False, mill_space=False, pressure_line=False, linewidth=1)
+    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, pre=g.pitch_radius_effective, closed=True), color=RACK_COLOR)
+    extra = g.plot(gear_space=False, mill_space=False, pressure_line=False, color='fill-'+GEAR_COLOR)
     plt.title('Involute Radii')
     legend2()
     g.plot_show((5.5, 1.5, 3))
+
+    g = GearInvolute(17, profile_shift=0.5, rot=rot, **GearInvolute.HIGH_QUALITY)
+    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, pre=g.pitch_radius_effective, closed=True), color=RACK_COLOR)
+    extra = g.plot(gear_space=False, mill_space=False, pressure_line=True, color='fill-'+GEAR_COLOR)
+    plt.title('Involute Radii with Profile Shift of 0.5')
+    legend2()
+    g.plot_show((6, 1, 3))
 
 
 def doc_tooth_parts():
@@ -317,22 +332,34 @@ def test_angle():
 
 
 def doc_tooth_equations():
-    # gap_width, including profile shift
-    # tooth_offset
-    # undercut aka root_cut, face-root intersection
-
-    full_fig = 'rack radii pitch_radius tip_radius base_radius pointer gear gear_face pp involute_0'
-
-    doc_tooth_equations_fig('Rack and Gear', 4, 'rack gear rack_a gear_a')
-
     # pitch
     # tooth
     # half_tooth
-    doc_tooth_equations_fig('Rack Dimensions', 3, 'rack_0.5 pitch_line pitch tooth half_tooth')
+    doc_tooth_equations_fig('Rack Dimensions', 3, 'rack_0.5 pitch_line pitch_line_a pitch tooth half_tooth')
+
+    doc_tooth_equations_fig('Rack (with Cutter) and Gear', 4, 'rack_tall cutter gear rack_a gear_a')
+    doc_tooth_equations_fig('Path of the Cutter Tip Trochoid', 3, 'rack_tall gear trochoid_0')
+
+    # undercut aka root_cut, face-root intersection
+    doc_tooth_equations_fig('Intersection of Gear Face Involute and Cutter Tip Trochoid\n'
+                            '(with teeth=5 for elucidation)',
+                            1.5,
+                            'base_radius rack_tall gear gear_face_full trochoid_0 rf_intersection',
+                            teeth=5)
 
     # pp_inv_angle
     # pp_off_angle
-    doc_tooth_equations_fig('Calculation of Involute offset', 3, 'radii gear gear_face pp involute_0')
+    doc_tooth_equations_fig('Calculation of Involute offset', 3, 'radii radii_a gear gear_face gear_face_a pp involute_0')
+
+    # half_tooth_ps
+    doc_tooth_equations_fig('Profile Shift',
+                            1.5,
+                            'pitch_radius gear_o gear_ps_fill gear_ps_a', teeth=11)
+    doc_tooth_equations_fig('Profile Shift\n'
+                            '(dotted=original, solid=profile shift of 0.4)',
+                            2,
+                            'rack_o rack_ps pitch_line pitch_radius gear_o gear_ps_fill half_tooth_ps',
+                            teeth=11)
 
     doc_tooth_equations_fig('All fields', 5, 'all')
 
@@ -350,13 +377,23 @@ def doc_tooth_equations_fig(title, zoom, fig, teeth=27):
     elif isinstance(fig, str):
         fig = set(fig.split())
 
-    g = GearInvolute(teeth, module=1, pressure_angle=20, **GearInvolute.HIGH_QUALITY)
+    pressure_angle = 20
+
+    g = GearInvolute(teeth, module=1, pressure_angle=pressure_angle, **GearInvolute.HIGH_QUALITY)
+    rack = g.rack()
+
+    g_ps = GearInvolute(teeth, module=1, pressure_angle=pressure_angle, profile_shift=0.4, **GearInvolute.HIGH_QUALITY)
+    rack_ps = g_ps.rack()
+
     extra_rot = 0.5
     base_rot = g.teeth / 4 - extra_rot
     base_ang = base_rot / g.teeth * 360
     ang = 90
     center = Point(0, 0)
     zero_vec = Vector(1, 0).rotate(ang)
+    parts = g.gen_gear_tooth_parts(closed=True, include_extras=True)
+    extras = dict(parts)
+    localz: dict = extras['_locals']
 
     plt.title(title)
     """
@@ -376,13 +413,29 @@ def doc_tooth_equations_fig(title, zoom, fig, teeth=27):
         return path_rotate_ccw([Point(r, -l/2), Point(r, l/2)], ang, as_pt=True)
 
     rack_rot = -extra_rot
-    rack = g.rack()
     pitch_line = rack_line(g.pitch_radius, 200)
     pitch_segment = rack_line(g.tip_radius + 0.5, g.pitch)
     tooth_segment = rack_line(g.pitch_radius, g.pitch/2)
     if 'rack' in fig:
         rack_path = rack.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
-        plot_fill(rack_path, color='#80CCFF')
+        plot_fill(rack_path, color=RACK_COLOR)
+    if 'rack_ps' in fig:
+        rack_path = rack_ps.path(teeth=7, pre=g_ps.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        plot_fill(rack_path, color=RACK_COLOR)
+    if 'rack_o' in fig:
+        rack_path = rack.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        plot(rack_path, color=RACK_PS_COLOR, linestyle=':')
+    if 'rack_tall' in fig:
+        rack_tall = g.rack(tall_tooth=True)
+        rack_path = rack_tall.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        plot_fill(rack_path, color=RACK_CUTTER_COLOR)
+        rack_path = rack.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        plot_fill(rack_path, color=RACK_COLOR)
+        if 'cutter' in fig:
+            rack_path = rack_tall.path(teeth=1, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang)
+            mid = rack_path[1].mid(rack_path[2])
+            plot_annotate('Cutter', mid + Vector(0, 0.1), 'dc')
+        # plot(rack_path, color='#6099BF', linestyle=':')
     if 'rack_a' in fig:
         plot_annotate('Rack', Vector(g.tip_radius+1.5, 0).rotate(ang), 'cc')
     if 'rack_0.5' in fig:
@@ -390,20 +443,32 @@ def doc_tooth_equations_fig(title, zoom, fig, teeth=27):
         for side in [-1, 1]:
             cl = path_rotate_ccw([Point(0, side*g.pitch/2), Point(100, side*g.pitch/2)], ang)
             plot(cl, 'lightgrey')
-        plot_fill(rack_path, color='#80CCFF')
-        if 'pitch_line' in fig:
-            plot(pitch_line, 'lightgreen')
-            plot_annotate('Pitch Line', zero_vec * g.pitch_radius + Vector(g.pitch/2, 0), 'cc')
-        if 'pitch' in fig:
-            plot(arrow(pitch_segment, 'both'), 'green')
-            plot_annotate('Pitch', pitch_segment[0].mid(pitch_segment[1]), 'dc')
-        if 'tooth' in fig:
-            plot(arrow(tooth_segment, 'both'), 'green')
-            plot_annotate('Tooth\n=\nPitch / 2', tooth_segment[0].mid(tooth_segment[1]), 'uc')
+        plot_fill(rack_path, color=RACK_COLOR)
+    if 'pitch_line' in fig:
+        plot(pitch_line, 'lightgreen')
+        if 'pitch_line_a' in fig:
+            plot_annotate('Pitch Line', zero_vec * g.pitch_radius + Vector(g.pitch / 2, 0), 'cc')
+    if 'pitch' in fig:
+        plot(arrow(pitch_segment, 'both'), 'green')
+        plot_annotate('Pitch', pitch_segment[0].mid(pitch_segment[1]), 'dc')
+    if 'tooth' in fig:
+        plot(arrow(tooth_segment, 'both'), 'green')
+        plot_annotate('Tooth\n=\nPitch / 2', tooth_segment[0].mid(tooth_segment[1]), 'uc')
+
+    if 'gear_ps' in fig:
+        plot(path_close(g_ps.instance().poly_at(base_rot)), 'darkgrey')
+    if 'gear_ps_fill' in fig:
+        plot_fill(path_close(g_ps.instance().poly_at(base_rot)), 'darkgrey')
     if 'gear' in fig:
         plot_fill(path_close(g.instance().poly_at(base_rot)), 'lightgrey')
+    if 'gear_o' in fig:
+        plot(path_close(g.instance().poly_at(base_rot)), 'lightgrey', linestyle=':')
     if 'gear_a' in fig:
         plot_annotate('Gear', Vector(g.root_radius-1.0, 0).rotate(ang), 'cc')
+    if 'gear_ps_a' in fig:
+        a = zero_vec * g.tip_radius
+        b = zero_vec * g_ps.tip_radius      # TODO-what about tip shortening?
+        plot_annotate('Profile Shift', plot([a, b], 'green'), 'cl')
 
     radii_config = [
         ('root_radius', g.root_radius, 'Root Radius', 'green', 3),
@@ -412,27 +477,42 @@ def doc_tooth_equations_fig(title, zoom, fig, teeth=27):
         ('tip_radius', g.tip_radius, 'Tip Radius', 'green', 0),
     ]
     for key, val, label, color, ang_shift in radii_config:
-        if 'radii' in fig or key in fig and not ('-'+key) in fig:
+        if 'radii' in fig or key in fig:
             plot(circle(val), color)
             loc = zero_vec.rotate(8+ang_shift) * val + Vector(-0.5, -0.1)
-            plot_annotate(label, loc, 'cc')
+            if 'radii_a' in fig or (key+'_a') in fig:
+                plot_annotate(label, loc, 'cc')
+
+    if 'half_tooth_ps' in fig:
+        rack_path = rack.path(teeth=1, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        mid = rack_path[1].mid(rack_path[2])
+        rack_path = rack_ps.path(teeth=1, pre=g_ps.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        mid_ps = rack_path[1].mid(rack_path[2])
+        l = plot([mid, mid_ps], 'green')
+        plot_annotate('Profile Shift', l, 'cr')
+
+        tw_mid = Point(0, g.pitch_radius)
+        tw_half = Vector(localz['half_tooth'], 0)
+        l = plot([tw_mid-tw_half, tw_mid+tw_half], 'red')
+        plot_annotate('Tooth Width', l, 'dc')
+
+        tw_ps = Vector(g_ps.profile_shift * g_ps.module * tan(radians(pressure_angle)), 0)
+        tw_ps_l = tw_mid + tw_half
+        tw_ps_r = tw_ps_l + tw_ps
+        l = plot([tw_ps_l, tw_ps_r], 'green')
+        plot_annotate('Extra Width due to Profile Shift', l, 'uc')
 
     pointer = arrow([center, Point(g.pitch_radius_effective, 0)], tip_len=0.5 * g.module)
     pointer = path_rotate_ccw(pointer, base_ang)
     if 'pointer' in fig:
         plot(pointer, color='wheat')
 
-    parts = g.gen_gear_tooth_parts(closed=True, include_extras=True)
-    extras = dict(parts)
-    # import pprint; pprint.pp(extras.keys())
-    localz: dict = extras['_locals']
-
     if 'pp' in fig:
         pp_vec = zero_vec.rotate(degrees(localz['pp_off_angle'])) * g.pitch_radius_effective
         angle('pp_off_angle', center, zero_vec, pp_vec,
               vec_len=g.pitch_radius_effective * 2, arc_pos=0.52, arrow='none')
         plot_annotate('(ppx, ppy)', pp_vec, 'dl')
-        print(localz['pp_inv_angle'], localz['pp_off_angle'])
+        # print(localz['pp_inv_angle'], localz['pp_off_angle'])
 
     gear_face: InvoluteWithOffsets = extras['_gear_face']
     if 'gear_face' in fig:
@@ -442,10 +522,18 @@ def doc_tooth_equations_fig(title, zoom, fig, teeth=27):
         for p in path:
             if (Point(*p) - center).length() > (g.tip_radius-0.1 + g.pitch_radius) * 0.5:
                 break
-        plot_annotate('Involute offset by\npp_off_angle + half_tooth', p, (20, 0))
-        angle('half_tooth', center, zero_vec, degrees=-90/g.teeth,
-              xytext=(0, -15),
-              arc_pos=g.pitch_radius, arrow='both', vec_color='none')
+        if 'gear_face_a' in fig:
+            plot_annotate('Involute offset by\npp_off_angle + half_tooth', p, (20, 0))
+            angle('half_tooth', center, zero_vec, degrees=-90/g.teeth,
+                  xytext=(0, -15),
+                  arc_pos=g.pitch_radius, arrow='both', vec_color='none')
+
+    if 'gear_face_full' in fig:
+        gff = gear_face.copy()
+        gff.end_angle *= 2
+        gff.start_angle = 0
+        path = path_rotate_ccw(path_from_xy(gff.path(30)), ang)
+        plot(path, 'green')
 
     if 'involute_0' in fig:
         save_end = gear_face.end_angle
@@ -460,40 +548,37 @@ def doc_tooth_equations_fig(title, zoom, fig, teeth=27):
             if (Point(*p) - center).length() > g.tip_radius + 0.5 * g.module:
                 break
         plot_annotate('Involute @ zero offset', p, (20, 0))
-        print(p)
+        # print(p)
         gear_face.end_angle = save_end
         gear_face.start_angle = save_start
 
     root_cut: InvoluteWithOffsets = extras['_root_cut']
+    if 'trochoid_0' in fig:
+        trochoid_0 = root_cut
+        # trochoid_0.offset_radius = localz['addendum_ps']
+        # trochoid_0.offset_norm = localz['addendum_offset']
+        trochoid_0.end_angle = tau
+        trochoid_0.start_angle = -tau
+        plot(path_rotate_ccw(trochoid_0.path_pt(200), ang), 'blue')
+
     root_cut.end_angle *= 2
     root_cut.start_angle *= 2
     plot(root_cut.path(20), 'blue')
 
-    intersection: Point = extras['_face_root_intersection']
-    # plot(cross(0.1, intersection), 'pink')
-    # plot(circle(0.1, intersection), 'pink')
-    plt.annotate(
-        'Intersection of gear face\ninvolute and root cut trochoid', intersection.xy(),
-        xytext=(40, -80), textcoords='offset points',
-        ha='center', va='top',
-        arrowprops=dict(arrowstyle='->'),
-        bbox=dict(facecolor='white', edgecolor='darkgrey', pad=4.0, alpha=0.8),
-    )
+    if 'rf_intersection' in fig:
+        intersection: Point = extras['_face_root_intersection']
+        loc = (intersection - center).rotate(ang)
+        # plot(cross(0.1, intersection), 'pink')
+        # plot(circle(0.1, intersection), 'pink')
+        plot_annotate('Intersection', loc, 'cl')
+        plt.annotate(
+            'Intersection of gear face\ninvolute and root cut trochoid', intersection.xy(),
+            xytext=(40, -80), textcoords='offset points',
+            ha='center', va='top',
+            arrowprops=dict(arrowstyle='->'),
+            bbox=dict(facecolor='white', edgecolor='darkgrey', pad=4.0, alpha=0.8),
+        )
 
-    if not intersection:
-        colors = dict(face='blue', root_cut='red', dropcut='orange', root_arc='green', tip_arc='cyan')
-        labels = dict(face='Gear Face', root_cut='Root Cut', dropcut='Drop Cut', root_arc='Root Arc',
-                      tip_arc='Tip Arc')
-        seen = set()
-        for tag, points in parts:
-            if tag.startswith('_'):
-                continue
-            plot(points, color=colors[tag], linewidth=3, label=labels[tag] if tag not in seen else None)
-            seen.add(tag)
-            if tag == 'root_arc':
-                # Plot this again mirrored so that plot is symmetric
-                plot([(p.x, -p.y) for p in points], color=colors[tag], linewidth=3)
-        plt.legend(loc=6)
     g.plot_show(zoom * g.module, axis='y' if ang == 90 else 'x', grid=False)
     # g.plot_show()
     if isinstance(fig, FigAll):
@@ -502,9 +587,9 @@ def doc_tooth_equations_fig(title, zoom, fig, teeth=27):
 
 def main():
     # test_angle()
-    # doc_radii()
+    doc_radii()
     # doc_tooth_parts()
-    doc_tooth_equations()
+    # doc_tooth_equations()
 
 
 if __name__ == '__main__':

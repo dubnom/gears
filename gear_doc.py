@@ -641,6 +641,7 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
 
 
 def doc_intro():
+    plt.gcf().set_size_inches(3, 2)
     g = InvolutePair(25, 9)
     plot_fill(g.pinion().poly_at(), GEAR_PS_COLOR)
     plot_fill(g.wheel().poly_at(), GEAR_COLOR)

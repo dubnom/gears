@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from math import cos, sin, radians
 
 from x7.geom.geom import Line, Vector, Point
-from x7.geom.utils import arc, plot
+from x7.geom.utils import arc
+from x7.geom.plot_utils import plot
 from gear_base import GearInstance, CUT_KIND_COLOR_MAP
 from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvolutePair

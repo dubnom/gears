@@ -41,21 +41,6 @@ class TestGearInvolute(TestCaseExtended):
         self.assertEqual(g.teeth, 7)
         self.assertEqual(g.tip_arc, 1.1)
 
-    @tests(gear_involute.GearInvolute.cuts_for_mill)
-    def test_cuts_for_mill(self):
-        # cuts_for_mill(self, tool_angle, tool_tip_height=0.0) -> List[Tuple[float, float, float]]
-        pass  # TODO-impl gear_involute.GearInvolute.cuts_for_mill test
-
-    @tests(gear_involute.GearInvolute.gen_by_rack)
-    def test_gen_by_rack(self):
-        # gen_by_rack(self)
-        pass  # TODO-impl gear_involute.GearInvolute.gen_by_rack test
-
-    @tests(gear_involute.GearInvolute.gen_cuts_by_rack)
-    def test_gen_cuts_by_rack(self):
-        # gen_cuts_by_rack(self) -> Tuple[List[x7.geom.geom.Line], List[x7.geom.geom.Line]]
-        pass  # TODO-impl gear_involute.GearInvolute.gen_cuts_by_rack test
-
     @tests(gear_involute.GearInvolute._finish_tooth_parts)
     @tests(gear_involute.GearInvolute.gen_gear_tooth_parts)
     @tests(gear_involute.GearInvolute.gen_gear_tooth)
@@ -87,7 +72,7 @@ class TestGearInvolute(TestCaseExtended):
         def test_plot(self):
             gears = self.gears_for_tests()
             for tag, gear in gears:
-                gear.plot(mill_space=False, gear_space=False)
+                gear.plot()
             gears[-1][1].plot_show()
 
     def test_plot_show(self):

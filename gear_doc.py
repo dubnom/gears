@@ -34,6 +34,8 @@ def plot_show(fig_name: str, gear: GearInvolute, zoom: Union[None, float, tuple]
               axis='x', grid=False, title_loc='tc'):
     fig: Figure = plt.gcf()
     fig.subplots_adjust(0, 0, 1, 1)
+    fig.canvas.set_window_title(fig_name+'.png')
+
     ax: Axes = plt.gca()
     ax.axis('off')
     title = ax.title.get_text()
@@ -60,15 +62,11 @@ def plot_show(fig_name: str, gear: GearInvolute, zoom: Union[None, float, tuple]
     fig.savefig(out)
 
 
-def plot_fill(xy: PointUnionList, color='black', label=None,
-         linewidth=None, linestyle=None,
-         plotter=None) -> Artist:
+def plot_fill(xy: PointUnionList, color='black', plotter=None) -> Artist:
     """Quick entry to pyplot.fill() for List[Point]"""
 
     plotter = plotter or plt
-    artists = plotter.fill(*zip(*xy), color)  # , label=label,
-    # linestyle=linestyle, linewidth=linewidth,
-    # solid_capstyle='round' if linewidth and linewidth > 1 else None)
+    artists = plotter.fill(*zip(*xy), color)
 
     # if label:
     #    for artist in artists:
@@ -313,14 +311,14 @@ def doc_radii():
 
     g = GearInvolute(17, profile_shift=0, rot=rot, **GearInvolute.HIGH_QUALITY)
     plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, pre=g.pitch_radius_effective, closed=True), color=RACK_COLOR)
-    extra = g.plot(gear_space=False, mill_space=False, pressure_line=False, color='fill-'+GEAR_COLOR)
+    extra = g.plot(pressure_line=False, color='fill-'+GEAR_COLOR)
     plt.title('Involute Radii')
     legend2()
     plot_show('inv_radii', g, (5.5, 1.5, 3))
 
     g = GearInvolute(17, profile_shift=0.5, rot=rot, **GearInvolute.HIGH_QUALITY)
     plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, pre=g.pitch_radius_effective, closed=True), color=RACK_COLOR)
-    extra = g.plot(gear_space=False, mill_space=False, pressure_line=True, color='fill-'+GEAR_COLOR)
+    extra = g.plot(pressure_line=True, color='fill-'+GEAR_COLOR)
     plt.title('Involute Radii with Profile Shift of 0.5')
     legend2()
     plot_show('inv_radii_ps', g, (6, 1, 3))

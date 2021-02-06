@@ -4,7 +4,7 @@
 
 from math import pi, tan, radians
 from typing import Tuple, List
-from x7.geom.geom import Point, Line, Vector, PointOrXYList
+from x7.geom.geom import Point, Line, Vector, PointOrXYList, PointList
 from x7.geom.utils import path_to_xy, path_rotate_ccw, path_translate
 
 
@@ -78,6 +78,35 @@ class Rack(object):
 
         return rack_pts
 
+    def _finish_path(self, path, as_pt):
+        if self.angle:
+            path = path_rotate_ccw(path, self.angle, as_pt=True)
+        path = path_translate(path, self.center, as_pt=True)
+        return path if as_pt else path_to_xy(path)
+
+    def line(self, loc, teeth=1) -> PointList:
+        y_shift = Vector(0, self.circular_pitch * teeth / 2)
+        center = Point(loc, 0)
+        path = [center + y_shift, center - y_shift]
+        return self._finish_path(path, True)
+
+    def pitch_line(self, teeth=1) -> PointList:
+        return self.line(self.pitch_radius, teeth)
+
+    @property
+    def tip_radius(self):
+        return self.pitch_radius - self.module
+
+    @property
+    def root_radius(self):
+        return self.pitch_radius + self.module * self.relief_factor
+
+    def tip_line(self, teeth=1) -> PointList:
+        return self.line(self.tip_radius, teeth)
+
+    def root_line(self, teeth=1) -> PointList:
+        return self.line(self.root_radius, teeth)
+
     def path(self, teeth=1, rot=0.5, closed=False, depth=8, as_pt=True) -> PointOrXYList:
         """
             Generate a rack
@@ -99,10 +128,7 @@ class Rack(object):
             bot = path[0].y
             back = self.module * depth + self.pitch_radius
             path.extend([Point(back, top), Point(back, bot)])
-        if self.angle:
-            path = path_rotate_ccw(path, self.angle, as_pt=True)
-        path = path_translate(path, self.center, as_pt=True)
-        return path if as_pt else path_to_xy(path)
+        return self._finish_path(path, as_pt)
 
         # One tooth
         #      ____          +h_a    # addendum

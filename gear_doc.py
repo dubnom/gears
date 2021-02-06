@@ -20,6 +20,7 @@ from x7.geom.utils import circle, min_rotation, path_rotate_ccw, path_from_xy
 from x7.geom.plot_utils import plot
 from x7.lib.iters import t_range, iter_rotate
 from gear_involute import GearInvolute, InvoluteWithOffsets, InvolutePair
+from rack import Rack
 
 GEAR_COLOR = 'lightgrey'
 GEAR_PS_COLOR = 'darkgrey'
@@ -30,7 +31,7 @@ RACK_CUTTER_COLOR = '#FF8080'
 IMAGES_GEAR_DOC = './doc/images/gear_doc'
 
 
-def plot_show(fig_name: str, gear: GearInvolute, zoom: Union[None, float, tuple],
+def plot_show(fig_name: str, gear: Optional[GearInvolute], zoom_radius: Union[None, float, tuple],
               axis='x', grid=False, title_loc='tc'):
     fig: Figure = plt.gcf()
     fig.subplots_adjust(0, 0, 1, 1)
@@ -56,22 +57,34 @@ def plot_show(fig_name: str, gear: GearInvolute, zoom: Union[None, float, tuple]
     )
     title_a.draggable()
 
-    gear.plot_show(zoom, axis=axis, grid=grid)
+    if gear:
+        gear.plot_show(zoom_radius, axis=axis, grid=grid)
+    else:
+        plt.axis('equal')
+        if grid:
+            plt.grid()
+        # Set zoom_radius to zoom in around where gears meet
+        if zoom_radius:
+            zxl, zxr, zy = zoom_radius if isinstance(zoom_radius, tuple) else (zoom_radius, zoom_radius, zoom_radius)
+            ax = plt.gca()
+            ax.set_xlim(-zxl, zxr)
+            ax.set_ylim(-zy, zy)
+        plt.show()
+
     out = os.path.join(IMAGES_GEAR_DOC, fig_name+'.png')
     print('Saving to', out)
     fig.savefig(out)
 
 
-def plot_fill(xy: PointUnionList, color='black', plotter=None) -> Artist:
+def plot_fill(xy: PointUnionList, color='black', plotter=None, label=None) -> Artist:
     """Quick entry to pyplot.fill() for List[Point]"""
 
     plotter = plotter or plt
-    artists = plotter.fill(*zip(*xy), color)
+    artist, = plotter.fill(*zip(*xy), color)
 
-    # if label:
-    #    for artist in artists:
-    #        artist.set_label(label)
-    return artists
+    if label:
+        artist.set_label(label)
+    return artist
 
 
 def ha_va_from_xy(xytext) -> Tuple[str, str]:
@@ -295,6 +308,7 @@ def angle(text: str, center: BasePoint, p1: Union[Vector, BasePoint],
         arrowprops=dict(arrowstyle='->'),
         bbox=dict(facecolor='white', edgecolor='darkgrey', pad=4.0, alpha=0.8),
     )
+    annotation.draggable()
     return annotation, vec_artist, arc_artist
 
 
@@ -652,8 +666,50 @@ def doc_intro():
     plot_show('intro_gears', g.gear_wheel, None)
 
 
+def doc_rack():
+    plt.title('Rack Calculations')
+    r = Rack(angle=-90)
+    plot_fill(r.path(5, closed=True, depth=3), RACK_COLOR, label=r'$\alpha = 20_\circ$')
+
+    plot(r.pitch_line(5), 'grey', linestyle=':')
+    plot_annotate('Pitch Line', (-r.circular_pitch, 0), 'cc')
+    plot(r.tip_line(5), 'grey', linestyle=':')
+    plot_annotate('Tip Line', (-r.circular_pitch, -r.tip_radius), 'cc')
+    plot(r.root_line(5), 'grey', linestyle=':')
+    plot_annotate('Root Line', (-r.circular_pitch, -r.root_radius), 'cc')
+
+    path = r.path(1)
+    pv = Point(path[0].x, path[1].y)
+    angle(r'$\alpha$: @', path[0], pv, path[1], color='blue', arc_pos=0.6, vec_len=3, arrow='none', xytext=(50, -10))
+    l = plot([pv, path[1]], 'red')
+    plot_annotate(r'$H_t * \tan \alpha$', l, 'uc')
+    l = plot([pv, path[0]], 'green')
+    plot_annotate(r'$H_t$: total', l, 'cr')
+
+    cl = -r.circular_pitch * 3 / 4
+    l = plot([(cl, 0), (cl, -r.tip_radius)], 'green')
+    plot_annotate('$H_a$: addendum', l, 'cl')
+    l = plot([(cl, 0), (cl, -r.root_radius)], 'cyan')
+    plot_annotate('$H_d$: dedendum', l, 'cl')
+    l = plot([(cl, -r.tip_radius), path[2]], 'red')
+    plot_annotate(r'$H_a * \tan \alpha$', l, 'uc')
+
+    plot_show('inv_rack_calcs', None, (1.5 * r.circular_pitch, 0.5 * r.circular_pitch, 1))
+
+    plt.title('Rack Pressure Angles')
+    r = Rack(angle=-90)
+    plot_fill(r.path(5, closed=True, depth=3), RACK_COLOR, label=r'$\alpha = 20_\circ$')
+    r = Rack(angle=-90, pressure_angle=14.5)
+    plot(path_close(r.path(5, closed=True, depth=3)), 'red', label=r'$\alpha = 14.5_\circ$')
+    r = Rack(angle=-90, pressure_angle=30)
+    plot(path_close(r.path(5, closed=True, depth=3)), 'green', label=r'$\alpha = 30_\circ$')
+    plt.legend()
+    plot_show('inv_rack_angles', None, (1.5 * r.circular_pitch, 0.5 * r.circular_pitch, 1))
+
+
 def main():
     # test_angle()
+    doc_rack()
     doc_intro()
     doc_radii()
     doc_tooth_parts()

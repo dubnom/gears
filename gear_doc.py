@@ -158,7 +158,8 @@ def arrow(path: PointList, where='end', tip_len=None) -> PointList:
     return head + path + tail
 
 
-def arc(r, sa, ea, c=Point(0, 0), steps=-1, direction='shortest',
+# noinspection PyShadowingNames
+def arc(r, sa, ea, c: BasePoint = Point(0, 0), steps=-1, direction='shortest',
         arrow=None, mid=False) -> Union[XYList, Tuple[XYList, XYTuple]]:
     """
         Generate an arc of radius r about c as a list of x,y pairs
@@ -214,6 +215,7 @@ def arc(r, sa, ea, c=Point(0, 0), steps=-1, direction='shortest',
         return path
 
 
+# noinspection PyShadowingNames
 def angle(text: str, center: BasePoint, p1: Union[Vector, BasePoint],
           p2: Union[Vector, BasePoint, None] = None, degrees: Optional[float] = None,
           xytext: Optional[XYTuple] = None, vec_len: Optional[float] = None, arc_pos=None,
@@ -298,6 +300,7 @@ def angle(text: str, center: BasePoint, p1: Union[Vector, BasePoint],
 
 def doc_radii():
     save_legend = []
+
     def legend2():
         line = plot([(0, 0)], color='white')
         leg1 = plt.legend(loc=3)
@@ -310,14 +313,14 @@ def doc_radii():
     rot = -0.35
 
     g = GearInvolute(17, profile_shift=0, rot=rot, **GearInvolute.HIGH_QUALITY)
-    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, pre=g.pitch_radius_effective, closed=True), color=RACK_COLOR)
+    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, closed=True), color=RACK_COLOR)
     extra = g.plot(pressure_line=False, color='fill-'+GEAR_COLOR)
     plt.title('Involute Radii')
     legend2()
     plot_show('inv_radii', g, (5.5, 1.5, 3))
 
     g = GearInvolute(17, profile_shift=0.5, rot=rot, **GearInvolute.HIGH_QUALITY)
-    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, pre=g.pitch_radius_effective, closed=True), color=RACK_COLOR)
+    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, closed=True), color=RACK_COLOR)
     extra = g.plot(pressure_line=True, color='fill-'+GEAR_COLOR)
     plt.title('Involute Radii with Profile Shift of 0.5')
     legend2()
@@ -330,7 +333,7 @@ def doc_tooth_parts():
         g.curved_root = False
         plot_fill(g.instance().poly, 'lightgrey')
         plt.title('Tooth path for %d teeth' % g.teeth)
-        plot_fill(g.rack().path(5, rot=0.5, pre=g.pitch_radius_effective, closed=True), RACK_COLOR)
+        plot_fill(g.rack().path(5, rot=0.5, closed=True), RACK_COLOR)
         colors = dict(face='blue', root_cut='red', dropcut='orange', root_arc='green', tip_arc='cyan')
         labels = dict(face='Gear Face', root_cut='Root Cut', dropcut='Drop Cut', root_arc='Root Arc', tip_arc='Tip Arc')
         seen = set()
@@ -417,16 +420,17 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
 
     pressure_angle = 20
 
+    ang = 90
+
     g = GearInvolute(teeth, module=1, pressure_angle=pressure_angle, **GearInvolute.HIGH_QUALITY)
-    rack = g.rack()
+    rack = g.rack(angle=ang)
 
     g_ps = GearInvolute(teeth, module=1, pressure_angle=pressure_angle, profile_shift=0.4, **GearInvolute.HIGH_QUALITY)
-    rack_ps = g_ps.rack()
+    rack_ps = g_ps.rack(angle=ang)
 
     extra_rot = 0.5
     base_rot = g.teeth / 4 - extra_rot
     base_ang = base_rot / g.teeth * 360
-    ang = 90
     center = Point(0, 0)
     zero_vec = Vector(1, 0).rotate(ang)
     parts = g.gen_gear_tooth_parts(closed=True, include_extras=True)
@@ -455,29 +459,29 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
     pitch_segment = rack_line(g.tip_radius + 0.5, g.pitch)
     tooth_segment = rack_line(g.pitch_radius, g.pitch/2)
     if 'rack' in fig:
-        rack_path = rack.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        rack_path = rack.path(teeth=7, rot=rack_rot, closed=True)
         plot_fill(rack_path, color=RACK_COLOR)
     if 'rack_ps' in fig:
-        rack_path = rack_ps.path(teeth=7, pre=g_ps.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        rack_path = rack_ps.path(teeth=7, rot=rack_rot, closed=True)
         plot_fill(rack_path, color=RACK_COLOR)
     if 'rack_o' in fig:
-        rack_path = rack.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        rack_path = rack.path(teeth=7, rot=rack_rot, closed=True)
         plot(rack_path, color=RACK_PS_COLOR, linestyle=':')
     if 'rack_tall' in fig:
-        rack_tall = g.rack(tall_tooth=True)
-        rack_path = rack_tall.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        rack_tall = g.rack(angle=ang, tall_tooth=True)
+        rack_path = rack_tall.path(teeth=7, rot=rack_rot, closed=True)
         plot_fill(rack_path, color=RACK_CUTTER_COLOR)
-        rack_path = rack.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        rack_path = rack.path(teeth=7, rot=rack_rot, closed=True)
         plot_fill(rack_path, color=RACK_COLOR)
         if 'cutter' in fig:
-            rack_path = rack_tall.path(teeth=1, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang)
+            rack_path = rack_tall.path(teeth=1, rot=rack_rot)
             mid = rack_path[1].mid(rack_path[2])
             plot_annotate('Cutter', mid + Vector(0, 0.1), 'dc')
         # plot(rack_path, color='#6099BF', linestyle=':')
     if 'rack_a' in fig:
         plot_annotate('Rack', Vector(g.tip_radius+1.5, 0).rotate(ang), 'cc')
     if 'rack_0.5' in fig:
-        rack_path = rack.path(teeth=7, pre=g.pitch_radius_effective, rot=rack_rot+0.5, angle=ang, closed=True)
+        rack_path = rack.path(teeth=7, rot=rack_rot+0.5, closed=True)
         for side in [-1, 1]:
             cl = path_rotate_ccw([Point(0, side*g.pitch/2), Point(100, side*g.pitch/2)], ang)
             plot(cl, 'lightgrey')
@@ -522,9 +526,9 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
                 plot_annotate(label, loc, 'cc')
 
     if 'half_tooth_ps' in fig:
-        rack_path = rack.path(teeth=1, pre=g.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        rack_path = rack.path(teeth=1, rot=rack_rot, closed=True)
         mid = rack_path[1].mid(rack_path[2])
-        rack_path_ps = rack_ps.path(teeth=1, pre=g_ps.pitch_radius_effective, rot=rack_rot, angle=ang, closed=True)
+        rack_path_ps = rack_ps.path(teeth=1, rot=rack_rot, closed=True)
         mid_ps = rack_path_ps[1].mid(rack_path_ps[2])
         l = plot([mid, mid_ps], 'green')
         plot_annotate('Profile Shift: $x$', l, (-25, -35))
@@ -644,8 +648,7 @@ def doc_intro():
     plot_fill(g.pinion().poly_at(), GEAR_PS_COLOR)
     plot_fill(g.wheel().poly_at(), GEAR_COLOR)
     gp = g.gear_pinion
-    off = g.gear_wheel.pitch_radius_effective + g.gear_pinion.pitch_radius_effective*2
-    plot_fill(gp.rack().path(9, pre=off, closed=True), RACK_COLOR)
+    plot_fill(gp.rack().path(9, closed=True, depth=4), RACK_COLOR)
     plot_show('intro_gears', g.gear_wheel, None)
 
 

@@ -5,7 +5,7 @@
 from math import pi, tan, radians
 from typing import Tuple, List
 from x7.geom.geom import Point, Line, Vector, PointOrXYList
-from x7.geom.utils import path_to_xy, path_rotate_ccw
+from x7.geom.utils import path_to_xy, path_rotate_ccw, path_translate
 
 
 class Rack(object):
@@ -18,7 +18,9 @@ class Rack(object):
 
     """
 
-    def __init__(self, module=1, pressure_angle=20.0, relief_factor=1.25, tall_tooth=False):
+    def __init__(self, module=1, pressure_angle=20.0, relief_factor=1.25,
+                 center=Point(0, 0), angle=0.0, pitch_radius=0.0,
+                 tall_tooth=False):
         """
             :param module: gear module
             :param pressure_angle: angle of tooth
@@ -28,8 +30,13 @@ class Rack(object):
         self.module = module
         self.pressure_angle = pressure_angle
         self.relief_factor = relief_factor
+        self.center = center
+        self.angle = angle
+        self.pitch_radius = pitch_radius
+
         self.circular_pitch = self.module * pi
         self.half_tooth = self.circular_pitch / 4
+
         dedendum = self.module * self.relief_factor
         addendum = self.module
         tan_pa = tan(radians(self.pressure_angle))
@@ -71,30 +78,30 @@ class Rack(object):
 
         return rack_pts
 
-    def path(self, teeth=1, rot=0.5, pre=0, angle=0.0, closed=False, as_pt=True) -> PointOrXYList:
+    def path(self, teeth=1, rot=0.5, closed=False, depth=8, as_pt=True) -> PointOrXYList:
         """
             Generate a rack
             :param teeth:   Number of teeth (must be odd)
             :param rot:     Rotation of gear (shifts rack accordingly)
-            :param pre:     Pitch Radius Effective (aka offset)
-            :param angle:   Rotation (0=vertical on right, 90=horizontal on top)
             :param closed:  True to 'close' the rack around the back
+            :param depth:   Depth of closure in module-units
             :param as_pt:   True to return points
             :return:
         """
         tooth_pts = [self.tooth_base_high, self.tooth_tip_high, self.tooth_tip_low, self.tooth_base_low]
         y_shift = Vector(0, -self.circular_pitch)
-        offset = Vector(pre, 0) + y_shift * (rot % 1)
+        offset = Vector(self.pitch_radius, 0) + y_shift * (rot % 1)
         teeth //= 2
         path = [(p+offset+y_shift*tooth) for tooth in range(-teeth, teeth+1) for p in tooth_pts]
         if closed:
             # Add a back to the rack to make a closed polygon
             top = path[-1].y
             bot = path[0].y
-            back = self.module * 4 + pre
+            back = self.module * depth + self.pitch_radius
             path.extend([Point(back, top), Point(back, bot)])
-        if angle:
-            path = path_rotate_ccw(path, angle, as_pt=True)
+        if self.angle:
+            path = path_rotate_ccw(path, self.angle, as_pt=True)
+        path = path_translate(path, self.center, as_pt=True)
         return path if as_pt else path_to_xy(path)
 
         # One tooth

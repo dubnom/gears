@@ -432,9 +432,11 @@ class GearInvolute(object):
         parts = [(tag, [Point(x, y) for x, y in reversed(points)]) for tag, points in reversed(parts)]
         return parts + extras
 
-    def rack(self, tall_tooth=False) -> Rack:
+    def rack(self, tall_tooth=False, angle=0.0) -> Rack:
         return Rack(module=self.module, pressure_angle=self.pressure_angle_degrees,
-                    relief_factor=self.relief_factor, tall_tooth=tall_tooth)
+                    relief_factor=self.relief_factor,
+                    pitch_radius=self.pitch_radius_effective, center=self.center,
+                    angle=angle, tall_tooth=tall_tooth)
 
     def gen_rack_tooth(self, teeth=1, rot=0.5, as_pt=False):
         """Generate a rack with teeth (must be odd)"""
@@ -543,13 +545,14 @@ class InvolutePair:
                                         relief_factor=relief_factor, pressure_angle=pressure_angle,
                                         steps=steps, tip_arc=tip_arc, root_arc=root_arc, curved_root=curved_root,
                                         debug=debug)
+        pinion_offset = self.gear_wheel.pitch_radius_effective + self.gear_pinion.pitch_radius_effective
+        self.gear_pinion.center = self.gear_wheel.center + Vector(pinion_offset, 0)
 
     def wheel(self):
         return self.gear_wheel.instance()
 
     def pinion(self):
         p = self.gear_pinion.instance()
-        p.center = Point(self.gear_wheel.pitch_radius + self.gear_pinion.pitch_radius, 0)
         p.rotation_extra = 0.5 if p.teeth % 2 == 0 else 0.0
         return p
 

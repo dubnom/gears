@@ -1,20 +1,34 @@
 from __future__ import annotations
 import os
-from typing import Optional
+from typing import Optional, List
+import numpy as np
+import scipy.optimize
 import matplotlib.pyplot as plt
-from math import cos, sin, radians
+from math import cos, sin, radians, tau, hypot, pi, degrees
 
-from x7.geom.geom import Line, Vector, Point
-from x7.geom.utils import arc
-from x7.geom.plot_utils import plot
-from gear_base import GearInstance, CUT_KIND_COLOR_MAP
+from x7.geom.geom import Line, Vector, Point, PointList
+from x7.geom.utils import arc, circle, path_rotate, path_from_xy, path_rotate_ccw, path_translate, cross
+from x7.geom.plot_utils import plot, plot_show
+from x7.lib.iters import t_range
+
+from gear_base import GearInstance, CUT_KIND_COLOR_MAP, ClassifiedCut
 from gear_cycloidal import CycloidalPair
-from gear_involute import GearInvolute, InvolutePair
-
-# setenv SHOW_INTERACTIVE to 1 or true to display interactive plots
+from gear_doc import path_close, plot_fill, plot_annotate
+from gear_involute import GearInvolute, InvolutePair, Involute
 from tool import Tool
 
+# setenv SHOW_INTERACTIVE to 1 or true to display interactive plots
 SHOW_INTERACTIVE = os.environ.get('SHOW_INTERACTIVE', 'false').lower() in {'1', 'true'}
+
+
+def tooth_locate(cuts: List[ClassifiedCut], angle=0.0):
+    """
+        Locate a tooth with angle as the center of the tooth
+
+        :param cuts:
+        :param angle:
+        :return:
+    """
 
 
 def plot_classified_cuts(gear: GearInstance, tool: Tool):
@@ -213,7 +227,200 @@ def find_nt():
         print('%-3d %8.4f %8.4f %8.4f %s' % (nt, pr, dr, br, br < dr))
 
 
+def limacon_path(a, b, start_angle, end_angle) -> PointList:
+    """
+        Path of a limacon
+
+        :param a: distance from center of revolving circle
+        :param b: diameter of generating circles
+        :param start_angle: in degrees
+        :param end_angle:   in degrees
+        :return: PointList
+    """
+    path = []
+    for angle in t_range(90, radians(start_angle), radians(end_angle)):
+        x = b * cos(angle) + a * cos(2 * angle + pi)
+        y = b * sin(angle) + a * sin(2 * angle + pi)
+        path.append(Point(x, y))
+    return path
+
+
+def gear_one_intersection(inv: Involute, ang0: float, pitch_diameter: float, angle: float, dist=False):
+    """
+
+        :param inv:             Involute to use
+        :param ang0:            Basic rotation to align one-tooth involute
+        :param pitch_diameter:  Distance between centers
+        :param angle:           Current rotation of primary (secondary is pi-angle)
+        :param dist:            Just calculate distance
+        :return:
+    """
+    # Find the intersection of gear_face and undercut
+    def calc_a(ang):
+        v = Vector(*inv.calc_point(ang)).rotate(degrees(ang0-angle))
+        return Point(v.x, -v.y)
+
+    def calc_b(ang):
+        v = Vector(*inv.calc_point(ang)).rotate(degrees(ang0-(pi-angle)))
+        return Point(v.x + pitch_diameter, -v.y)
+
+    def objective(ab):
+        a, b = ab
+        ax, ay = calc_a(a).xy()
+        bx, by = calc_b(b).xy()
+        return np.array([ax - bx, ay - by])
+
+    def objective_min(ab):
+        a, b = ab
+        ax, ay = calc_a(a).xy()
+        bx, by = calc_b(b).xy()
+        return np.array([(ax - bx)**2, (ay - by)**2])
+
+    def objective_dist(a):
+        b = tau-a
+        return (calc_a(a) - calc_b(b)).length()
+
+    debug = False
+    if debug:
+        print('goi:', ang0, pitch_diameter, angle)
+    ang0 = radians(ang0)
+    if dist:
+        return [(t/tau*pitch_diameter, objective_dist(t)) for t in t_range(80, 0, tau)]
+    guesses = np.array([pi, pi])
+    algo = 'none'
+    if algo == 'none':
+        return calc_a(angle % tau)
+    if algo == 'dist':
+        result = scipy.optimize.minimize(objective_dist, np.array([angle % tau]),
+                                         tol=1e-14, bounds=[(-0.1, tau+0.1)],
+                                         options={
+                                             'maxiter': 100,
+                                             'iprint': 200,
+                                         })
+        ta, = result.x
+        tb = tau - ta
+        print('sum: %9.4f  a: %9.4f a-ang: %9.4f b: %9.4f' % ((ta + tb)/pi, ta/pi, (ta - angle % tau), tb/pi))
+        if not result.success:
+            print('...', result.message, result.fun, result.nfev, result.nit)
+    elif algo == 'fsolve':
+        result, info, ok, message = scipy.optimize.fsolve(objective, guesses, full_output=True)
+        print(result, info, ok, message)
+        ta, tb = result
+    else:
+        result = scipy.optimize.least_squares(objective_min, guesses, bounds=([0, 0], [tau+1, tau+1]))
+        ta, tb = result.x
+        print('sum: %9.4f  a: %9.4f  b: %9.4f' % (ta + tb, ta, tb))
+    path_a = [calc_a(t) for t in t_range(80, 0, tau)]
+    path_b = [calc_b(t) for t in t_range(80, 0, tau)]
+    pa = calc_a(ta)
+    if debug:
+        pb = calc_b(tb)
+        print('a0:', calc_a(0), ' b0:', calc_b(0))
+        plot(path_a, 'green')
+        plot(path_b, 'red')
+        plot_annotate('pa', pa, 'ul')
+        plot_annotate('pb', pb, 'dr')
+        print(pa, pb, (pa-pb).length())
+    return pa
+
+
+def gear_one():
+    base_radius = 1.5 / 2
+    center = Point(0, 0)
+    inv = Involute(base_radius, max_radius=10, min_radius=base_radius)
+    inv.end_angle = tau
+    path = [(x, -y) for x, y in inv.path(150)]
+    # path = [(0.0, 0.0)] + path
+    path = path_from_xy(path)
+    c2 = path[-1] + Vector(base_radius, 0)
+    c2v = c2 - center
+    print('c2-center: ', c2v.length(), '  ang: ', c2v.angle())
+    ang = c2v.angle()
+    xlate = Vector(c2v.length(), 0)
+    pitch_radius = xlate.x / 2
+
+    animate = True
+    find_intersection = False
+    debug = False
+
+    if find_intersection:
+        if debug:
+            gear_one_intersection(inv, ang, pitch_radius * 2, 1)
+            path = path_rotate_ccw(path, -ang, as_pt=True)
+            plot(path, 'blue', linestyle=':')
+            path2 = path_translate(path_rotate_ccw(path, 180, as_pt=True), xlate, as_pt=True)
+            print(xlate, pitch_radius*2)
+            plot(path2, 'green', linestyle=':')
+
+            plt.axis('equal')
+            plt.show()
+            return
+
+        intersections = [gear_one_intersection(inv, ang, pitch_radius*2, t) for t in t_range(3, 0.1, 3)]
+        if not animate:
+            plot(intersections, 'darkgrey', linewidth=3)
+
+    tip_radius = hypot(*path[-1])
+    do_rotate = True
+    if do_rotate:
+        path = path_rotate_ccw(path, -ang, as_pt=True)
+    print(inv.start_angle/tau, inv.end_angle/tau)
+    print(path[-1], hypot(*path[-1]))
+    path = path
+    limacon_angle = (path[-1]-center).angle()
+    print('la:', limacon_angle, limacon_angle+46.7)
+    limacon_gen = path_rotate_ccw(limacon_path(tip_radius, pitch_radius*2, -46.942, limacon_angle), -limacon_angle, as_pt=True)
+    if do_rotate:
+        path.extend(limacon_gen)
+    print('pr:', pitch_radius, ' tr:', tip_radius)
+
+    rotation = [0]
+    line_o_action = []
+
+    def plot_one(ax):
+        rot = rotation[0]
+        # plot(circle(base_radius), 'grey', plotter=ax)
+        # plot(circle(xlate.x/2), 'lightgrey', plotter=ax)
+        # plot(circle(base_radius, c=xlate), 'grey', plotter=ax)
+        # plot(circle(xlate.x/2, c=xlate), 'lightgrey', plotter=ax)
+        plot_fill(path_rotate_ccw(path, rot), plotter=ax)
+        path_other = path_translate(path_rotate_ccw(path, 180 - rot, as_pt=True), xlate, as_pt=True)
+        plot_fill(path_other, 'green', plotter=ax)
+
+        plot(path_rotate_ccw(path_from_xy(cross(0.1)), rot), 'white', plotter=ax)
+        plot(path_translate(path_rotate_ccw(path_from_xy(cross(0.1)), 180 - rot, as_pt=True), xlate), 'white',
+             plotter=ax)
+
+        ix = gear_one_intersection(inv, ang, pitch_radius*2, radians(rot))
+        line_o_action.append(ix)
+        plot(line_o_action, 'grey', plotter=ax)
+        plot_fill(circle(0.2, ix), 'lightgrey', plotter=ax)
+        plot(gear_one_intersection(inv, ang, pitch_radius*2, radians(rot), dist=True), 'wheat', plotter=ax)
+
+        ax.axis('equal')
+        ax.set_ylim(-8, 8)
+        ax.set_xlim(-6, 10)
+        rotation[0] += 3
+
+    if animate:
+        from x7.geom.plot_viewer import PlotViewer
+
+        pv = PlotViewer(update_func=plot_one)
+        pv.mainloop()       # never returns
+    else:
+        plot(circle(6), 'lightgrey')
+        plot(circle(base_radius), 'grey')
+        plot(circle(4.945), 'grey')
+        plot_one(plt.gca())
+        # plot(path_translate(path_rotate(path, 180, as_pt=True), xlate), 'green')
+
+        # plot(limacon_gen, 'red')
+
+        plt.show()
+
+
 def main():
+    gear_one(); return
     # find_nt(); return
     # [test_inv(n) for n in [3, 7, 17, 21, 101]]; return
     # [test_inv(n) for n in range(3, 18, 3)]; return
@@ -233,7 +440,7 @@ def main():
     plot_classified_cuts(pair.pinion(), tool)
     pair.plot()
     pair.wheel().plot_show()
-    return
+    # return
     plot_classified_cuts(CycloidalPair(40, 17).pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4); return
     # plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
     # do_pinions(zoom_radius=5, cycloidal=not False); return

@@ -9,7 +9,7 @@ from x7.geom.plot_utils import plot
 from tool import Tool
 
 __all__ = [
-    'GearInstance', 'CUT_KIND_COLOR_MAP', 'CutError',
+    'GearInstance', 'CUT_KIND_COLOR_MAP', 'CutError', 'ClassifiedCut',
 ]
 
 CUT_KIND_COLOR_MAP = {

@@ -1,11 +1,11 @@
 from math import sin, cos, radians, ceil, tan
 from typing import List, Tuple, Optional
-from matplotlib import pyplot as plt
 from x7.lib.iters import iter_rotate, t_range
 from x7.geom.geom import Point, Vector, Line, polygon_area, PointList
 from x7.geom.transform import Transform
 from x7.geom.utils import check_point_list, path_rotate, path_translate, circle
 from x7.geom.plot_utils import plot
+from plot_utils import PlotZoomable
 from tool import Tool
 
 __all__ = [
@@ -92,11 +92,11 @@ class ClassifiedCut:
         return self.kind in {'out', 'ascending'}
 
 
-class GearInstance:
+class GearInstance(PlotZoomable):
     """Holder for finished gear (could be just about any polygon, really)"""
     def __init__(self, module, teeth, shape, kind, tooth_path: PointList, center: Point,
                  poly: Optional[PointList] = None, rotation_extra=0.,
-                 tip_radius=0., base_radius=0., root_radius=0.):
+                 tip_radius=0., base_radius=0., root_radius=0., pitch_radius_effective=0.):
         self.module = module
         self.teeth = teeth
         self.shape = shape
@@ -111,8 +111,19 @@ class GearInstance:
         self.tip_radius = tip_radius
         self.base_radius = base_radius
         self.root_radius = root_radius
+        self.pitch_radius_effective = pitch_radius_effective or self.pitch_radius
         self.poly = list(poly or self.gen_poly())
         check_point_list(self.poly)
+
+    def tooth_at(self, rotation=0.0) -> PointList:
+        """
+            Generate single tooth at rotation
+
+            :param rotation: Amount of rotation in #teeth
+            :return:
+        """
+
+        return path_rotate(self.tooth_path, rotation * 360 / self.teeth, True)
 
     def gen_poly(self, rotation=0.0) -> PointList:
         """
@@ -181,21 +192,6 @@ class GearInstance:
         pointer_rotation = (rotation + 1 + self.rotation_extra) * 360 / self.teeth
         rotated = path_rotate([Point(0, 0), Point(self.pitch_radius, 0)], pointer_rotation, True)
         plot(path_translate(rotated, self.center), color, plotter=plotter)
-
-    def set_zoom(self, zoom_radius=0.0, plotter=None):
-        plotter = plotter or plt
-        plotter.axis('equal')
-        plotter.grid()
-        # Set zoom_radius to zoom in around where gears meet
-        if zoom_radius:
-            from matplotlib.axes import Axes
-            ax = plotter if isinstance(plotter, Axes) else plt.gca()
-            ax.set_xlim(self.pitch_radius - zoom_radius, self.pitch_radius + zoom_radius)
-            ax.set_ylim(-zoom_radius, zoom_radius)
-
-    def plot_show(self, zoom_radius=0.0, plotter=None):
-        self.set_zoom(zoom_radius=zoom_radius, plotter=plotter)
-        plt.show()
 
     def classify_cuts_pass1(self, tool: Tool) -> List[ClassifiedCut]:
         """

@@ -2,14 +2,12 @@ import numpy as np
 import scipy.optimize
 from math import sqrt, cos, sin, pi, radians, tan, atan2, degrees, hypot, tau
 from typing import List, Tuple, Union, Any
-
-from matplotlib import pyplot as plt
-
 from x7.lib.iters import t_range
 from x7.geom.geom import Point, Vector, PointList, XYList
 from x7.geom.utils import circle, path_to_xy, path_from_xy
 from x7.geom.plot_utils import plot
 from gear_base import GearInstance
+from plot_utils import PlotZoomable, plot_fill
 from rack import Rack
 
 
@@ -168,7 +166,7 @@ class Involute(object):
         return [(x + cx, y + cy) for x, y in zp]
 
 
-class GearInvolute(object):
+class GearInvolute(PlotZoomable):
     HIGH_QUALITY = dict(steps=20, tip_arc=0.5, root_arc=0.5, curved_root=True)
 
     def __init__(self, teeth=30, center=Point(0, 0), rot=0.0,
@@ -450,8 +448,6 @@ class GearInvolute(object):
 
     def plot(self, color='red', pressure_line=True, linewidth=1) -> str:
         """Plot the gear, along with construction lines & circles.  Returns additional text to display"""
-        from gear_doc import plot_fill
-
         addendum = self.module
         pitch_radius = self.pitch_radius
         if color.startswith('fill-'):
@@ -498,25 +494,6 @@ class GearInvolute(object):
         # self.gen_gcode()
         return extra_text
 
-    def plot_show(self, zoom_radius: Union[None, float, Tuple[float, float, float]] = None,
-                  axis='x', grid=True):
-        plt.axis('equal')
-        if grid:
-            plt.grid()
-        # Set zoom_radius to zoom in around where gears meet
-        if zoom_radius:
-            zxl, zxr, zy = zoom_radius if isinstance(zoom_radius, tuple) else (zoom_radius, zoom_radius, zoom_radius)
-            ax = plt.gca()
-            if axis in ('x', '-x'):
-                pre = self.pitch_radius_effective if axis == 'x' else -self.pitch_radius_effective
-                ax.set_xlim(pre - zxl, pre + zxr)
-                ax.set_ylim(-zy, zy)
-            else:
-                pre = self.pitch_radius_effective if axis == 'y' else -self.pitch_radius_effective
-                ax.set_ylim(pre - zxl, pre + zxr)
-                ax.set_xlim(-zy, zy)
-        plt.show()
-
     def instance(self):
         """
             Return a gear instance that represents this gear
@@ -528,7 +505,7 @@ class GearInvolute(object):
         return GearInstance(self.module, self.teeth, 'Involute', '', self.gen_gear_tooth(),
                             center=self.center, rotation_extra=self.rot,
                             tip_radius=self.tip_radius, base_radius=self.base_radius,
-                            root_radius=self.root_radius)
+                            root_radius=self.root_radius, pitch_radius_effective=self.pitch_radius_effective)
 
 
 class InvolutePair:

@@ -3,23 +3,23 @@ Various plots to document gear calculations
 See also: https://www.tec-science.com/mechanical-power-transmission/involute-gear/calculation-of-involute-gears/
 """
 import os
-from math import cos, sin, radians, degrees, tau, tan
-from typing import Union, Optional, Tuple
+from math import radians, degrees, tau, tan
+from typing import Union, Optional
 
 import matplotlib.pyplot as plt
 # plt.style.use('ggplot')
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.legend import Legend, DraggableLegend
-from matplotlib.artist import Artist
-from matplotlib.lines import Line2D
-from matplotlib.text import Annotation
 
-from x7.geom.geom import PointList, Point, Vector, XYList, XYTuple, PointUnionList, BasePoint
-from x7.geom.utils import circle, min_rotation, path_rotate_ccw, path_from_xy
+from x7.geom.geom import Point, Vector
+from x7.geom.utils import circle, path_rotate_ccw, path_from_xy
 from x7.geom.plot_utils import plot
-from x7.lib.iters import t_range, iter_rotate
+
+from gear_base import GearInstance
+from gear_cycloidal import CycloidalPair
 from gear_involute import GearInvolute, InvoluteWithOffsets, InvolutePair
+from plot_utils import PlotZoomable, plot_fill, plot_annotate, path_close, arrow, angle
 from rack import Rack
 
 GEAR_COLOR = 'lightgrey'
@@ -31,7 +31,7 @@ RACK_CUTTER_COLOR = '#FF8080'
 IMAGES_GEAR_DOC = './doc/images/gear_doc'
 
 
-def plot_show(fig_name: str, gear: Optional[GearInvolute], zoom_radius: Union[None, float, tuple],
+def plot_show(fig_name: str, gear: Optional[PlotZoomable], zoom_radius: Union[None, float, tuple],
               axis='x', grid=False, title_loc='tc'):
     fig: Figure = plt.gcf()
     fig.subplots_adjust(0, 0, 1, 1)
@@ -76,242 +76,6 @@ def plot_show(fig_name: str, gear: Optional[GearInvolute], zoom_radius: Union[No
     fig.savefig(out)
 
 
-def plot_fill(xy: PointUnionList, color='black', plotter=None, label=None) -> Artist:
-    """Quick entry to pyplot.fill() for List[Point]"""
-
-    plotter = plotter or plt
-    artist, = plotter.fill(*zip(*xy), color)
-
-    if label:
-        artist.set_label(label)
-    return artist
-
-
-def ha_va_from_xy(xytext) -> Tuple[str, str]:
-    x, y = xytext
-    ha = 'left' if x > 0 else 'right' if x < 0 else 'center'
-    va = 'bottom' if y > 0 else 'top' if y < 0 else 'center'
-    return ha, va
-
-
-def plot_annotate(text, where, xytext, xycoords='data', noarrow=False) -> Annotation:
-    if isinstance(xytext, str):
-        v, h = xytext[0], xytext[1]
-        h = {'c': 0, 'r': 1, 'l': -1}[h]
-        v = {'c': 0, 'u': 1, 'd': -1}[v]
-        xytext = ((25 if v == 0 else 10) * h, 20 * v)
-    if xytext:
-        ha, va = ha_va_from_xy(xytext)
-    else:
-        ha = 'center'
-        va = 'center'
-        xytext = (0, 0)
-    arrowprops = None if noarrow or xytext == (0, 0) else dict(arrowstyle='->')
-
-    if isinstance(where, (BasePoint, Vector)):
-        where = where.xy()
-    elif isinstance(where, Line2D):
-        x_data = where.get_xdata()
-        y_data = where.get_ydata()
-        where = (x_data[0]+x_data[-1])/2, (y_data[0]+y_data[-1])/2
-    annotation = plt.annotate(
-        text, where, xycoords=xycoords,
-        xytext=xytext, textcoords='offset points',
-        ha=ha, va=va,
-        arrowprops=arrowprops,
-        bbox=dict(facecolor='white', edgecolor='darkgrey', pad=4.0, alpha=0.8),
-    )
-    annotation.draggable()
-    return annotation
-
-
-def path_close(path: PointList) -> PointList:
-    return path + [path[0]]
-
-
-def path_len(path: PointList) -> float:
-    total = 0
-    a: Point
-    b: Point
-    for a, b in iter_rotate(path, 2, cycle=False):
-        total += (a - b).length()
-    return total
-
-
-def arrow(path: PointList, where='end', tip_len=None) -> PointList:
-    """
-        Attach arrowheads to a path
-
-        :param path: input path
-        :param where: where to put arrowheads: None->no arrow, 'both', 'start', 'end'
-        :param tip_len: length of arrowhead tip: None->auto calc
-        :return: PointList
-    """
-
-    if tip_len is None:
-        tip_len = path_len(path) / 10
-    head = []
-    tail = []
-    if where in ('both', 'end'):
-        end_pt = Point(*path[-1])
-        v = Point(*path[-2]) - end_pt
-        v = v.unit() * tip_len
-        vl = v.rotate(15)
-        vr = v.rotate(-15)
-        tail = [end_pt+vl, end_pt, end_pt+vr]
-    if where in ('both', 'start'):
-        end_pt = Point(*path[0])
-        v = Point(*path[1]) - end_pt
-        v = v.unit() * tip_len
-        vl = v.rotate(15)
-        vr = v.rotate(-15)
-        head = [end_pt+vl, end_pt, end_pt+vr]
-    if where not in (None, 'none', 'start', 'end', 'both'):
-        raise ValueError('where: must be None, start, end, or both, not %r' % arrow)
-    return head + path + tail
-
-
-# noinspection PyShadowingNames
-def arc(r, sa, ea, c: BasePoint = Point(0, 0), steps=-1, direction='shortest',
-        arrow=None, mid=False) -> Union[XYList, Tuple[XYList, XYTuple]]:
-    """
-        Generate an arc of radius r about c as a list of x,y pairs
-        :param r:   radius
-        :param sa:  starting angle in degrees
-        :param ea:  ending angle in degrees
-        :param c:   center point of arc
-        :param steps: number of steps (-1 => 1 per degree)
-        :param direction: 'shortest', 'ccw' (from sa to ea), 'cw' (from sa to ea) (None defaults to 'shortest')
-        :param arrow: None->no arrow, 'both', 'start', 'end'
-        :param mid: Also return arc midpoint
-        :return: list of (x, y) or (list of (x,y), arc-mid-vector) if midpoint
-    """
-    sa = sa % 360
-    ea = ea % 360
-    if direction == 'ccw':
-        if ea < sa:
-            ea += 360
-    elif direction == 'cw':
-        if ea > sa:
-            ea -= 360
-    elif direction == 'shortest' or direction is None:
-        ea = sa + min_rotation(ea, sa)
-    else:
-        raise ValueError('direction: expected shortest, ccw, or cw, not %r' % direction)
-    steps = int(abs(ea-sa)+1) if steps < 0 else steps
-    path = [(r * cos(t) + c.x, r * sin(t) + c.y) for t in t_range(steps, radians(sa), radians(ea))]
-
-    arc_len = abs(radians(ea - sa)) * r
-    arrow_len = min(arc_len / 3, r / 4)
-    arc_prev = min(5, len(path)-1)
-    if arrow in ('both', 'start'):
-        end_pt = Point(*path[0])
-        v = Point(*path[arc_prev]) - end_pt
-        v = v.unit() * arrow_len
-        vl = v.rotate(15)
-        vr = v.rotate(-15)
-        path = [end_pt+vl, end_pt, end_pt+vr] + path
-    if arrow in ('both', 'end'):
-        end_pt = Point(*path[-1])
-        v = Point(*path[-arc_prev]) - end_pt
-        v = v.unit() * arrow_len
-        vl = v.rotate(15)
-        vr = v.rotate(-15)
-        path.extend([end_pt+vl, end_pt, end_pt+vr])
-    if arrow not in (None, 'none', 'start', 'end', 'both'):
-        raise ValueError('arrow: must be None, start, end, or both, not %r' % arrow)
-    if mid:
-        t = radians(sa+ea) / 2
-        mid = (r * cos(t), r * sin(t))
-        return path, mid
-    else:
-        return path
-
-
-# noinspection PyShadowingNames
-def angle(text: str, center: BasePoint, p1: Union[Vector, BasePoint],
-          p2: Union[Vector, BasePoint, None] = None, degrees: Optional[float] = None,
-          xytext: Optional[XYTuple] = None, vec_len: Optional[float] = None, arc_pos=None,
-          color='cyan', direction=None,
-          arc_color=None, vec_color=None, arrow: Optional[str] = 'end',
-          ) -> Tuple[Annotation, Artist, Artist]:
-    r"""
-        Annotate an angle.  ``text`` may specify how angle (in degrees) is to be formatted.
-        ``@`` will be substituted with ``${angle:.1f}^\circ$`` (use ``{at}`` to get a single ``@`` sign).
-        Examples::
-
-        *   ``r'$\alpha is {angle:.1f}^\circ$'``
-        *   ``r'$\alpha is $@'``
-        *   ``'angle is {angle:8.3f} degrees'``
-
-        :param text:    Text to display, with optional degrees spec.
-        :param center:  Center point
-        :param p1:      First point or vector to first point
-        :param p2:      Second point or vector (exclusive with angle)
-        :param degrees: Angle to second point (exclusive with p2)
-        :param xytext:  Override default xytext location
-        :param vec_len:    Override displayed p1 & p2 vector lengths
-        :param arc_pos: Position of angular arc along vectors (default 0.5)
-        :param color:   Color of arc & vectors
-        :param arc_color: Color of arc (defaults to color, 'none' for no arc)
-        :param vec_color: Color of vectors (defaults to color, 'none' for no vectors)
-        :param arrow:     'start', 'end', 'both', 'none' or None
-        :param direction: Direction of arc (ccw, cw, shortest).  None defaults to shortest
-        :return: (Annotation, vectors Artist, arc Artist)
-    """
-    p1v = p1 if isinstance(p1, Vector) else (p1 - center)
-    if p2 is None:
-        if degrees is None:
-            # degrees is required
-            raise ValueError('One of p2 or degrees must be supplied')
-        p2v = p1v.rotate(degrees)
-        if direction is None:
-            direction = 'ccw' if degrees > 0 else 'cw'
-    else:
-        if degrees is not None:
-            raise ValueError('Only one of p2 or degrees can be supplied')
-        p2v = p2 if isinstance(p2, Vector) else (p2 - center)
-    arc_color = arc_color or color
-    vec_color = vec_color or color
-    vec_len = vec_len if vec_len else max(p1v.length(), p2v.length())
-    vec_artist = plot([center + p1v.unit() * vec_len, center, center + p2v.unit() * vec_len], color=vec_color)
-    if vec_color == 'none':
-        vec_artist.remove()
-    if degrees is None:
-        degrees = (p2v.angle() - p1v.angle()) % 360
-    text = text.replace('@', r'${angle:.1f}^\circ$')
-    text = text.format(angle=degrees, at='@')
-    degrees = abs(degrees)
-
-    if arc_pos is None:
-        if degrees < 15:
-            arc_pos = 0.95
-        elif degrees < 40:
-            arc_pos = 0.75
-        else:
-            arc_pos = 0.5
-    arc_path, midv = arc(arc_pos * vec_len, p1v.angle(), p2v.angle(), center, direction=direction, arrow=arrow, mid=True)
-    arc_artist = plot(arc_path, color=arc_color)
-    if arc_color == 'none':
-        arc_artist.remove()
-    midv = Vector(*midv)
-    # plot([center, center + midv])
-    xo = -1 if midv.x < 0 else 1
-    yo = -1 if midv.y < 0 else 1
-    xytext = (10*xo, 20*yo) if xytext is None else xytext
-    ha, va = ha_va_from_xy(xytext)
-
-    annotation = plt.annotate(
-        text, (center+midv).xy(),
-        xytext=xytext, textcoords='offset points',
-        ha=ha, va=va,
-        arrowprops=dict(arrowstyle='->'),
-        bbox=dict(facecolor='white', edgecolor='darkgrey', pad=4.0, alpha=0.8),
-    )
-    annotation.draggable()
-    return annotation, vec_artist, arc_artist
-
-
 def doc_radii():
     save_legend = []
 
@@ -327,14 +91,14 @@ def doc_radii():
     rot = -0.35
 
     g = GearInvolute(17, profile_shift=0, rot=rot, **GearInvolute.HIGH_QUALITY)
-    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, closed=True), color=RACK_COLOR)
+    plot_fill(g.rack().path(teeth=5, rot=g.rot + 0.5, closed=True), color=RACK_COLOR)
     extra = g.plot(pressure_line=False, color='fill-'+GEAR_COLOR)
     plt.title('Involute Radii')
     legend2()
     plot_show('inv_radii', g, (5.5, 1.5, 3))
 
     g = GearInvolute(17, profile_shift=0.5, rot=rot, **GearInvolute.HIGH_QUALITY)
-    plot_fill(g.rack().path(teeth=5, rot=g.rot+0.5, closed=True), color=RACK_COLOR)
+    plot_fill(g.rack().path(teeth=5, rot=g.rot + 0.5, closed=True), color=RACK_COLOR)
     extra = g.plot(pressure_line=True, color='fill-'+GEAR_COLOR)
     plt.title('Involute Radii with Profile Shift of 0.5')
     legend2()
@@ -362,26 +126,6 @@ def doc_tooth_parts():
                 plot([(p.x, -p.y) for p in points], color=colors[tag], linewidth=3)
         plt.legend(loc=6)
         plot_show('inv_parts_%d' % teeth, g, (3, 1, 2))
-
-
-def test_angle():
-    # plot(arc(5, 45, 45+270, Point(2, 2)), color='cyan')
-    angle('Something is @', Point(-20, 0), Vector(10, 1), Vector(8, 3), color='green', arc_pos=0.95, arrow='both')
-    angle(r'$\alpha$ is @', Point(-20, 0), Vector(8, 4), Vector(-8, 4), color='green', arc_pos=0.95)
-    angle('Hi-precision is {angle:8.5f}', Point(-20, 0), Vector(8, 4), Vector(-8, 4), color='green', arc_pos=0.5)
-    angle('Something Blue', Point(0, 0), Point(1, 0), Point(0, 1), vec_len=15, color='blue')
-    angle('Something Else', Point(20, 0), Vector(10, 1), degrees=-270, arrow=None)
-    angle('15,0 < 0,15', Point(0, 20), Vector(5, 0), Vector(0, 5), color='red', direction='ccw')
-    angle('0,15 < 15,0', Point(0, -20), Vector(0, 5), Vector(5, 0), color='pink', direction='ccw')
-    angle('ang 10: @', Point(-30, -20), Vector(10, 10), degrees=10, color='pink', arc_color='red', direction='ccw')
-    angle('ang 30{at}@', Point(-30, -20), Vector(10, 10), degrees=30, color='pink', vec_color='red', xytext=(1, -40), direction='ccw')
-    angle('ang 100: @', Point(-30, -20), Vector(10, 10), degrees=100, color='pink', direction='ccw')
-    angle('Just Arc', Point(20, -20), Vector(10, 10), degrees=90, color='pink', vec_color='none', direction='ccw', arrow='both')
-    angle('Just Vecs', Point(20, -20), Vector(-10, -10), degrees=90, color='pink', arc_color='none', direction='ccw')
-    plot([(0, -30)], color='white')
-    plt.axis('equal')
-    plt.grid()
-    plt.show()
 
 
 def doc_tooth_equations():
@@ -464,9 +208,9 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
     T_w = T_a * P_r = pi / T * M * T / 2 = pi * M / 2 
     """
 
-    def rack_line(r, l):
-        r = 2 * g.pitch_radius - r
-        return path_rotate_ccw([Point(r, -l/2), Point(r, l/2)], ang, as_pt=True)
+    def rack_line(right, left):
+        right = 2 * g.pitch_radius - right
+        return path_rotate_ccw([Point(right, -left/2), Point(right, left/2)], ang, as_pt=True)
 
     rack_rot = -extra_rot
     pitch_line = rack_line(g.pitch_radius, 200)
@@ -493,7 +237,7 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
             plot_annotate('Cutter', mid + Vector(0, 0.1), 'dc')
         # plot(rack_path, color='#6099BF', linestyle=':')
     if 'rack_a' in fig:
-        plot_annotate('Rack', Vector(g.tip_radius+1.5, 0).rotate(ang), 'cc')
+        plot_annotate('Rack', Vector(g.tip_radius + 1.5, 0).rotate(ang), 'cc')
     if 'rack_0.5' in fig:
         rack_path = rack.path(teeth=7, rot=rack_rot+0.5, closed=True)
         for side in [-1, 1]:
@@ -520,7 +264,7 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
     if 'gear_o' in fig:
         plot(path_close(g.instance().poly_at(base_rot)), GEAR_COLOR, linestyle=':')
     if 'gear_a' in fig:
-        plot_annotate('Gear', Vector(g.root_radius-1.0, 0).rotate(ang), 'cc')
+        plot_annotate('Gear', Vector(g.root_radius - 1.0, 0).rotate(ang), 'cc')
     if 'gear_ps_a' in fig:
         a = zero_vec * g.tip_radius
         b = zero_vec * g_ps.tip_radius      # TODO-what about tip shortening?
@@ -560,7 +304,7 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
                       r'$x \cdot \tan \alpha$',
                       l, 'uc')
         angle('Pressure Angle\n'
-              r'$\alpha$', rack_path[1], rack_path_ps[1], rack_path_ps[1]-tw_ps,
+              r'$\alpha$', rack_path[1], rack_path_ps[1], rack_path_ps[1] - tw_ps,
               arrow='none', xytext=(0, 25))
 
     pointer = arrow([center, Point(g.pitch_radius_effective, 0)], tip_len=0.5 * g.module)
@@ -585,7 +329,7 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
                 break
         if 'gear_face_a' in fig:
             plot_annotate('Involute offset by\npp_off_angle + half_tooth', p, (20, 0))
-            angle('half_tooth', center, zero_vec, degrees=-90/g.teeth,
+            angle('half_tooth', center, zero_vec, degrees=-90 / g.teeth,
                   xytext=(0, -15),
                   arc_pos=g.pitch_radius, arrow='both', vec_color='none')
 
@@ -707,8 +451,58 @@ def doc_rack():
     plot_show('inv_rack_angles', None, (1.5 * r.circular_pitch, 0.5 * r.circular_pitch, 1))
 
 
+def gear_min_angle(fig_name: str, gear: GearInstance):
+    gear.center = Point(0, 0)
+    p1 = gear.tooth_at(-0.5)
+    p2 = gear.tooth_at(0.5)
+    path = p1 + [p1[-1].mid(p2[0])] + p2
+    # path = gear.tooth_at(-0.5)+gear.tooth_at(0.5)
+    steps_per_tooth = len(path) // 2
+    low = steps_per_tooth - steps_per_tooth // 2 - 2
+    high = steps_per_tooth + steps_per_tooth // 2 + 2
+
+    # Find the narrowest angle
+    narrowest_angle = 180
+    narrowest_pts = (0, 0, 0)
+    narrowest_center = (0, 0, 0)
+    for c in range(steps_per_tooth, high-1):
+        cp = path[c]
+        for l in range(low, c-1):
+            lv = path[l]-cp
+            for r in range(c+1, high):
+                rv = path[r]-cp
+                ang = abs(rv.angle() - lv.angle())
+                if ang < narrowest_angle:
+                    narrowest_angle = ang
+                    narrowest_pts = l, c, r
+        if c == steps_per_tooth:
+            narrowest_center = narrowest_pts
+
+    plot(gear.tooth_at(-0.5)+gear.tooth_at(0.5), 'darkgrey', linewidth=1)
+    plot_fill(gear.poly_at(0.5), GEAR_COLOR)
+
+    l, c, r = narrowest_center
+    angle('Center: @', path[c], path[r], path[l], vec_len=6, color='pink', arrow='none')
+
+    l, c, r = narrowest_pts
+    angle('Narrowest: @', path[c], path[r], path[l], color='black', arrow='none', xytext=(-40, 30))
+
+    plt.title('Check angle for %s' % gear.description())
+    plot_show(fig_name, gear, 5)
+
+
+def doc_min_angle():
+    pair = CycloidalPair(137, 33, module=1.0)
+    gear_min_angle('cyc_ang_pinion', pair.pinion())
+    gear_min_angle('cyc_ang_wheel', pair.wheel())
+
+    for teeth in [7, 17, 33, 137]:
+        gear = GearInvolute(teeth)
+        gear_min_angle('inv_ang_%d' % teeth, gear.instance())
+
+
 def main():
-    # test_angle()
+    doc_min_angle()
     doc_rack()
     doc_intro()
     doc_radii()

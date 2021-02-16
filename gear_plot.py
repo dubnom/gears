@@ -1,34 +1,24 @@
 from __future__ import annotations
 import os
-from typing import Optional, List
+from typing import Optional
 import numpy as np
 import scipy.optimize
 import matplotlib.pyplot as plt
 from math import cos, sin, radians, tau, hypot, pi, degrees
 
 from x7.geom.geom import Line, Vector, Point, PointList
-from x7.geom.utils import arc, circle, path_rotate, path_from_xy, path_rotate_ccw, path_translate, cross
-from x7.geom.plot_utils import plot, plot_show
+from x7.geom.utils import arc, circle, path_from_xy, path_rotate_ccw, path_translate, cross
+from x7.geom.plot_utils import plot
 from x7.lib.iters import t_range
 
-from gear_base import GearInstance, CUT_KIND_COLOR_MAP, ClassifiedCut
+from gear_base import GearInstance, CUT_KIND_COLOR_MAP
 from gear_cycloidal import CycloidalPair
-from gear_doc import path_close, plot_fill, plot_annotate
+from plot_utils import plot_fill, plot_annotate
 from gear_involute import GearInvolute, InvolutePair, Involute
 from tool import Tool
 
 # setenv SHOW_INTERACTIVE to 1 or true to display interactive plots
 SHOW_INTERACTIVE = os.environ.get('SHOW_INTERACTIVE', 'false').lower() in {'1', 'true'}
-
-
-def tooth_locate(cuts: List[ClassifiedCut], angle=0.0):
-    """
-        Locate a tooth with angle as the center of the tooth
-
-        :param cuts:
-        :param angle:
-        :return:
-    """
 
 
 def plot_classified_cuts(gear: GearInstance, tool: Tool):
@@ -420,7 +410,7 @@ def gear_one():
 
 
 def main():
-    gear_one(); return
+    # gear_one(); return
     # find_nt(); return
     # [test_inv(n) for n in [3, 7, 17, 21, 101]]; return
     # [test_inv(n) for n in range(3, 18, 3)]; return
@@ -441,7 +431,7 @@ def main():
     pair.plot()
     pair.wheel().plot_show()
     # return
-    plot_classified_cuts(CycloidalPair(40, 17).pinion(), tool_angle=0.0, tool_tip_height=1/32*25.4); return
+    plot_classified_cuts(CycloidalPair(40, 17).pinion(), tool); return
     # plot_classified_cuts(GearInvolute(11).gen_poly(), 0); return
     # do_pinions(zoom_radius=5, cycloidal=not False); return
     do_gears(zoom_radius=5, pinion_teeth=7, cycloidal=True, animate=True)

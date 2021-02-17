@@ -26,13 +26,20 @@ class TestGearInvolute(TestCaseExtended):
         g3 = GearInvolute(teeth=5, center=Point(2, 1), rot=1.5, module=1.5, steps=3, profile_shift=0.3)
         return [('g1', g1), ('g2', g2), ('g3', g3)]
 
+    @tests(gear_involute.GearInvolute.restore)
     @tests(gear_involute.GearInvolute.copy)
     @tests(gear_involute.GearInvolute.__eq__)
     def test_eq(self):
         gears = self.gears_for_tests()
         for tag, gear in gears:
-            with self.subTest(gear=tag):
+            with self.subTest(gear=tag+'_copy'):
                 self.assertEqual(gear, gear.copy())
+        copies = [gear.copy() for tag, gear in (gears[1:]+gears[:1])]
+        for (tag, gear), copy in zip(gears, copies):
+            with self.subTest(gear=tag+'_restore'):
+                self.assertNotEqual(gear, copy)
+                copy.restore(gear)
+                self.assertEqual(gear, copy)
 
     @tests(gear_involute.GearInvolute.__init__)
     def test_init(self):

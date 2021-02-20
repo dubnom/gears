@@ -3,6 +3,7 @@ Various plots to document gear calculations
 See also: https://www.tec-science.com/mechanical-power-transmission/involute-gear/calculation-of-involute-gears/
 """
 import os
+import sys
 from math import radians, degrees, tau, tan
 from typing import Union, Optional
 
@@ -29,6 +30,7 @@ RACK_PS_COLOR = '#6099BF'
 RACK_CUTTER_COLOR = '#FF8080'
 
 IMAGES_GEAR_DOC = './doc/images/gear_doc'
+interactive = True
 
 
 def plot_show(fig_name: str, gear: Optional[PlotZoomable], zoom_radius: Union[None, float, tuple],
@@ -58,7 +60,7 @@ def plot_show(fig_name: str, gear: Optional[PlotZoomable], zoom_radius: Union[No
     title_a.draggable()
 
     if gear:
-        gear.plot_show(zoom_radius, axis=axis, grid=grid)
+        gear.plot_show(zoom_radius, axis=axis, grid=grid, plotter=None if interactive else plt.gca())
     else:
         plt.axis('equal')
         if grid:
@@ -69,11 +71,13 @@ def plot_show(fig_name: str, gear: Optional[PlotZoomable], zoom_radius: Union[No
             ax = plt.gca()
             ax.set_xlim(-zxl, zxr)
             ax.set_ylim(-zy, zy)
-        plt.show()
+        if interactive:
+            plt.show()
 
     out = os.path.join(IMAGES_GEAR_DOC, fig_name+'.png')
     print('Saving to', out)
     fig.savefig(out)
+    plt.close(fig)
 
 
 def doc_radii():
@@ -502,6 +506,13 @@ def doc_min_angle():
 
 
 def main():
+    if len(sys.argv) > 1:
+        if sys.argv[1:] == ['--batch']:
+            global interactive
+            interactive = False
+        else:
+            raise ValueError('Expected no args or --batch')
+
     doc_min_angle()
     doc_rack()
     doc_intro()

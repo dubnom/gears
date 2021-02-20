@@ -43,7 +43,7 @@ class InvoluteWithOffsets(object):
         self.start_angle = self.calc_angle(self.radius_min)
         self.end_angle = self.calc_angle(self.radius_max) if radius_max else (2*tau)
         debug_print = False
-        if debug_print:
+        if debug_print:         # pragma: no cover
             print('InvWO: r=%.6f mnr=%.6f mxr=%.6f sa=%.6f ea=%.6f' %
                   (self.radius, self.radius_min, self.radius_max, self.start_angle, self.end_angle))
 
@@ -127,7 +127,7 @@ class Involute(object):
         self.start_angle = self.calc_angle(self.min_radius)
         self.end_angle = self.calc_angle(self.max_radius)
         debug_print = False
-        if debug_print:
+        if debug_print:         # pragma: no cover
             print('Inv: r=%.6f mnr=%.6f mxr=%.6f sa=%.6f ea=%.6f' %
                   (self.radius, self.min_radius, self.max_radius, self.start_angle, self.end_angle))
 
@@ -305,7 +305,7 @@ class GearInvolute(PlotZoomable):
             tip_angle_degrees = degrees(tip_angle * 2)
             if tip_angle_degrees > self.tip_arc:
                 steps = int(tip_angle_degrees / self.tip_arc) + 1
-                if self.debug:
+                if self.debug:          # pragma: no cover
                     print('total tip angle=%.2f  steps=%d' % (tip_angle_degrees, steps))
                 tip_arc = []
                 for n in range(1-cs, steps+cs):
@@ -319,7 +319,7 @@ class GearInvolute(PlotZoomable):
             root_angle_degrees = degrees(root_angle * 2)
             if root_angle_degrees > self.root_arc:
                 steps = int(root_angle_degrees / self.root_arc) + 1
-                if self.debug:
+                if self.debug:          # pragma: no cover
                     print('total root angle=%.2f  steps=%d' % (root_angle_degrees, steps))
                 root_arc = []
                 for n in range(1-cs, steps+cs):
@@ -538,7 +538,7 @@ class InvolutePair:
         self.pinion().plot(color, rotation, plotter)
 
 
-def main():
+def main():         # pragma: no cover
     nt = 14
     # for rot in [0, 0.25, 0.5]:
     # for rot in t_range(10, 0, 0.5):
@@ -560,5 +560,5 @@ def main():
         g.plot_show(5*g.module)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':      # pragma: no cover
     main()

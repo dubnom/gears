@@ -204,12 +204,12 @@ def doc_tooth_equations_fig(fig_name, title, zoom, fig, teeth=27, title_loc='tc'
     pitch = M * pi
     pitch_radius = P_r = M * T / 2
     tooth_width = T_w = pitch / 2 = M * pi / 2
-    
+
     pitch_angle = P_a = 2 * pi / T
     tooth_angle = T_a = P_a / 2 = pi / T
     half_tooth_angle = HT_a = P_a / 4
-    
-    T_w = T_a * P_r = pi / T * M * T / 2 = pi * M / 2 
+
+    T_w = T_a * P_r = pi / T * M * T / 2 = pi * M / 2
     """
 
     def rack_line(right, left):

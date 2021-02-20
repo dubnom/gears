@@ -61,7 +61,6 @@ class Rack(object):
         """
 
         pitch_radius = self.module * teeth_in_gear / 2
-        w_tooth = self.half_tooth * 2
         rack_pts = []
         tooth_pts = [self.tooth_base_high, self.tooth_tip_high, self.tooth_tip_low, self.tooth_base_low]
         steps = (teeth_in_rack+1)//2

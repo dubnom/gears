@@ -3,3 +3,9 @@
 *.gif
 *.png
 venv/
+
+# Coverage
+htmlcov/
+.coverage
+images/
+orrery/

@@ -67,7 +67,6 @@ class TestGearInvolute(TestCaseExtended):
             with self.subTest(gear=tag):
                 coords = [(n, [p.xy() for p in path]) for n, path in gear.gen_gear_tooth_parts()]
                 self.assertMatch(coords, tag)
-                plain_coords = coords
             tag = tag_root + '_closed'
             with self.subTest(gear=tag):
                 coords = [(n, [p.xy() for p in path]) for n, path in gear.gen_gear_tooth_parts(closed=True)]

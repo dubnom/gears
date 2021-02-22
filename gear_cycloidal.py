@@ -26,8 +26,6 @@ class CycloidalPair:
         self.pinion_teeth = pinion_teeth
 
         self.circular_pitch = self.module * pi
-        self.pitch_diameter = self.module * self.wheel_teeth
-        self.pitch_radius = self.pitch_diameter / 2
         self.wheel_pitch_radius = self.module * self.wheel_teeth / 2
         self.pinion_pitch_radius = self.module * self.pinion_teeth / 2
         self.wheel_tooth_degrees = 360 / self.wheel_teeth
@@ -48,9 +46,9 @@ class CycloidalPair:
         self.pinion_dedendum = self.addendum_factor_theoretical * 1.05 * self.module
         self.wheel_base_radius = self.wheel_pitch_radius - self.wheel_dedendum * 1.05
         self.pinion_base_radius = self.pinion_pitch_radius - self.wheel_addendum * 1.4
-        self.wheel_tip_radius = self.pitch_radius + self.wheel_addendum
+        self.wheel_tip_radius = self.wheel_pitch_radius + self.wheel_addendum
         self.pinion_tip_radius = self.pinion_pitch_radius + self.pinion_addendum_factor * self.module
-        # print('pr=%8.6f af=%8.6f' % (self.pitch_radius, self.addendum_factor))
+        # print('pr=%8.6f af=%8.6f' % (self.wheel_pitch_radius, self.addendum_factor))
 
     def __str__(self):
         return 'CycloidalPair: wheel=%d pinion=%d module=%g' % (self.wheel_teeth, self.pinion_teeth, self.module)

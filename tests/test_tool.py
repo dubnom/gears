@@ -2,12 +2,12 @@ from typing import List, Tuple
 from unittest import TestCase
 from x7.lib.annotations import tests
 import tool
-from x7.testing.extended import TestCaseExtended
+from x7.geom.testing import TestCaseGeomExtended
 from tool import Tool
 
 
 @tests(tool.Tool)
-class TestTool(TestCaseExtended):
+class TestTool(TestCaseGeomExtended):
     SAVE_MATCH = False
 
     @staticmethod
@@ -81,8 +81,9 @@ class TestTool(TestCaseExtended):
 
     @tests(tool.Tool.plot)
     def test_plot(self):
-        # interactive function, nothing to test
-        pass
+        with self.assertMatchPlot(shrink=8):
+            t = Tool()
+            t.plot(do_show=False)
 
     @tests(tool.Tool.shaft_poly)
     def test_shaft_poly(self):

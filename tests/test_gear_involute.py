@@ -3,17 +3,16 @@ from typing import List, Tuple
 from unittest import TestCase
 
 from x7.geom.geom import Point
+from x7.geom.testing import TestCaseGeomExtended
 from x7.lib.annotations import tests
 from x7.testing.extended import TestCaseExtended
 
 import gear_involute
 from gear_involute import GearInvolute, Involute, InvoluteWithOffsets, InvolutePair
 
-include_interactive = False
-
 
 @tests(gear_involute.GearInvolute)
-class TestGearInvolute(TestCaseExtended):
+class TestGearInvolute(TestCaseGeomExtended):
     SAVE_MATCH = False
     maxDiff = 10000
 
@@ -108,12 +107,10 @@ class TestGearInvolute(TestCaseExtended):
     @tests(gear_involute.GearInvolute.plot)
     def test_plot(self):
         gears = self.gears_for_tests()
-        last_gear = None
         for tag, gear in gears:
-            gear.plot()
-            last_gear = gear
-        if include_interactive:
-            last_gear.plot_show()
+            with self.subTest(gear=tag):
+                with self.assertMatchPlot(case=tag):
+                    gear.plot()
 
     @tests(gear_involute.GearInvolute.base_radius)
     def test_base_radius(self):

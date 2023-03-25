@@ -1,0 +1,11 @@
+# SHOW_INTERACTIVE=True
+echo gears
+python3 ./gears.py -t 137 -k 2 --pinion_teeth=33 -m .89647 --make=2 --cycloidal=pinion --algo=new -T cutter40.cfg orrery/foo_pinion_40.nc
+python3 ./gears.py -t 137 -k 2 --pinion_teeth=33 -m .89647 --make=2 --cycloidal=wheel --algo=new -T cutter40.cfg orrery/foo_wheel_40.nc
+# python3 ./gears.py -t 137 -k 2 --pinion_teeth=33 -m .89647 --cycloidal=wheel --algo=new -T saw0293.cfg orrery/foo_wheel_0293.nc
+python3 ./gears.py -t 137 -k 2 --pinion_teeth=33 -m .89647 --cycloidal=pinion --algo=new -T saw0293.cfg orrery/foo_pinion_0293.nc
+echo render
+python3 ./render.py orrery/foo_wheel_40.nc -azp -t 6
+python3 ./render.py orrery/foo_pinion_40.nc -azp -t 6
+# python3 ./render.py orrery/foo_wheel_0293.nc -azp -t 6
+python3 ./render.py orrery/foo_pinion_0293.nc -azp -t 6

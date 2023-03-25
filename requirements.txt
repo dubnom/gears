@@ -1,0 +1,9 @@
+configargparse
+matplotlib
+shapely
+celluloid
+Pillow
+numpy
+pygifsicle
+scipy
+x7

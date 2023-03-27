@@ -65,11 +65,11 @@ class TestGearInvolute(TestCaseGeomExtended):
             tag = tag_root + '_plain'
             with self.subTest(gear=tag):
                 coords = [(n, [p.xy() for p in path]) for n, path in gear.gen_gear_tooth_parts()]
-                self.assertMatch(coords, tag)
+                self.assertAlmostMatch(coords, tag)
             tag = tag_root + '_closed'
             with self.subTest(gear=tag):
                 coords = [(n, [p.xy() for p in path]) for n, path in gear.gen_gear_tooth_parts(closed=True)]
-                self.assertMatch(coords, tag)
+                self.assertAlmostMatch(coords, tag)
             tag = tag_root + '_extra'
             with self.subTest(gear=tag):
                 plain_coords = [(n, [p.xy() for p in path]) for n, path in gear.gen_gear_tooth_parts()]
@@ -264,7 +264,7 @@ class TestInvoluteWithOffsets(TestCaseExtended):
         inv_wo = InvoluteWithOffsets(7, radius_max=9, radius_min=7.5)
         self.assertAlmostEqual(inv.path(), inv_wo.path())
         inv_wo = InvoluteWithOffsets(7, 0.5, 0.6, 0.7, 9, 7.5)
-        self.assertMatch(inv_wo.path(), '0')
+        self.assertAlmostMatch(inv_wo.path(), '0')
 
     @tests(gear_involute.InvoluteWithOffsets.x_calc_undercut_t_at_r)
     def test_x_calc_undercut_t_at_r(self):

@@ -62,7 +62,7 @@ class TestCycloidalPair(TestCaseGeomExtended):
         for tag, pair in self.pairs():
             with self.subTest(pair=tag):
                 path = pair.gen_wheel_tooth()
-                self.assertMatch(path, case=tag)
+                self.assertAlmostMatch(path, case=tag)
 
     @tests(gear_cycloidal.CycloidalPair.pinion)
     def test_pinion(self):

@@ -12,7 +12,12 @@ Creating triangle-tooth gears
 
 ### How do I get set up? ###
 
-* Summary of set up
+*   Summary of set up
+
+    To install bezier package on macOS, use this command:
+
+    `env BEZIER_NO_EXTENSION=true python -m pip install --upgrade bezier --no-binary=bezier`
+
 * Configuration
 * Dependencies
 * Database configuration
